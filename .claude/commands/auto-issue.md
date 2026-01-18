@@ -1,16 +1,30 @@
-# /work-on-issue
+# /auto-issue
 
-Start working on a GitHub issue using a structured, gated workflow.
+Autonomous workflow for implementing a GitHub issue without gates. Use for trusted issues where human review is not needed between phases.
 
 ## Usage
 
 ```
-/work-on-issue <issue_number>
+/auto-issue <issue_number>
 ```
 
 ## Arguments
 
 - `issue_number` (required): The GitHub issue number to work on
+
+## When to Use
+
+Use `/auto-issue` when:
+- Issue is well-defined with clear acceptance criteria
+- Low risk (won't break existing functionality)
+- Small scope (single feature or bug fix)
+- You trust the plan without review
+
+Use `/work-on-issue` instead when:
+- Issue is complex or ambiguous
+- Significant architectural changes
+- You want to review the plan before implementation
+- First time working on this area of code
 
 ## Agents Summary
 
@@ -27,10 +41,10 @@ Start working on a GitHub issue using a structured, gated workflow.
 ```
 Setup → Research → Implement → Review → Finalize
   ↓        ↓          ↓          ↓         ↓
-GATE 1   GATE 2     GATE 3     GATE 4    DONE
+ AUTO     AUTO       AUTO       AUTO      DONE
 ```
 
-**Gated workflow**: Each phase requires explicit approval before proceeding.
+**No gates**: Workflow proceeds automatically through all phases.
 
 ---
 
@@ -44,17 +58,13 @@ pnpm checkpoint workflow find {issue_number}
 
 **If a running workflow exists:**
 
-Show to user:
 ```
 Existing workflow found for issue #{issue_number}:
 - Workflow ID: {id}
 - Current phase: {current_phase}
 - Last updated: {updated_at}
-- Recent actions: {list of recent actions}
 
-Options:
-1. Resume from {current_phase} phase
-2. Start fresh (creates new workflow)
+Resuming from {current_phase} phase...
 ```
 
 If resuming, jump to the saved phase with the existing `workflow_id`.
@@ -76,31 +86,7 @@ The setup-agent will:
 - Assign self to issue
 - Add "in-progress" label
 
----
-
-## GATE 1: Issue Review
-
-**STOP** - Hard gate requiring explicit approval.
-
-**Show to user:**
-
-```
-SETUP COMPLETE
-
-Issue: #{number} - {title}
-Branch: {branch}
-Workflow ID: {workflow_id}
-
-Issue Body:
-{full issue body}
-
-Labels: {labels}
-Milestone: {milestone if any}
-```
-
-**Wait for:** "proceed", "yes", "go ahead", "approved"
-
-**Do NOT continue until explicit approval received.**
+*Proceed immediately to Phase 2*
 
 ---
 
@@ -120,50 +106,9 @@ The issue-researcher will:
 - Create implementation plan
 - Log plan creation to checkpoint
 
----
-
-## GATE 2: Plan Approval
-
-**STOP** - Hard gate requiring explicit approval.
-
-**Show to user:**
-
-```
-RESEARCH COMPLETE
-
-## Issue Analysis: #{number} - {title}
-
-### Summary
-{one-line summary}
-
-### Type & Scope
-- Type: {feat|fix|refactor|test|docs}
-- Scope: {package/area}
-- Complexity: {low|medium|high}
-
-### Approach
-{high-level strategy}
-
-### Implementation Steps
-
-1. **{Step title}**
-   - Files: {list}
-   - Tests: {list}
-
-2. **{Step title}**
-   ...
-
-### Risks
-- {risk 1}
-- {risk 2}
-
-### Questions (if any)
-- {question 1}
-```
-
-**Wait for:** "proceed", "approved", or feedback for adjustments
-
-**Do NOT continue until explicit approval received.**
+**Auto-proceed check:**
+- If `plan.questions` is non-empty: STOP and ask for clarification
+- Otherwise: Proceed immediately to Phase 3
 
 ---
 
@@ -184,45 +129,7 @@ The atomic-developer will:
 - Validate after each step (tests, types, lint)
 - Log implementation complete
 
-**Implementation loop:**
-```
-For each step in plan:
-  1. Write/update tests
-  2. Implement the change
-  3. Run validation (pnpm typecheck && pnpm test && pnpm lint)
-  4. Commit with conventional commit message
-  5. Log commit to checkpoint
-```
-
----
-
-## GATE 3: Implementation Review
-
-**STOP** - Hard gate requiring explicit approval.
-
-**Show to user:**
-
-```
-IMPLEMENTATION COMPLETE
-
-## Commits Made
-
-{list of commits with hashes and messages}
-
-## Files Changed
-
-{git diff --stat output}
-
-## Validation Status
-
-- Tests: {pass/fail}
-- Types: {pass/fail}
-- Lint: {pass/fail}
-```
-
-**Wait for:** "proceed", "approved", or feedback for adjustments
-
-**Do NOT continue until explicit approval received.**
+*Proceed immediately to Phase 4*
 
 ---
 
@@ -237,44 +144,9 @@ pnpm test
 pnpm build
 ```
 
-Review changes:
-```bash
-git log origin/main..HEAD --oneline
-git diff origin/main --stat
-```
-
-Verify:
-- All validation passes
-- Changes match issue requirements
-- Commit messages are clear
-- No unintended changes
-
----
-
-## GATE 4: Ready for PR
-
-**STOP** - Hard gate requiring explicit approval.
-
-**Show to user:**
-
-```
-REVIEW COMPLETE
-
-All validation passed:
-- [x] Tests pass
-- [x] Types pass
-- [x] Lint passes
-- [x] Build passes
-
-Changes summary:
-{git diff origin/main --stat}
-
-Ready to create PR?
-```
-
-**Wait for:** "proceed", "create PR", "approved"
-
-**Do NOT continue until explicit approval received.**
+**Auto-proceed check:**
+- If any validation fails: STOP and report failures
+- If all pass: Proceed immediately to Phase 5
 
 ---
 
@@ -298,18 +170,44 @@ The finalize-agent will:
 
 ## Complete
 
-**Show to user:**
+**Report to user:**
 
 ```
 WORKFLOW COMPLETE
 
+Issue: #{number} - {title}
+Branch: {branch}
 PR: {pr_url}
-Issue: #{number} will close when PR merges
 
-Next steps:
-1. Review PR in GitHub
-2. Address any review feedback
-3. Merge when approved
+Commits:
+{list of commits}
+
+All validation passed. PR ready for review.
+```
+
+---
+
+## Stop Conditions
+
+The autonomous workflow will stop if:
+
+1. **Questions in plan**: Issue-researcher found ambiguities
+2. **Validation failures**: Tests, types, or lint failed
+3. **Scope creep**: Implementation reveals unexpected complexity
+4. **Errors**: Any phase encounters an error
+
+When stopped:
+```
+AUTO-ISSUE PAUSED
+
+Phase: {current_phase}
+Reason: {reason}
+
+{details about what went wrong}
+
+Options:
+1. Fix and resume: /auto-issue {issue_number}
+2. Switch to gated: /work-on-issue {issue_number}
 ```
 
 ---
@@ -331,19 +229,25 @@ Please verify:
 ```
 Warning: Uncommitted changes detected.
 
-Options:
-1. Stash changes and continue
-2. Commit changes first
-3. Stop workflow
+Stashing changes and continuing...
 ```
+
+Unlike `/work-on-issue`, this stashes automatically.
 
 ### Validation Failures
 
-If tests/lint/types fail:
-1. Fix the issues
-2. Commit fixes
-3. Re-run validation
-4. Continue workflow
+If tests/lint/types fail, workflow stops:
+```
+AUTO-ISSUE STOPPED
+
+Validation failed:
+- Types: FAIL (3 errors)
+- Tests: PASS
+- Lint: PASS
+
+Fix the issues and run again:
+/auto-issue {issue_number}
+```
 
 ---
 

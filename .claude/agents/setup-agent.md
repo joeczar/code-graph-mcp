@@ -1,197 +1,237 @@
+---
+name: setup-agent
+description: Prepares environment for issue work - creates branch, checkpoint, assigns self, fetches issue details. Use at the start of any issue workflow.
+model: sonnet
+---
+
 # Setup Agent
 
-## Purpose
+Prepares everything needed before implementation work begins.
 
-Initialize work on an issue: fetch details, create branch, assign self, update board status.
+## Contract
 
-## Input Contract
+### Input
 
-```yaml
-issue_number: number  # GitHub issue number to work on
-```
+| Field          | Type    | Required | Description                                         |
+| -------------- | ------- | -------- | --------------------------------------------------- |
+| `issue_number` | number  | Yes      | GitHub issue number                                 |
+| `branch_name`  | string  | No       | Custom branch name (auto-generated if not provided) |
 
-## Output Contract
+### Output
 
-```yaml
-issue:
-  number: number
-  title: string
-  body: string
-  labels: string[]
-  milestone: string | null
-branch_name: string    # Created branch name
-workflow_id: string    # Checkpoint workflow ID for subsequent phases
-ready: boolean         # True if setup complete
-```
+| Field          | Type     | Description                                  |
+| -------------- | -------- | -------------------------------------------- |
+| `workflow_id`  | string   | Checkpoint workflow ID for subsequent agents |
+| `branch`       | string   | Git branch name                              |
+| `issue.number` | number   | Issue number                                 |
+| `issue.title`  | string   | Issue title                                  |
+| `issue.body`   | string   | Full issue body                              |
+| `issue.labels` | string[] | Issue labels                                 |
+| `resumed`      | boolean  | Whether this resumed an existing workflow    |
 
-## Execution Steps
+### Side Effects
 
-### 1. Validate Issue Exists
+1. Creates git branch (or checks out existing)
+2. Creates checkpoint workflow record (or finds existing)
+3. Assigns self to issue
+4. Adds "in-progress" label
+
+### Checkpoint Actions Logged
+
+- `workflow_started`: { issueNumber, branch }
+
+## Skills Used
+
+Load these skills for reference:
+
+- `checkpoint-workflow` - CLI commands for workflow state
+
+## Workflow
+
+### Step 1: Fetch Issue
 
 ```bash
-gh issue view {issue_number} --json number,title,body,labels,milestone,state
+gh issue view <issue_number> --json number,title,body,labels,milestone,assignees,state
 ```
 
-**Check:**
-- Issue exists
-- Issue is not closed
-- Issue is not already assigned to someone else working on it
+If issue not found: STOP, return error.
 
-**If issue doesn't exist or is closed:**
-- STOP and report to user
+Extract and store:
 
-### 2. Fetch Issue Details
+- `issue.number`
+- `issue.title`
+- `issue.body`
+- `issue.labels` (array of label names)
 
-Parse the issue response to extract:
-- Title (for branch naming)
-- Body (for context)
-- Labels (for type classification)
-- Milestone (for scope understanding)
+### Step 2: Check for Existing Workflow
 
-### 3. Determine Branch Type
-
-Map labels or title keywords to branch type:
-
-| Indicator | Branch Type |
-|-----------|-------------|
-| Label: `bug`, title: "fix" | `fix/` |
-| Label: `enhancement`, `feature` | `feat/` |
-| Label: `documentation` | `docs/` |
-| Label: `test` | `test/` |
-| Default | `feat/` |
-
-### 4. Create Branch Name
-
-```
-{type}/{issue_number}-{slugified-title}
+```bash
+pnpm checkpoint workflow find <issue_number>
 ```
 
-Slugify rules:
-- Lowercase
-- Replace spaces with hyphens
-- Remove special characters
-- Max 50 chars for description part
+**If workflow exists and status is "running":**
 
-Example: `feat/12-add-typescript-parser`
+- Store `workflow_id` from response
+- Set `resumed = true`
+- Check out the existing branch:
+  ```bash
+  git checkout <existing_branch>
+  ```
+- Skip to Step 6 (assign self)
 
-### 5. Ensure Clean State
+**If workflow exists but status is "failed" or "completed":**
+
+- Treat as fresh start (will create new workflow)
+
+**If no workflow exists:**
+
+- Continue to Step 3
+
+### Step 3: Generate Branch Name
+
+If `branch_name` not provided:
+
+- Determine type from labels/title:
+
+| Indicator                   | Branch Type |
+| --------------------------- | ----------- |
+| Label: `bug`, title: "fix"  | `fix/`      |
+| Label: `enhancement`        | `feat/`     |
+| Label: `documentation`      | `docs/`     |
+| Label: `test`               | `test/`     |
+| Default                     | `feat/`     |
+
+- Extract short description from issue title (lowercase, hyphenated, max 30 chars)
+- Format: `<type>/<issue-number>-<short-description>`
+
+Example: Issue "Add TypeScript parser" → `feat/12-add-typescript-parser`
+
+### Step 4: Ensure Clean State
 
 ```bash
 git status --porcelain
 ```
 
 **If dirty:**
-- STOP and ask user how to handle uncommitted changes
 
-### 6. Create and Switch Branch
+- STOP and ask user how to handle uncommitted changes:
+  ```
+  Working directory has uncommitted changes:
+  {list of files}
+
+  Options:
+  1. Stash changes: git stash
+  2. Commit changes first
+  3. Discard changes (destructive)
+
+  How would you like to proceed?
+  ```
+
+### Step 5: Create Branch
 
 ```bash
 git checkout main
 git pull origin main
-git checkout -b {branch_name}
+git checkout -b <branch_name>
 ```
 
-### 7. Create Checkpoint Workflow
-
-Check for existing workflow:
-```bash
-pnpm checkpoint workflow find {issue_number}
-```
-
-**If found with status=running:**
-- Offer to resume existing workflow
-- Return existing `workflow_id`
-
-**If not found or status=completed/failed:**
-```bash
-pnpm checkpoint workflow create {issue_number} "{branch_name}"
-```
-
-Extract `workflow_id` from the JSON output (the `id` field).
-
-Log workflow started:
-```bash
-pnpm checkpoint workflow log-action "{workflow_id}" "workflow_started" success
-```
-
-### 8. Assign Self to Issue
+If branch already exists:
 
 ```bash
-gh issue edit {issue_number} --add-assignee @me
+git checkout <branch_name>
 ```
 
-### 9. Add In-Progress Label
+### Step 6: Create Checkpoint Workflow
 
 ```bash
-gh issue edit {issue_number} --add-label "in-progress"
+pnpm checkpoint workflow create <issue_number> "<branch_name>"
 ```
 
-### 10. Update Board Status (if configured)
+Extract `workflow_id` from JSON response (the `id` field).
 
-See `.claude/skills/board-manager/` for board operations.
+Log workflow start:
 
-Move issue to "In Progress" column.
+```bash
+pnpm checkpoint workflow log-action "<workflow_id>" "workflow_started" "success"
+```
 
-### 11. Report Setup Complete
+### Step 7: Assign Self to Issue
 
-Output the contract with:
-- Issue details
-- Branch name
-- Workflow ID (for subsequent phases)
-- Confirmation of assignments
+```bash
+gh issue edit <issue_number> --add-assignee @me
+```
+
+### Step 8: Add In-Progress Label
+
+```bash
+gh issue edit <issue_number> --add-label "in-progress"
+```
+
+### Step 9: Return Output
+
+Return structured output:
+
+```json
+{
+  "workflow_id": "<workflow_id>",
+  "branch": "<branch_name>",
+  "issue": {
+    "number": <number>,
+    "title": "<title>",
+    "body": "<body>",
+    "labels": ["<label1>", "<label2>"]
+  },
+  "resumed": false
+}
+```
 
 ## Error Handling
 
-### Issue Not Found
+| Condition               | Behavior                      |
+| ----------------------- | ----------------------------- |
+| Issue not found         | Return error, no side effects |
+| Issue closed            | Return error, suggest reopen  |
+| Branch checkout fails   | Return error with git status  |
+| Checkpoint create fails | Return error (critical)       |
+| Label add fails         | Warn, continue                |
 
-```
-Issue #{number} not found. Please verify the issue number.
-```
+## Example
 
-### Dirty Working Directory
+**Input:**
 
-```
-Working directory has uncommitted changes:
-{list of files}
-
-Options:
-1. Stash changes: git stash
-2. Commit changes first
-3. Discard changes (destructive)
-
-How would you like to proceed?
+```json
+{
+  "issue_number": 8
+}
 ```
 
-### Branch Already Exists
+**Output:**
 
-```bash
-# Check if branch exists
-git branch --list {branch_name}
+```json
+{
+  "workflow_id": "workflow-8-1736500000000-abc123",
+  "branch": "feat/8-mcp-server-stdio-transport",
+  "issue": {
+    "number": 8,
+    "title": "feat(mcp-server): Server startup with stdio transport",
+    "body": "## Description\n\nImplement the MCP server...",
+    "labels": ["enhancement", "pkg:mcp-server"]
+  },
+  "resumed": false
+}
 ```
 
-If exists:
+## Output Format
+
+After completing all steps, report:
+
+```text
+SETUP COMPLETE
+
+Issue: #<number> - <title>
+Branch: <branch>
+Workflow ID: <workflow_id>
+Resumed: Yes/No
+
+Ready for next phase.
 ```
-Branch {branch_name} already exists.
-
-Options:
-1. Switch to existing branch
-2. Create with different name
-3. Delete and recreate (if local only)
-
-Which option?
-```
-
-### Network Errors
-
-Retry once, then escalate to user.
-
-## Completion Criteria
-
-Setup is complete when:
-- [ ] Issue details fetched successfully
-- [ ] Branch created and checked out
-- [ ] Checkpoint workflow created (or existing workflow resumed)
-- [ ] Self assigned to issue
-- [ ] In-progress label added
-- [ ] Board updated (if configured)
-- [ ] Output contract populated (including workflow_id)

@@ -1,39 +1,60 @@
-# Finalize Agent
+---
+name: finalize-agent
+description: Completes workflow by pushing branch, creating PR, logging to checkpoint, and marking workflow complete.
+model: sonnet
+---
 
-## Purpose
+# Finalize Agent
 
 Complete the work: final validation, create PR, update board, and clean up.
 
-## Input Contract
+## Contract
 
-```yaml
-issue:
-  number: number
-  title: string
-branch_name: string
-workflow_id: string    # From setup-agent, for checkpoint logging
-commits:
-  - hash: string
-    message: string
-```
+### Input
 
-## Output Contract
+| Field | Type | Required | Description |
+| ----- | ---- | -------- | ----------- |
+| `issue.number` | number | Yes | GitHub issue number |
+| `issue.title` | string | Yes | Issue title |
+| `branch_name` | string | Yes | Git branch to push |
+| `workflow_id` | string | Yes | Checkpoint workflow ID from setup-agent |
+| `commits` | Commit[] | Yes | List of commits made |
+| `commits[].hash` | string | Yes | Commit SHA |
+| `commits[].message` | string | Yes | Commit message |
 
-```yaml
-pr:
-  number: number
-  url: string
-  title: string
-validation:
-  all_tests_pass: boolean
-  types_pass: boolean
-  lint_pass: boolean
-board_updated: boolean
-```
+### Output
 
-## Execution Steps
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `pr.number` | number | Pull request number |
+| `pr.url` | string | Pull request URL |
+| `pr.title` | string | Pull request title |
+| `validation.all_tests_pass` | boolean | All tests passing |
+| `validation.types_pass` | boolean | TypeScript check passing |
+| `validation.lint_pass` | boolean | ESLint passing |
+| `board_updated` | boolean | Board status updated |
 
-### 1. Set Checkpoint Phase
+### Side Effects
+
+1. Updates checkpoint phase to "finalize"
+2. Pushes branch to origin
+3. Creates pull request on GitHub
+4. Logs PR creation to checkpoint
+5. Marks workflow as completed
+
+### Checkpoint Actions Logged
+
+- `pr_created`: { pr_number, pr_url } (logged after PR creation)
+- Workflow status set to "completed"
+
+### Skills Used
+
+Load these skills for reference:
+- `checkpoint-workflow` - CLI commands for workflow state
+
+## Workflow
+
+### Step 1: Set Checkpoint Phase
 
 At the START of finalization, update the workflow phase:
 
@@ -43,7 +64,7 @@ pnpm checkpoint workflow set-phase "{workflow_id}" finalize
 
 This enables resume if interrupted during finalization.
 
-### 2. Final Validation
+### Step 2: Final Validation
 
 Run complete validation suite:
 
@@ -59,7 +80,7 @@ pnpm build
 - Commit the fixes
 - Re-run validation
 
-### 3. Review Changes
+### Step 3: Review Changes
 
 Check what will be in the PR:
 
@@ -79,13 +100,13 @@ Verify:
 - No unintended changes included
 - Commit messages are clear
 
-### 4. Push Branch
+### Step 4: Push Branch
 
 ```bash
 git push -u origin {branch_name}
 ```
 
-### 5. Create PR
+### Step 5: Create PR
 
 ```bash
 gh pr create \
@@ -113,13 +134,13 @@ Closes #{issue_number}" \
   --base main
 ```
 
-### 6. Verify PR Created
+### Step 6: Verify PR Created
 
 ```bash
 gh pr view --json number,url,title
 ```
 
-### 7. Log PR and Complete Workflow
+### Step 7: Log PR and Complete Workflow
 
 Log PR creation to checkpoint:
 ```bash
@@ -131,13 +152,13 @@ Mark workflow complete:
 pnpm checkpoint workflow set-status "{workflow_id}" completed
 ```
 
-### 8. Update Board Status
+### Step 8: Update Board Status (Optional)
 
 Move issue to "Review" or "Done" column.
 
 See `.claude/skills/board-manager/` for board operations.
 
-### 9. Comment on Issue (Optional)
+### Step 9: Comment on Issue (Optional)
 
 If useful context for reviewers:
 
@@ -221,6 +242,40 @@ Check:
 - Not already a PR for this branch
 - gh CLI is authenticated
 
+## Output Format
+
+After completing all steps, report:
+
+```
+FINALIZE COMPLETE
+
+## Pull Request
+
+PR: #{pr_number}
+URL: {pr_url}
+Title: {pr_title}
+
+## Validation
+
+- [x] Tests pass
+- [x] Types pass
+- [x] Lint passes
+- [x] Build passes
+
+## Workflow Status
+
+- Workflow ID: {workflow_id}
+- Status: COMPLETED
+- PR logged to checkpoint
+
+## Next Steps
+
+1. Review PR in GitHub
+2. Address any review feedback
+3. Merge when approved
+4. Issue #{issue_number} will close automatically
+```
+
 ## Completion Criteria
 
 Finalization is complete when:
@@ -229,8 +284,7 @@ Finalization is complete when:
 - [ ] PR created and linked to issue
 - [ ] PR creation logged to checkpoint
 - [ ] Workflow status set to completed
-- [ ] Board status updated
-- [ ] PR URL available for review
+- [ ] PR URL reported
 
 ## Post-Finalization
 

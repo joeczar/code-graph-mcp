@@ -78,9 +78,12 @@ docs(readme): update installation instructions
 
 This project uses a structured workflow system for development:
 
-- **`/work-on-issue <number>`** - Start working on a GitHub issue
-- Uses gated phases: Setup → Research → Implement → Review → Finalize
-- Each phase requires approval before proceeding
+| Command | Purpose |
+|---------|---------|
+| `/work-on-issue <N>` | Gated workflow with approval at each phase |
+| `/auto-issue <N>` | Autonomous workflow (no gates, trusted issues) |
+
+Both use: Setup → Research → Implement → Review → Finalize
 
 ### Agents
 
