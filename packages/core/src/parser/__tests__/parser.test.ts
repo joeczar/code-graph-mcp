@@ -14,17 +14,18 @@ describe('CodeParser', () => {
   });
 
   describe('getSupportedLanguages', () => {
-    it('returns typescript and ruby', () => {
+    it('returns typescript, tsx, and ruby', () => {
       const languages = parser.getSupportedLanguages();
       expect(languages).toContain('typescript');
+      expect(languages).toContain('tsx');
       expect(languages).toContain('ruby');
     });
   });
 
   describe('parse TypeScript', () => {
-    it('parses TypeScript code successfully', () => {
+    it('parses TypeScript code successfully', async () => {
       const code = 'function hello() { return "world"; }';
-      const result = parser.parse(code, 'typescript');
+      const result = await parser.parse(code, 'typescript');
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -34,13 +35,13 @@ describe('CodeParser', () => {
       }
     });
 
-    it('extracts function declarations', () => {
+    it('extracts function declarations', async () => {
       const code = `
         function greet(name: string): string {
           return "Hello, " + name;
         }
       `;
-      const result = parser.parse(code, 'typescript');
+      const result = await parser.parse(code, 'typescript');
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -51,7 +52,7 @@ describe('CodeParser', () => {
       }
     });
 
-    it('extracts class declarations', () => {
+    it('extracts class declarations', async () => {
       const code = `
         class Calculator {
           add(a: number, b: number): number {
@@ -59,7 +60,7 @@ describe('CodeParser', () => {
           }
         }
       `;
-      const result = parser.parse(code, 'typescript');
+      const result = await parser.parse(code, 'typescript');
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -72,9 +73,9 @@ describe('CodeParser', () => {
   });
 
   describe('parse Ruby', () => {
-    it('parses Ruby code successfully', () => {
+    it('parses Ruby code successfully', async () => {
       const code = 'def hello; "world"; end';
-      const result = parser.parse(code, 'ruby');
+      const result = await parser.parse(code, 'ruby');
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -83,13 +84,13 @@ describe('CodeParser', () => {
       }
     });
 
-    it('extracts method definitions', () => {
+    it('extracts method definitions', async () => {
       const code = `
         def greet(name)
           "Hello, #{name}!"
         end
       `;
-      const result = parser.parse(code, 'ruby');
+      const result = await parser.parse(code, 'ruby');
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -100,7 +101,7 @@ describe('CodeParser', () => {
       }
     });
 
-    it('extracts class definitions', () => {
+    it('extracts class definitions', async () => {
       const code = `
         class Calculator
           def add(a, b)
@@ -108,7 +109,7 @@ describe('CodeParser', () => {
           end
         end
       `;
-      const result = parser.parse(code, 'ruby');
+      const result = await parser.parse(code, 'ruby');
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -124,9 +125,9 @@ describe('CodeParser', () => {
   });
 
   describe('parseFile', () => {
-    it('parses TypeScript file', () => {
+    it('parses TypeScript file', async () => {
       const filePath = join(fixturesDir, 'sample.ts');
-      const result = parser.parseFile(filePath);
+      const result = await parser.parseFile(filePath);
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -139,9 +140,9 @@ describe('CodeParser', () => {
       }
     });
 
-    it('parses Ruby file', () => {
+    it('parses Ruby file', async () => {
       const filePath = join(fixturesDir, 'sample.rb');
-      const result = parser.parseFile(filePath);
+      const result = await parser.parseFile(filePath);
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -154,8 +155,8 @@ describe('CodeParser', () => {
       }
     });
 
-    it('returns error for unsupported file type', () => {
-      const result = parser.parseFile('test.unknown');
+    it('returns error for unsupported file type', async () => {
+      const result = await parser.parseFile('test.unknown');
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -163,8 +164,8 @@ describe('CodeParser', () => {
       }
     });
 
-    it('returns error for non-existent file', () => {
-      const result = parser.parseFile('/nonexistent/path/file.ts');
+    it('returns error for non-existent file', async () => {
+      const result = await parser.parseFile('/nonexistent/path/file.ts');
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -175,9 +176,9 @@ describe('CodeParser', () => {
   });
 
   describe('handles syntax errors gracefully', () => {
-    it('parses code with syntax errors without throwing', () => {
+    it('parses code with syntax errors without throwing', async () => {
       const brokenCode = 'function { broken syntax';
-      const result = parser.parse(brokenCode, 'typescript');
+      const result = await parser.parse(brokenCode, 'typescript');
 
       // Tree-sitter still produces a tree, just with error nodes
       expect(result.success).toBe(true);
@@ -191,7 +192,10 @@ describe('CodeParser', () => {
 describe('detectLanguage', () => {
   it('detects TypeScript files', () => {
     expect(detectLanguage('file.ts')).toBe('typescript');
-    expect(detectLanguage('file.tsx')).toBe('typescript');
+  });
+
+  it('detects TSX files', () => {
+    expect(detectLanguage('file.tsx')).toBe('tsx');
   });
 
   it('detects Ruby files', () => {
@@ -209,6 +213,7 @@ describe('getSupportedLanguages', () => {
     const languages = getSupportedLanguages();
     expect(Array.isArray(languages)).toBe(true);
     expect(languages).toContain('typescript');
+    expect(languages).toContain('tsx');
     expect(languages).toContain('ruby');
   });
 });
