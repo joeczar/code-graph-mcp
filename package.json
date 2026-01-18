@@ -20,7 +20,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "checkpoint": "node packages/cli/dist/index.js checkpoint"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

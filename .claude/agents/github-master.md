@@ -186,3 +186,38 @@ git status
 # Rebase if needed
 git rebase origin/<branch>
 ```
+
+## Checkpoint Logging
+
+Log workflow actions after git operations for resume capability.
+
+### After Creating Branch
+
+```bash
+pnpm checkpoint workflow create {issue_number} "{branch_name}"
+pnpm checkpoint workflow log-action "{workflow_id}" "workflow_started" success
+```
+
+### After Each Commit
+
+**CRITICAL: Always log commits in two separate commands.**
+
+```bash
+# 1. Get SHA first (separate command)
+git rev-parse HEAD
+
+# 2. Log to checkpoint (use literal SHA, not variable)
+pnpm checkpoint workflow log-commit "{workflow_id}" "{sha}" "{message}"
+```
+
+**NEVER use `&&` or shell variables.** This ensures errors are handled properly.
+
+### After Creating PR
+
+```bash
+pnpm checkpoint workflow set-phase "{workflow_id}" finalize
+pnpm checkpoint workflow log-action "{workflow_id}" "pr_created" success
+pnpm checkpoint workflow set-status "{workflow_id}" completed
+```
+
+See `.claude/skills/checkpoint-workflow/SKILL.md` for full CLI reference.

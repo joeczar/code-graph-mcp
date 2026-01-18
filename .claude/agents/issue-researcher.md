@@ -13,6 +13,7 @@ issue:
   body: string
   labels: string[]
 branch_name: string
+workflow_id: string    # From setup-agent, for checkpoint logging
 ```
 
 ## Output Contract
@@ -136,6 +137,17 @@ If anything is unclear:
 - Design decisions needed
 - Missing acceptance criteria
 
+### 8. Log Plan Creation to Checkpoint
+
+After the plan is finalized:
+
+```bash
+pnpm checkpoint workflow set-phase "{workflow_id}" research
+pnpm checkpoint workflow log-action "{workflow_id}" "dev_plan_created" success
+```
+
+This enables resuming from the research phase if context is compacted.
+
 ## Decision Points
 
 ### When to Ask for Clarification
@@ -202,3 +214,4 @@ Research is complete when:
 - [ ] Steps broken down clearly
 - [ ] Risks identified
 - [ ] Questions raised (or confirmed none)
+- [ ] Plan creation logged to checkpoint

@@ -25,6 +25,40 @@ created  approved  commits    all        created
 
 **Gated workflow**: Each phase requires approval before proceeding.
 
+## Resume from Checkpoint
+
+Before starting Phase 1, check for an existing workflow:
+
+```bash
+pnpm checkpoint workflow find {issue_number}
+```
+
+**If a running workflow exists:**
+```
+Existing workflow found for issue #{issue_number}:
+- Phase: {current_phase}
+- Last updated: {updated_at}
+- Recent actions: {list of recent actions}
+
+Options:
+1. Resume from {current_phase}
+2. Start fresh (deletes existing workflow)
+```
+
+If resuming, skip to the saved phase with the existing `workflow_id`.
+
+## Workflow State
+
+A `workflow_id` is created in Phase 1 and passed to all subsequent phases:
+
+```
+Phase 1 → outputs workflow_id
+Phase 2 → receives workflow_id, logs plan creation
+Phase 3 → receives workflow_id, logs each commit
+Phase 4 → receives workflow_id
+Phase 5 → receives workflow_id, logs PR, marks complete
+```
+
 ## Phases
 
 ### Phase 1: Setup
@@ -34,21 +68,27 @@ created  approved  commits    all        created
 **Actions:**
 1. Fetch issue details from GitHub
 2. Create feature branch
-3. Assign self to issue
-4. Add "in-progress" label
-5. Update board (if configured)
+3. Create checkpoint workflow (or resume existing)
+4. Assign self to issue
+5. Add "in-progress" label
+6. Update board (if configured)
 
-**Gate**: Confirm issue details and branch are correct
+**Output**: `workflow_id` for subsequent phases
+
+**Gate**: Confirm issue details, branch, and workflow_id are correct
 
 ### Phase 2: Research
 
 **Agent**: `.claude/agents/issue-researcher.md`
+
+**Input**: `workflow_id` from Phase 1
 
 **Actions:**
 1. Analyze issue requirements
 2. Explore relevant codebase areas
 3. Identify dependencies and risks
 4. Create implementation plan
+5. Log plan creation to checkpoint
 
 **Gate**: Approve implementation plan before coding
 
@@ -56,11 +96,15 @@ created  approved  commits    all        created
 
 **Agent**: `.claude/agents/atomic-developer.md`
 
+**Input**: `workflow_id` from Phase 1
+
 **Actions:**
 1. Execute plan step-by-step
 2. Write tests first (when applicable)
 3. Make atomic commits
-4. Validate after each step
+4. Log each commit to checkpoint
+5. Validate after each step
+6. Log implementation complete
 
 **Gate**: Confirm implementation is complete
 
@@ -78,13 +122,17 @@ created  approved  commits    all        created
 
 **Agent**: `.claude/agents/finalize-agent.md`
 
+**Input**: `workflow_id` from Phase 1
+
 **Actions:**
 1. Push branch
 2. Create pull request
-3. Update board status
-4. Report PR URL
+3. Log PR creation to checkpoint
+4. Mark workflow as completed
+5. Update board status
+6. Report PR URL
 
-**Complete**: PR ready for human review
+**Complete**: PR ready for human review, workflow marked complete
 
 ## Gate Prompts
 
@@ -205,7 +253,9 @@ This command uses:
 - `.claude/shared/conventional-commits.md` - Commit format
 - `.claude/shared/validation-commands.md` - Test/lint/build commands
 - `.claude/shared/escalation-patterns.md` - When to ask for help
+- `.claude/shared/checkpoint-patterns.md` - Checkpoint logging patterns
 - `.claude/agents/github-master.md` - Git/GitHub operations
+- `.claude/skills/checkpoint-workflow/SKILL.md` - Checkpoint CLI reference
 
 ## Troubleshooting
 

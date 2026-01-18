@@ -13,6 +13,7 @@ plan:
       files: string[]
       tests: string[]
 branch_name: string
+workflow_id: string    # From setup-agent, for checkpoint logging
 ```
 
 ## Output Contract
@@ -110,6 +111,22 @@ git commit -m "<type>(<scope>): <description>
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
+
+### 5a. Log Commit to Checkpoint
+
+**CRITICAL: Always log commits in separate commands.**
+
+First, get the SHA:
+```bash
+git rev-parse HEAD
+```
+
+Then log to checkpoint (use the literal SHA value, not a variable):
+```bash
+pnpm checkpoint workflow log-commit "{workflow_id}" "{sha}" "{commit_message}"
+```
+
+**NEVER combine with `&&` or use shell variables.** This prevents errors if git fails.
 
 ### 6. Progress Check
 
@@ -211,6 +228,7 @@ Step is complete when:
 - [ ] Type check passes
 - [ ] Lint passes
 - [ ] Changes committed
+- [ ] Commit logged to checkpoint
 
 All steps complete when:
 - [ ] All planned steps implemented
@@ -218,3 +236,10 @@ All steps complete when:
 - [ ] No type errors
 - [ ] No lint errors
 - [ ] Commits are clean and atomic
+- [ ] All commits logged to checkpoint
+- [ ] Implementation complete logged:
+
+```bash
+pnpm checkpoint workflow set-phase "{workflow_id}" implement
+pnpm checkpoint workflow log-action "{workflow_id}" "implementation_complete" success
+```

@@ -1,0 +1,20 @@
+{
+  "name": "@code-graph/cli",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "code-graph": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@code-graph/core": "workspace:*"
+  }
+}

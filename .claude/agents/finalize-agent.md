@@ -11,6 +11,7 @@ issue:
   number: number
   title: string
 branch_name: string
+workflow_id: string    # From setup-agent, for checkpoint logging
 commits:
   - hash: string
     message: string
@@ -108,13 +109,26 @@ Closes #{issue_number}" \
 gh pr view --json number,url,title
 ```
 
-### 6. Update Board Status
+### 6. Log PR and Complete Workflow
+
+Log PR creation to checkpoint:
+```bash
+pnpm checkpoint workflow set-phase "{workflow_id}" finalize
+pnpm checkpoint workflow log-action "{workflow_id}" "pr_created" success
+```
+
+Mark workflow complete:
+```bash
+pnpm checkpoint workflow set-status "{workflow_id}" completed
+```
+
+### 7. Update Board Status
 
 Move issue to "Review" or "Done" column.
 
 See `.claude/skills/board-manager/` for board operations.
 
-### 7. Comment on Issue (Optional)
+### 8. Comment on Issue (Optional)
 
 If useful context for reviewers:
 
@@ -204,6 +218,8 @@ Finalization is complete when:
 - [ ] All validation passes
 - [ ] Branch pushed to origin
 - [ ] PR created and linked to issue
+- [ ] PR creation logged to checkpoint
+- [ ] Workflow status set to completed
 - [ ] Board status updated
 - [ ] PR URL available for review
 

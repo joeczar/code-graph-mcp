@@ -8,6 +8,14 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./checkpoint": {
+      "import": "./dist/checkpoint/index.js",
+      "types": "./dist/checkpoint/index.d.ts"
+    },
+    "./db": {
+      "import": "./dist/db/index.js",
+      "types": "./dist/db/index.d.ts"
     }
   },
   "files": [
