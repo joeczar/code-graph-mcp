@@ -1,51 +1,58 @@
-import type Parser from 'tree-sitter';
+import { Language } from 'web-tree-sitter';
 import { createRequire } from 'node:module';
+import { join, dirname } from 'node:path';
 
 const require = createRequire(import.meta.url);
 
-export type SupportedLanguage = 'typescript' | 'ruby';
+export type SupportedLanguage = 'typescript' | 'tsx' | 'ruby';
 
 interface LanguageConfig {
   name: SupportedLanguage;
   extensions: string[];
-  loadGrammar: () => Parser.Language;
+  wasmFile: string;
 }
 
 const languageConfigs: Record<SupportedLanguage, LanguageConfig> = {
   typescript: {
     name: 'typescript',
-    extensions: ['.ts', '.tsx'],
-    loadGrammar: () => {
-      try {
-        const tsGrammar = require('tree-sitter-typescript') as {
-          typescript: Parser.Language;
-        };
-        return tsGrammar.typescript;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        throw new Error(
-          `Failed to load TypeScript grammar. ` +
-            `Ensure tree-sitter-typescript is installed: ${message}`
-        );
-      }
-    },
+    extensions: ['.ts'],
+    wasmFile: 'tree-sitter-typescript.wasm',
+  },
+  tsx: {
+    name: 'tsx',
+    extensions: ['.tsx'],
+    wasmFile: 'tree-sitter-tsx.wasm',
   },
   ruby: {
     name: 'ruby',
     extensions: ['.rb'],
-    loadGrammar: () => {
-      try {
-        return require('tree-sitter-ruby') as Parser.Language;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        throw new Error(
-          `Failed to load Ruby grammar. ` +
-            `Ensure tree-sitter-ruby is installed: ${message}`
-        );
-      }
-    },
+    wasmFile: 'tree-sitter-ruby.wasm',
   },
 };
+
+function getWasmPath(wasmFile: string): string {
+  const wasmsPath = dirname(require.resolve('@repomix/tree-sitter-wasms/package.json'));
+  return join(wasmsPath, 'out', wasmFile);
+}
+
+export async function loadLanguage(
+  language: SupportedLanguage
+): Promise<Language> {
+  const config = languageConfigs[language];
+  if (!config) {
+    throw new Error(`Unsupported language: ${language}`);
+  }
+
+  const wasmPath = getWasmPath(config.wasmFile);
+  try {
+    return await Language.load(wasmPath);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    throw new Error(
+      `Failed to load ${language} grammar from ${wasmPath}: ${message}`
+    );
+  }
+}
 
 export function getLanguageConfig(
   language: SupportedLanguage

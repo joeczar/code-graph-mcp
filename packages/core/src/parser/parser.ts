@@ -1,8 +1,8 @@
-import Parser, { type Tree } from 'tree-sitter';
-import { readFileSync } from 'node:fs';
+import { Parser, type Language, type Tree } from 'web-tree-sitter';
+import { readFile } from 'node:fs/promises';
 import {
   type SupportedLanguage,
-  getLanguageConfig,
+  loadLanguage,
   detectLanguage,
   getSupportedLanguages,
 } from './languages.js';
@@ -23,35 +23,47 @@ export type ParseOutcome =
   | { success: true; result: ParseResult }
   | { success: false; error: ParseError };
 
-export class CodeParser {
-  private parser: Parser;
-  private loadedLanguages = new Map<SupportedLanguage, Parser.Language>();
+let parserInitialized = false;
 
-  constructor() {
-    this.parser = new Parser();
+export class CodeParser {
+  private parser: Parser | null = null;
+  private loadedLanguages = new Map<SupportedLanguage, Language>();
+
+  private async ensureInitialized(): Promise<Parser> {
+    if (!parserInitialized) {
+      await Parser.init();
+      parserInitialized = true;
+    }
+    if (!this.parser) {
+      this.parser = new Parser();
+    }
+    return this.parser;
   }
 
-  private getLanguage(language: SupportedLanguage): Parser.Language {
+  private async getLanguage(language: SupportedLanguage): Promise<Language> {
     const cached = this.loadedLanguages.get(language);
     if (cached) {
       return cached;
     }
 
-    const config = getLanguageConfig(language);
-    if (!config) {
-      throw new Error(`Unsupported language: ${language}`);
-    }
-
-    const grammar = config.loadGrammar();
+    const grammar = await loadLanguage(language);
     this.loadedLanguages.set(language, grammar);
     return grammar;
   }
 
-  parse(code: string, language: SupportedLanguage): ParseOutcome {
+  async parse(code: string, language: SupportedLanguage): Promise<ParseOutcome> {
     try {
-      const grammar = this.getLanguage(language);
-      this.parser.setLanguage(grammar);
-      const tree = this.parser.parse(code);
+      const parser = await this.ensureInitialized();
+      const grammar = await this.getLanguage(language);
+      parser.setLanguage(grammar);
+      const tree = parser.parse(code);
+
+      if (!tree) {
+        return {
+          success: false,
+          error: { message: 'Failed to parse code' },
+        };
+      }
 
       return {
         success: true,
@@ -72,7 +84,7 @@ export class CodeParser {
     }
   }
 
-  parseFile(filePath: string): ParseOutcome {
+  async parseFile(filePath: string): Promise<ParseOutcome> {
     const language = detectLanguage(filePath);
     if (!language) {
       return {
@@ -84,10 +96,9 @@ export class CodeParser {
       };
     }
 
-    // Read file separately to provide specific error messages
     let code: string;
     try {
-      code = readFileSync(filePath, 'utf-8');
+      code = await readFile(filePath, 'utf-8');
     } catch (err) {
       const nodeErr = err as NodeJS.ErrnoException;
       let message: string;
@@ -103,11 +114,18 @@ export class CodeParser {
       return { success: false, error: { message, filePath } };
     }
 
-    // Parse the file
     try {
-      const grammar = this.getLanguage(language);
-      this.parser.setLanguage(grammar);
-      const tree = this.parser.parse(code);
+      const parser = await this.ensureInitialized();
+      const grammar = await this.getLanguage(language);
+      parser.setLanguage(grammar);
+      const tree = parser.parse(code);
+
+      if (!tree) {
+        return {
+          success: false,
+          error: { message: 'Failed to parse code', filePath },
+        };
+      }
 
       return {
         success: true,
