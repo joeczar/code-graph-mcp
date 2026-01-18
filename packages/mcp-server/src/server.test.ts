@@ -8,10 +8,10 @@ describe('createServer', () => {
     expect(server).toBeInstanceOf(Object);
   });
 
-  it('should have setRequestHandler method', () => {
+  it('should have registerTool method', () => {
     const server = createServer();
-    expect(server).toHaveProperty('setRequestHandler');
-    expect(typeof server.setRequestHandler).toBe('function');
+    expect(server).toHaveProperty('registerTool');
+    expect(typeof server.registerTool).toBe('function');
   });
 
   it('should have connect method', () => {
