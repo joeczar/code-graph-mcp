@@ -42,12 +42,35 @@ export const RELATIONSHIPS_INDEXES = [
 ];
 
 export function initializeSchema(db: Database.Database): void {
-  db.exec(ENTITIES_TABLE);
-  for (const index of ENTITIES_INDEXES) {
-    db.exec(index);
+  try {
+    db.exec(ENTITIES_TABLE);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    throw new Error(`Failed to create entities table: ${message}`);
   }
-  db.exec(RELATIONSHIPS_TABLE);
+
+  for (const index of ENTITIES_INDEXES) {
+    try {
+      db.exec(index);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      throw new Error(`Failed to create entity index: ${message}`);
+    }
+  }
+
+  try {
+    db.exec(RELATIONSHIPS_TABLE);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    throw new Error(`Failed to create relationships table: ${message}`);
+  }
+
   for (const index of RELATIONSHIPS_INDEXES) {
-    db.exec(index);
+    try {
+      db.exec(index);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      throw new Error(`Failed to create relationship index: ${message}`);
+    }
   }
 }

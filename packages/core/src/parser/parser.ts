@@ -84,8 +84,27 @@ export class CodeParser {
       };
     }
 
+    // Read file separately to provide specific error messages
+    let code: string;
     try {
-      const code = readFileSync(filePath, 'utf-8');
+      code = readFileSync(filePath, 'utf-8');
+    } catch (err) {
+      const nodeErr = err as NodeJS.ErrnoException;
+      let message: string;
+      if (nodeErr.code === 'ENOENT') {
+        message = `File not found: ${filePath}`;
+      } else if (nodeErr.code === 'EACCES') {
+        message = `Permission denied: ${filePath}`;
+      } else if (nodeErr.code === 'EISDIR') {
+        message = `Path is a directory: ${filePath}`;
+      } else {
+        message = `Failed to read file: ${nodeErr.message}`;
+      }
+      return { success: false, error: { message, filePath } };
+    }
+
+    // Parse the file
+    try {
       const grammar = this.getLanguage(language);
       this.parser.setLanguage(grammar);
       const tree = this.parser.parse(code);
@@ -103,7 +122,7 @@ export class CodeParser {
       return {
         success: false,
         error: {
-          message: err instanceof Error ? err.message : 'Unknown parse error',
+          message: `Parse error: ${err instanceof Error ? err.message : 'Unknown error'}`,
           filePath,
         },
       };

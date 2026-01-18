@@ -91,9 +91,23 @@ export function createMigrationRunner(db: Database.Database): MigrationRunner {
       let count = 0;
 
       for (const migration of pending.sort((a, b) => a.version - b.version)) {
-        db.exec(migration.up);
-        insertMigration.run(migration.version, migration.name);
-        count++;
+        try {
+          db.exec('BEGIN TRANSACTION');
+          db.exec(migration.up);
+          insertMigration.run(migration.version, migration.name);
+          db.exec('COMMIT');
+          count++;
+        } catch (err) {
+          try {
+            db.exec('ROLLBACK');
+          } catch {
+            // Rollback may fail if transaction wasn't started, ignore
+          }
+          const message = err instanceof Error ? err.message : 'Unknown error';
+          throw new Error(
+            `Migration ${String(migration.version)} (${migration.name}) failed: ${message}`
+          );
+        }
       }
 
       return count;
@@ -113,9 +127,23 @@ export function createMigrationRunner(db: Database.Database): MigrationRunner {
         return false;
       }
 
-      db.exec(migration.down);
-      deleteMigration.run(migration.version);
-      return true;
+      try {
+        db.exec('BEGIN TRANSACTION');
+        db.exec(migration.down);
+        deleteMigration.run(migration.version);
+        db.exec('COMMIT');
+        return true;
+      } catch (err) {
+        try {
+          db.exec('ROLLBACK');
+        } catch {
+          // Rollback may fail if transaction wasn't started, ignore
+        }
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        throw new Error(
+          `Rollback of migration ${String(migration.version)} (${migration.name}) failed: ${message}`
+        );
+      }
     },
 
     getApplied(): number[] {

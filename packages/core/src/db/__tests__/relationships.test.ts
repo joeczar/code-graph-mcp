@@ -81,6 +81,26 @@ describe('RelationshipStore', () => {
 
       expect(() => store.create(createSampleRelationship())).toThrow();
     });
+
+    it('throws error when source entity does not exist', () => {
+      expect(() =>
+        store.create({
+          sourceId: 'nonexistent-source-id',
+          targetId: targetId,
+          type: 'calls',
+        })
+      ).toThrow();
+    });
+
+    it('throws error when target entity does not exist', () => {
+      expect(() =>
+        store.create({
+          sourceId: sourceId,
+          targetId: 'nonexistent-target-id',
+          type: 'calls',
+        })
+      ).toThrow();
+    });
   });
 
   describe('findById', () => {

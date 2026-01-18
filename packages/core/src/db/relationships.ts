@@ -38,7 +38,13 @@ function rowToRelationship(row: RelationshipRow): Relationship {
   };
 
   if (row.metadata) {
-    rel.metadata = JSON.parse(row.metadata) as Record<string, unknown>;
+    try {
+      rel.metadata = JSON.parse(row.metadata) as Record<string, unknown>;
+    } catch {
+      console.warn(
+        `Failed to parse metadata for relationship ${row.id}, skipping metadata`
+      );
+    }
   }
 
   return rel;

@@ -162,6 +162,16 @@ describe('CodeParser', () => {
         expect(result.error.message).toContain('Cannot detect language');
       }
     });
+
+    it('returns error for non-existent file', () => {
+      const result = parser.parseFile('/nonexistent/path/file.ts');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.message).toContain('File not found');
+        expect(result.error.filePath).toBe('/nonexistent/path/file.ts');
+      }
+    });
   });
 
   describe('handles syntax errors gracefully', () => {

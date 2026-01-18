@@ -51,7 +51,13 @@ function rowToEntity(row: EntityRow): Entity {
   };
 
   if (row.metadata) {
-    entity.metadata = JSON.parse(row.metadata) as Record<string, unknown>;
+    try {
+      entity.metadata = JSON.parse(row.metadata) as Record<string, unknown>;
+    } catch {
+      console.warn(
+        `Failed to parse metadata for entity ${row.id}, skipping metadata`
+      );
+    }
   }
 
   return entity;

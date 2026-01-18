@@ -13,19 +13,35 @@ const languageConfigs: Record<SupportedLanguage, LanguageConfig> = {
     name: 'typescript',
     extensions: ['.ts', '.tsx'],
     loadGrammar: () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const tsGrammar = require('tree-sitter-typescript') as {
-        typescript: Parser.Language;
-      };
-      return tsGrammar.typescript;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const tsGrammar = require('tree-sitter-typescript') as {
+          typescript: Parser.Language;
+        };
+        return tsGrammar.typescript;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        throw new Error(
+          `Failed to load TypeScript grammar. ` +
+            `Ensure tree-sitter-typescript is installed: ${message}`
+        );
+      }
     },
   },
   ruby: {
     name: 'ruby',
     extensions: ['.rb'],
     loadGrammar: () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      return require('tree-sitter-ruby') as Parser.Language;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        return require('tree-sitter-ruby') as Parser.Language;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        throw new Error(
+          `Failed to load Ruby grammar. ` +
+            `Ensure tree-sitter-ruby is installed: ${message}`
+        );
+      }
     },
   },
 };
