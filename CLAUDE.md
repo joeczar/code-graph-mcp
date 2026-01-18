@@ -43,6 +43,11 @@ packages/
 - **Small functions** - Max ~50 lines, single responsibility
 - **Explicit types** - No implicit any, explicit return types on exports
 - **Error handling** - Use Result pattern or explicit error types
+- **ES Module `require()`** - Use `createRequire` from `node:module` instead of raw `require()`:
+  ```typescript
+  import { createRequire } from 'node:module';
+  const require = createRequire(import.meta.url);
+  ```
 
 ### Testing
 

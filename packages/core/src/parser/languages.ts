@@ -1,4 +1,7 @@
 import type Parser from 'tree-sitter';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 export type SupportedLanguage = 'typescript' | 'ruby';
 
@@ -14,7 +17,6 @@ const languageConfigs: Record<SupportedLanguage, LanguageConfig> = {
     extensions: ['.ts', '.tsx'],
     loadGrammar: () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const tsGrammar = require('tree-sitter-typescript') as {
           typescript: Parser.Language;
         };
@@ -33,7 +35,6 @@ const languageConfigs: Record<SupportedLanguage, LanguageConfig> = {
     extensions: ['.rb'],
     loadGrammar: () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
         return require('tree-sitter-ruby') as Parser.Language;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
