@@ -7,19 +7,21 @@ async function main(): Promise<void> {
   const transport = new StdioServerTransport();
 
   // Handle graceful shutdown
-  const cleanup = (): void => {
-    process.exit(0);
+  const cleanup = async (): Promise<void> => {
+    try {
+      await server.close();
+      process.exit(0);
+    } catch (error) {
+      console.error('Error during shutdown:', error);
+      process.exit(1);
+    }
   };
 
-  process.on('SIGINT', cleanup);
-  process.on('SIGTERM', cleanup);
+  process.on('SIGINT', () => void cleanup());
+  process.on('SIGTERM', () => void cleanup());
 
   await server.connect(transport);
-
-  // Keep process alive
-  await new Promise(() => {
-    // Never resolves - server runs until interrupted
-  });
+  // StdioServerTransport keeps the event loop alive via stdin
 }
 
 main().catch((error: unknown) => {
