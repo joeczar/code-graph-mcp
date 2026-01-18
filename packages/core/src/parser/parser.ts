@@ -23,16 +23,15 @@ export type ParseOutcome =
   | { success: true; result: ParseResult }
   | { success: false; error: ParseError };
 
-let parserInitialized = false;
-
 export class CodeParser {
+  private static initialized = false;
   private parser: Parser | null = null;
   private loadedLanguages = new Map<SupportedLanguage, Language>();
 
   private async ensureInitialized(): Promise<Parser> {
-    if (!parserInitialized) {
+    if (!CodeParser.initialized) {
       await Parser.init();
-      parserInitialized = true;
+      CodeParser.initialized = true;
     }
     if (!this.parser) {
       this.parser = new Parser();
