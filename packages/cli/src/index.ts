@@ -14,7 +14,7 @@ const command = args[0];
 async function main(): Promise<void> {
   if (!command) {
     printUsage();
-    process.exit(1);
+    throw new Error('No command provided');
   }
 
   switch (command) {
@@ -35,9 +35,8 @@ async function main(): Promise<void> {
       break;
 
     default:
-      console.error(`Unknown command: ${command}`);
       printUsage();
-      process.exit(1);
+      throw new Error(`Unknown command: ${command}`);
   }
 }
 

@@ -39,16 +39,13 @@ export async function runCheckpointCommand(args: string[]): Promise<void> {
   }
 
   if (subcommand !== 'workflow') {
-    console.error(`Unknown checkpoint subcommand: ${subcommand}`);
-    console.error('Use: checkpoint workflow <action>');
-    process.exit(1);
+    throw new Error(`Unknown checkpoint subcommand: ${subcommand}\nUse: checkpoint workflow <action>`);
   }
 
   const action = args[1];
   if (!action) {
-    console.error('Usage: checkpoint workflow <action>');
     printCheckpointHelp();
-    process.exit(1);
+    throw new Error('Usage: checkpoint workflow <action>');
   }
   const actionArgs = args.slice(2);
 
@@ -66,21 +63,18 @@ async function handleWorkflowAction(action: string, args: string[]): Promise<voi
     case 'create': {
       const [issueNumberStr, branchName] = args;
       if (!issueNumberStr || !branchName) {
-        console.error('Usage: checkpoint workflow create <issue_number> <branch_name>');
-        process.exit(1);
+        throw new Error('Usage: checkpoint workflow create <issue_number> <branch_name>');
       }
       const issueNumber = parseInt(issueNumberStr, 10);
       if (isNaN(issueNumber)) {
-        console.error('issue_number must be a number');
-        process.exit(1);
+        throw new Error('issue_number must be a number');
       }
 
       // Check if workflow already exists
       const existing = findWorkflowByIssue(db, issueNumber);
       if (existing) {
-        console.error(`Workflow already exists for issue #${issueNumber}`);
         console.log(JSON.stringify(existing, null, 2));
-        process.exit(1);
+        throw new Error(`Workflow already exists for issue #${issueNumber}`);
       }
 
       const workflow = createWorkflow(db, { issue_number: issueNumber, branch_name: branchName });
@@ -91,13 +85,11 @@ async function handleWorkflowAction(action: string, args: string[]): Promise<voi
     case 'find': {
       const [issueNumberStr] = args;
       if (!issueNumberStr) {
-        console.error('Usage: checkpoint workflow find <issue_number>');
-        process.exit(1);
+        throw new Error('Usage: checkpoint workflow find <issue_number>');
       }
       const issueNumber = parseInt(issueNumberStr, 10);
       if (isNaN(issueNumber)) {
-        console.error('issue_number must be a number');
-        process.exit(1);
+        throw new Error('issue_number must be a number');
       }
 
       const workflow = findWorkflowByIssue(db, issueNumber);
@@ -112,8 +104,7 @@ async function handleWorkflowAction(action: string, args: string[]): Promise<voi
     case 'get': {
       const [workflowId] = args;
       if (!workflowId) {
-        console.error('Usage: checkpoint workflow get <workflow_id>');
-        process.exit(1);
+        throw new Error('Usage: checkpoint workflow get <workflow_id>');
       }
 
       const summary = getWorkflowSummary(db, workflowId);
@@ -149,16 +140,12 @@ async function handleWorkflowAction(action: string, args: string[]): Promise<voi
     case 'set-phase': {
       const [workflowId, phase] = args;
       if (!workflowId || !phase) {
-        console.error('Usage: checkpoint workflow set-phase <workflow_id> <phase>');
-        console.error('Phases: setup, research, implement, review, finalize');
-        process.exit(1);
+        throw new Error('Usage: checkpoint workflow set-phase <workflow_id> <phase>\nPhases: setup, research, implement, review, finalize');
       }
 
       const validPhases: WorkflowPhase[] = ['setup', 'research', 'implement', 'review', 'finalize'];
       if (!validPhases.includes(phase as WorkflowPhase)) {
-        console.error(`Invalid phase: ${phase}`);
-        console.error(`Valid phases: ${validPhases.join(', ')}`);
-        process.exit(1);
+        throw new Error(`Invalid phase: ${phase}\nValid phases: ${validPhases.join(', ')}`);
       }
 
       const success = setWorkflowPhase(db, workflowId, phase as WorkflowPhase);
@@ -166,8 +153,7 @@ async function handleWorkflowAction(action: string, args: string[]): Promise<voi
         const workflow = getWorkflow(db, workflowId);
         console.log(JSON.stringify(workflow, null, 2));
       } else {
-        console.error(`Workflow not found: ${workflowId}`);
-        process.exit(1);
+        throw new Error(`Workflow not found: ${workflowId}`);
       }
       break;
     }
@@ -175,16 +161,12 @@ async function handleWorkflowAction(action: string, args: string[]): Promise<voi
     case 'set-status': {
       const [workflowId, status] = args;
       if (!workflowId || !status) {
-        console.error('Usage: checkpoint workflow set-status <workflow_id> <status>');
-        console.error('Statuses: running, paused, completed, failed');
-        process.exit(1);
+        throw new Error('Usage: checkpoint workflow set-status <workflow_id> <status>\nStatuses: running, paused, completed, failed');
       }
 
       const validStatuses: WorkflowStatus[] = ['running', 'paused', 'completed', 'failed'];
       if (!validStatuses.includes(status as WorkflowStatus)) {
-        console.error(`Invalid status: ${status}`);
-        console.error(`Valid statuses: ${validStatuses.join(', ')}`);
-        process.exit(1);
+        throw new Error(`Invalid status: ${status}\nValid statuses: ${validStatuses.join(', ')}`);
       }
 
       const success = setWorkflowStatus(db, workflowId, status as WorkflowStatus);
@@ -192,8 +174,7 @@ async function handleWorkflowAction(action: string, args: string[]): Promise<voi
         const workflow = getWorkflow(db, workflowId);
         console.log(JSON.stringify(workflow, null, 2));
       } else {
-        console.error(`Workflow not found: ${workflowId}`);
-        process.exit(1);
+        throw new Error(`Workflow not found: ${workflowId}`);
       }
       break;
     }
@@ -201,16 +182,12 @@ async function handleWorkflowAction(action: string, args: string[]): Promise<voi
     case 'log-action': {
       const [workflowId, actionType, status, ...detailsParts] = args;
       if (!workflowId || !actionType || !status) {
-        console.error('Usage: checkpoint workflow log-action <workflow_id> <action_type> <status> [details]');
-        console.error('Status: success, failed, skipped');
-        process.exit(1);
+        throw new Error('Usage: checkpoint workflow log-action <workflow_id> <action_type> <status> [details]\nStatus: success, failed, skipped');
       }
 
       const validStatuses = ['success', 'failed', 'skipped'];
       if (!validStatuses.includes(status)) {
-        console.error(`Invalid status: ${status}`);
-        console.error(`Valid statuses: ${validStatuses.join(', ')}`);
-        process.exit(1);
+        throw new Error(`Invalid status: ${status}\nValid statuses: ${validStatuses.join(', ')}`);
       }
 
       const details = detailsParts.length > 0 ? detailsParts.join(' ') : undefined;
@@ -228,8 +205,7 @@ async function handleWorkflowAction(action: string, args: string[]): Promise<voi
     case 'log-commit': {
       const [workflowId, sha, ...messageParts] = args;
       if (!workflowId || !sha || messageParts.length === 0) {
-        console.error('Usage: checkpoint workflow log-commit <workflow_id> <sha> <message>');
-        process.exit(1);
+        throw new Error('Usage: checkpoint workflow log-commit <workflow_id> <sha> <message>');
       }
 
       const message = messageParts.join(' ');
@@ -241,24 +217,21 @@ async function handleWorkflowAction(action: string, args: string[]): Promise<voi
     case 'delete': {
       const [workflowId] = args;
       if (!workflowId) {
-        console.error('Usage: checkpoint workflow delete <workflow_id>');
-        process.exit(1);
+        throw new Error('Usage: checkpoint workflow delete <workflow_id>');
       }
 
       const success = deleteWorkflow(db, workflowId);
       if (success) {
         console.log(`Deleted workflow: ${workflowId}`);
       } else {
-        console.error(`Workflow not found: ${workflowId}`);
-        process.exit(1);
+        throw new Error(`Workflow not found: ${workflowId}`);
       }
       break;
     }
 
     default:
-      console.error(`Unknown workflow action: ${action}`);
       printCheckpointHelp();
-      process.exit(1);
+      throw new Error(`Unknown workflow action: ${action}`);
   }
 }
 

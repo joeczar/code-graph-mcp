@@ -247,15 +247,15 @@ export function logAction(
   const id = randomUUID();
   const now = new Date().toISOString();
 
-  const stmt = db.prepare(`
-    INSERT INTO workflow_actions (id, workflow_id, action_type, status, details, created_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
+  const transaction = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO workflow_actions (id, workflow_id, action_type, status, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, workflowId, actionType, status, details ?? null, now);
 
-  stmt.run(id, workflowId, actionType, status, details ?? null, now);
-
-  // Update workflow updated_at
-  db.prepare('UPDATE workflows SET updated_at = ? WHERE id = ?').run(now, workflowId);
+    db.prepare('UPDATE workflows SET updated_at = ? WHERE id = ?').run(now, workflowId);
+  });
+  transaction();
 
   return {
     id,
@@ -297,15 +297,15 @@ export function logCommit(
   const id = randomUUID();
   const now = new Date().toISOString();
 
-  const stmt = db.prepare(`
-    INSERT INTO workflow_commits (id, workflow_id, sha, message, created_at)
-    VALUES (?, ?, ?, ?, ?)
-  `);
+  const transaction = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO workflow_commits (id, workflow_id, sha, message, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, workflowId, sha, message, now);
 
-  stmt.run(id, workflowId, sha, message, now);
-
-  // Update workflow updated_at
-  db.prepare('UPDATE workflows SET updated_at = ? WHERE id = ?').run(now, workflowId);
+    db.prepare('UPDATE workflows SET updated_at = ? WHERE id = ?').run(now, workflowId);
+  });
+  transaction();
 
   return {
     id,

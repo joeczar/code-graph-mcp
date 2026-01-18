@@ -42,7 +42,17 @@ context:
 
 ## Execution Steps
 
-### 1. Parse Issue Content
+### 1. Set Checkpoint Phase
+
+At the START of research, update the workflow phase:
+
+```bash
+pnpm checkpoint workflow set-phase "{workflow_id}" research
+```
+
+This enables resume if interrupted during research.
+
+### 2. Parse Issue Content
 
 Extract from issue body:
 - **Requirements**: What must be done
@@ -50,7 +60,7 @@ Extract from issue body:
 - **Constraints**: What must not change
 - **References**: Links to docs, related issues
 
-### 2. Classify the Issue
+### 3. Classify the Issue
 
 Determine:
 - **Type**: New feature, bug fix, refactor, etc.
@@ -64,7 +74,7 @@ Complexity guidelines:
 | Medium | Multiple files, some design decisions, 100-300 lines |
 | High | Architecture changes, new patterns, >300 lines |
 
-### 3. Explore Codebase
+### 4. Explore Codebase
 
 #### Find Related Files
 
@@ -94,7 +104,7 @@ Look for similar implementations:
 - How are other MCP tools implemented?
 - What patterns does this codebase use?
 
-### 4. Identify Dependencies
+### 5. Identify Dependencies
 
 List:
 - npm packages needed
@@ -102,7 +112,7 @@ List:
 - External APIs or services
 - Files that will import the new code
 
-### 5. Draft Implementation Plan
+### 6. Draft Implementation Plan
 
 Create step-by-step plan:
 
@@ -122,7 +132,7 @@ Each step should be:
 - Small enough for one commit
 - Clear about files touched
 
-### 6. Identify Risks
+### 7. Identify Risks
 
 Common risks:
 - Breaking existing functionality
@@ -130,23 +140,22 @@ Common risks:
 - Security considerations
 - Scope creep potential
 
-### 7. Note Questions
+### 8. Note Questions
 
 If anything is unclear:
 - Ambiguous requirements
 - Design decisions needed
 - Missing acceptance criteria
 
-### 8. Log Plan Creation to Checkpoint
+### 9. Log Plan Creation to Checkpoint
 
 After the plan is finalized:
 
 ```bash
-pnpm checkpoint workflow set-phase "{workflow_id}" research
 pnpm checkpoint workflow log-action "{workflow_id}" "dev_plan_created" success
 ```
 
-This enables resuming from the research phase if context is compacted.
+This records that research completed successfully.
 
 ## Decision Points
 

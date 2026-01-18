@@ -45,24 +45,30 @@ pnpm checkpoint workflow log-commit "$(git rev-parse HEAD)" ...
 
 ## Phase Transitions
 
-Update the phase when entering a new workflow stage:
+**IMPORTANT: Set the phase at the START of each phase, not at the end.**
+
+This ensures that if interrupted, `current_phase` reflects what we were working on,
+allowing correct resume:
 
 ```bash
-# After setup complete
+# At START of setup
 pnpm checkpoint workflow set-phase "{workflow_id}" setup
 
-# After research complete
+# At START of research (first thing issue-researcher does)
 pnpm checkpoint workflow set-phase "{workflow_id}" research
 
-# After implementation complete
+# At START of implementation (first thing atomic-developer does)
 pnpm checkpoint workflow set-phase "{workflow_id}" implement
 
-# After review complete
+# At START of review
 pnpm checkpoint workflow set-phase "{workflow_id}" review
 
-# After PR created
+# At START of finalization (first thing finalize-agent does)
 pnpm checkpoint workflow set-phase "{workflow_id}" finalize
 ```
+
+**Phase semantics:** `current_phase` means "the phase we are currently working on"
+(or about to work on). This allows resume to correctly restart the interrupted phase.
 
 ## Standard Actions
 

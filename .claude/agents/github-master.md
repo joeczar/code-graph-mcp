@@ -215,9 +215,10 @@ pnpm checkpoint workflow log-commit "{workflow_id}" "{sha}" "{message}"
 ### After Creating PR
 
 ```bash
-pnpm checkpoint workflow set-phase "{workflow_id}" finalize
 pnpm checkpoint workflow log-action "{workflow_id}" "pr_created" success
 pnpm checkpoint workflow set-status "{workflow_id}" completed
 ```
+
+Note: The phase is set at the START of each workflow phase, not at the end.
 
 See `.claude/skills/checkpoint-workflow/SKILL.md` for full CLI reference.

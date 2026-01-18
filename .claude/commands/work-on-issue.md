@@ -33,19 +33,23 @@ Before starting Phase 1, check for an existing workflow:
 pnpm checkpoint workflow find {issue_number}
 ```
 
+**Phase Semantics:** `current_phase` represents the phase currently being worked on
+(or about to be worked on). Agents set this at the START of their work, so if
+interrupted, resuming picks up where we left off.
+
 **If a running workflow exists:**
 ```
 Existing workflow found for issue #{issue_number}:
-- Phase: {current_phase}
+- Current phase: {current_phase}
 - Last updated: {updated_at}
 - Recent actions: {list of recent actions}
 
 Options:
-1. Resume from {current_phase}
+1. Resume {current_phase} phase
 2. Start fresh (deletes existing workflow)
 ```
 
-If resuming, skip to the saved phase with the existing `workflow_id`.
+If resuming, jump to the saved phase with the existing `workflow_id`.
 
 ## Workflow State
 
