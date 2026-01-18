@@ -1,0 +1,21 @@
+{
+  "name": "@code-graph/mcp-server",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "code-graph-mcp": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@code-graph/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.0.4"
+  }
+}
