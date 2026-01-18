@@ -11,6 +11,7 @@ issue:
   number: number
   title: string
 branch_name: string
+workflow_id: string    # From setup-agent, for checkpoint logging
 commits:
   - hash: string
     message: string
@@ -32,7 +33,17 @@ board_updated: boolean
 
 ## Execution Steps
 
-### 1. Final Validation
+### 1. Set Checkpoint Phase
+
+At the START of finalization, update the workflow phase:
+
+```bash
+pnpm checkpoint workflow set-phase "{workflow_id}" finalize
+```
+
+This enables resume if interrupted during finalization.
+
+### 2. Final Validation
 
 Run complete validation suite:
 
@@ -48,7 +59,7 @@ pnpm build
 - Commit the fixes
 - Re-run validation
 
-### 2. Review Changes
+### 3. Review Changes
 
 Check what will be in the PR:
 
@@ -68,13 +79,13 @@ Verify:
 - No unintended changes included
 - Commit messages are clear
 
-### 3. Push Branch
+### 4. Push Branch
 
 ```bash
 git push -u origin {branch_name}
 ```
 
-### 4. Create PR
+### 5. Create PR
 
 ```bash
 gh pr create \
@@ -102,19 +113,31 @@ Closes #{issue_number}" \
   --base main
 ```
 
-### 5. Verify PR Created
+### 6. Verify PR Created
 
 ```bash
 gh pr view --json number,url,title
 ```
 
-### 6. Update Board Status
+### 7. Log PR and Complete Workflow
+
+Log PR creation to checkpoint:
+```bash
+pnpm checkpoint workflow log-action "{workflow_id}" "pr_created" success
+```
+
+Mark workflow complete:
+```bash
+pnpm checkpoint workflow set-status "{workflow_id}" completed
+```
+
+### 8. Update Board Status
 
 Move issue to "Review" or "Done" column.
 
 See `.claude/skills/board-manager/` for board operations.
 
-### 7. Comment on Issue (Optional)
+### 9. Comment on Issue (Optional)
 
 If useful context for reviewers:
 
@@ -204,6 +227,8 @@ Finalization is complete when:
 - [ ] All validation passes
 - [ ] Branch pushed to origin
 - [ ] PR created and linked to issue
+- [ ] PR creation logged to checkpoint
+- [ ] Workflow status set to completed
 - [ ] Board status updated
 - [ ] PR URL available for review
 

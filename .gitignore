@@ -31,3 +31,8 @@ coverage/
 *.db
 *.sqlite
 *.sqlite3
+
+# Checkpoint state (workflow execution state)
+.claude/execution-state.db
+.claude/execution-state.db-wal
+.claude/execution-state.db-shm

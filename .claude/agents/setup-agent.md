@@ -20,6 +20,7 @@ issue:
   labels: string[]
   milestone: string | null
 branch_name: string    # Created branch name
+workflow_id: string    # Checkpoint workflow ID for subsequent phases
 ready: boolean         # True if setup complete
 ```
 
@@ -90,29 +91,53 @@ git pull origin main
 git checkout -b {branch_name}
 ```
 
-### 7. Assign Self to Issue
+### 7. Create Checkpoint Workflow
+
+Check for existing workflow:
+```bash
+pnpm checkpoint workflow find {issue_number}
+```
+
+**If found with status=running:**
+- Offer to resume existing workflow
+- Return existing `workflow_id`
+
+**If not found or status=completed/failed:**
+```bash
+pnpm checkpoint workflow create {issue_number} "{branch_name}"
+```
+
+Extract `workflow_id` from the JSON output (the `id` field).
+
+Log workflow started:
+```bash
+pnpm checkpoint workflow log-action "{workflow_id}" "workflow_started" success
+```
+
+### 8. Assign Self to Issue
 
 ```bash
 gh issue edit {issue_number} --add-assignee @me
 ```
 
-### 8. Add In-Progress Label
+### 9. Add In-Progress Label
 
 ```bash
 gh issue edit {issue_number} --add-label "in-progress"
 ```
 
-### 9. Update Board Status (if configured)
+### 10. Update Board Status (if configured)
 
 See `.claude/skills/board-manager/` for board operations.
 
 Move issue to "In Progress" column.
 
-### 10. Report Setup Complete
+### 11. Report Setup Complete
 
 Output the contract with:
 - Issue details
 - Branch name
+- Workflow ID (for subsequent phases)
 - Confirmation of assignments
 
 ## Error Handling
@@ -165,7 +190,8 @@ Retry once, then escalate to user.
 Setup is complete when:
 - [ ] Issue details fetched successfully
 - [ ] Branch created and checked out
+- [ ] Checkpoint workflow created (or existing workflow resumed)
 - [ ] Self assigned to issue
 - [ ] In-progress label added
 - [ ] Board updated (if configured)
-- [ ] Output contract populated
+- [ ] Output contract populated (including workflow_id)

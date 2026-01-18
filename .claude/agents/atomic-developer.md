@@ -13,6 +13,7 @@ plan:
       files: string[]
       tests: string[]
 branch_name: string
+workflow_id: string    # From setup-agent, for checkpoint logging
 ```
 
 ## Output Contract
@@ -50,14 +51,24 @@ For each step:
 
 ## Execution Steps
 
-### 1. Review Current Step
+### 1. Set Checkpoint Phase
+
+At the START of implementation, update the workflow phase:
+
+```bash
+pnpm checkpoint workflow set-phase "{workflow_id}" implement
+```
+
+This enables resume if interrupted during implementation.
+
+### 2. Review Current Step
 
 From the plan, identify:
 - What needs to be done
 - Which files to modify/create
 - Which tests to add/update
 
-### 2. Test-First (When Applicable)
+### 3. Test-First (When Applicable)
 
 For new functionality:
 ```typescript
@@ -78,14 +89,14 @@ it('should handle empty input without crashing', () => {
 });
 ```
 
-### 3. Implement the Change
+### 4. Implement the Change
 
 - Follow existing patterns in codebase
 - Use explicit types
 - Keep functions small (<50 lines)
 - Add inline docs for non-obvious code
 
-### 4. Validate Locally
+### 5. Validate Locally
 
 ```bash
 # Type check
@@ -100,7 +111,7 @@ pnpm lint
 
 **All must pass before committing.**
 
-### 5. Commit
+### 6. Commit
 
 ```bash
 git add <changed-files>
@@ -111,7 +122,23 @@ git commit -m "<type>(<scope>): <description>
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
-### 6. Progress Check
+### 6a. Log Commit to Checkpoint
+
+**CRITICAL: Always log commits in separate commands.**
+
+First, get the SHA:
+```bash
+git rev-parse HEAD
+```
+
+Then log to checkpoint (use the literal SHA value, not a variable):
+```bash
+pnpm checkpoint workflow log-commit "{workflow_id}" "{sha}" "{commit_message}"
+```
+
+**NEVER combine with `&&` or use shell variables.** This prevents errors if git fails.
+
+### 7. Progress Check
 
 After each commit:
 - Mark step complete in plan
@@ -211,6 +238,7 @@ Step is complete when:
 - [ ] Type check passes
 - [ ] Lint passes
 - [ ] Changes committed
+- [ ] Commit logged to checkpoint
 
 All steps complete when:
 - [ ] All planned steps implemented
@@ -218,3 +246,9 @@ All steps complete when:
 - [ ] No type errors
 - [ ] No lint errors
 - [ ] Commits are clean and atomic
+- [ ] All commits logged to checkpoint
+- [ ] Implementation complete logged:
+
+```bash
+pnpm checkpoint workflow log-action "{workflow_id}" "implementation_complete" success
+```

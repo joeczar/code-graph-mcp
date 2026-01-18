@@ -386,6 +386,82 @@ CREATE INDEX idx_entity_type ON entities(type);
 CREATE INDEX idx_entity_name ON entities(name);
 ```
 
+## Checkpoint System
+
+The checkpoint system enables workflow resume after context compaction.
+
+### Location
+
+```
+.claude/execution-state.db    # SQLite database (gitignored)
+```
+
+### Schema
+
+```sql
+-- Workflow tracking
+CREATE TABLE workflows (
+  id TEXT PRIMARY KEY,
+  issue_number INTEGER NOT NULL UNIQUE,
+  branch_name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'running',  -- running, paused, completed, failed
+  current_phase TEXT NOT NULL DEFAULT 'setup',  -- setup, research, implement, review, finalize
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Action log
+CREATE TABLE workflow_actions (
+  id TEXT PRIMARY KEY,
+  workflow_id TEXT NOT NULL,
+  action_type TEXT NOT NULL,  -- workflow_started, dev_plan_created, pr_created, etc.
+  status TEXT NOT NULL,       -- success, failed, skipped
+  details TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE
+);
+
+-- Commit log
+CREATE TABLE workflow_commits (
+  id TEXT PRIMARY KEY,
+  workflow_id TEXT NOT NULL,
+  sha TEXT NOT NULL,
+  message TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE
+);
+```
+
+### CLI Commands
+
+```bash
+# Workflow management
+pnpm checkpoint workflow create <issue_number> <branch_name>
+pnpm checkpoint workflow find <issue_number>
+pnpm checkpoint workflow get <workflow_id>
+pnpm checkpoint workflow list [--status=running]
+pnpm checkpoint workflow set-phase <workflow_id> <phase>
+pnpm checkpoint workflow set-status <workflow_id> <status>
+
+# Logging
+pnpm checkpoint workflow log-action <workflow_id> <action_type> <status>
+pnpm checkpoint workflow log-commit <workflow_id> <sha> <message>
+
+# Cleanup
+pnpm checkpoint workflow delete <workflow_id>
+```
+
+### Integration with Agents
+
+Each agent in the `/work-on-issue` workflow receives and uses the `workflow_id`:
+
+1. **setup-agent**: Creates workflow, outputs `workflow_id`
+2. **issue-researcher**: Logs plan creation
+3. **atomic-developer**: Logs each commit
+4. **finalize-agent**: Logs PR creation, marks complete
+
+See `.claude/skills/checkpoint-workflow/SKILL.md` for full reference.
+
 ---
 
 *This is a conceptual architecture. Implementation details will evolve.*

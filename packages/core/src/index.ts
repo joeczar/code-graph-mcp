@@ -45,3 +45,30 @@ export type {
   Migration,
   MigrationRunner,
 } from './db/index.js';
+
+// Checkpoint exports
+export {
+  getCheckpointDb,
+  closeCheckpointDb,
+  createWorkflow,
+  getWorkflow,
+  findWorkflowByIssue,
+  listWorkflows,
+  setWorkflowPhase,
+  setWorkflowStatus,
+  deleteWorkflow,
+  logAction,
+  getActions,
+  logCommit,
+  getCommits,
+  getWorkflowSummary,
+} from './checkpoint/index.js';
+export type {
+  WorkflowStatus,
+  WorkflowPhase,
+  Workflow,
+  WorkflowAction,
+  WorkflowCommit,
+  NewWorkflow,
+  WorkflowSummary,
+} from './checkpoint/index.js';
