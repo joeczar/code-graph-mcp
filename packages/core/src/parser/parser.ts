@@ -33,9 +33,7 @@ export class CodeParser {
       await Parser.init();
       CodeParser.initialized = true;
     }
-    if (!this.parser) {
-      this.parser = new Parser();
-    }
+    this.parser ??= new Parser();
     return this.parser;
   }
 

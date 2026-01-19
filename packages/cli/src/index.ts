@@ -11,7 +11,7 @@ import { runCheckpointCommand } from './commands/checkpoint.js';
 const args = process.argv.slice(2);
 const command = args[0];
 
-async function main(): Promise<void> {
+function main(): void {
   if (!command) {
     printUsage();
     throw new Error('No command provided');
@@ -19,7 +19,7 @@ async function main(): Promise<void> {
 
   switch (command) {
     case 'checkpoint':
-      await runCheckpointCommand(args.slice(1));
+      runCheckpointCommand(args.slice(1));
       break;
 
     case 'help':
@@ -71,7 +71,9 @@ EXAMPLES:
 `);
 }
 
-main().catch((err) => {
+try {
+  main();
+} catch (err: unknown) {
   console.error('Error:', err instanceof Error ? err.message : String(err));
   process.exit(1);
-});
+}
