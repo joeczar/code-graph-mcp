@@ -33,6 +33,8 @@ export class RubyRelationshipExtractor {
     if (node.type === 'call') {
       this.extractRequireRelationship(node, relationships, sourceCode);
       this.extractMethodCallRelationship(node, relationships, sourceCode);
+    } else if (node.type === 'class') {
+      this.extractClassInheritanceRelationship(node, relationships, sourceCode);
     }
 
     // Recursively walk children
@@ -83,6 +85,36 @@ export class RubyRelationshipExtractor {
       metadata: {
         requireType: methodName,
       },
+    });
+  }
+
+  /**
+   * Extract class inheritance relationships
+   */
+  private extractClassInheritanceRelationship(
+    classNode: SyntaxNode,
+    relationships: ExtractedRelationship[],
+    sourceCode: string
+  ): void {
+    const nameNode = classNode.childForFieldName('name');
+    if (!nameNode) return;
+
+    const className = nameNode.text;
+
+    // Check for superclass
+    const superclassNode = classNode.childForFieldName('superclass');
+    if (!superclassNode) return;
+
+    const superclassName = superclassNode.text;
+
+    relationships.push({
+      type: 'extends',
+      sourceName: className,
+      sourceLocation: {
+        line: classNode.startPosition.row + 1,
+        column: classNode.startPosition.column,
+      },
+      targetName: superclassName,
     });
   }
 
