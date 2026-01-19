@@ -1,12 +1,16 @@
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 
-export type RelationshipType =
-  | 'calls'
-  | 'imports'
-  | 'extends'
-  | 'implements'
-  | 'contains';
+/** All valid relationship types */
+export const ALL_RELATIONSHIP_TYPES = [
+  'calls',
+  'imports',
+  'extends',
+  'implements',
+  'contains',
+] as const;
+
+export type RelationshipType = (typeof ALL_RELATIONSHIP_TYPES)[number];
 
 export interface Relationship {
   id: string;
@@ -145,14 +149,10 @@ export function createRelationshipStore(db: Database.Database): RelationshipStor
     countByType(): Record<RelationshipType, number> {
       const rows = countByTypeStmt.all() as { type: string; count: number }[];
 
-      // Initialize all types to 0
-      const result: Record<RelationshipType, number> = {
-        calls: 0,
-        imports: 0,
-        extends: 0,
-        implements: 0,
-        contains: 0,
-      };
+      // Initialize all types to 0 using the constant
+      const result = Object.fromEntries(
+        ALL_RELATIONSHIP_TYPES.map(t => [t, 0])
+      ) as Record<RelationshipType, number>;
 
       // Fill in actual counts from database
       for (const row of rows) {

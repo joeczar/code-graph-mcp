@@ -1,13 +1,17 @@
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 
-export type EntityType =
-  | 'function'
-  | 'class'
-  | 'method'
-  | 'module'
-  | 'file'
-  | 'type';
+/** All valid entity types */
+export const ALL_ENTITY_TYPES = [
+  'function',
+  'class',
+  'method',
+  'module',
+  'file',
+  'type',
+] as const;
+
+export type EntityType = (typeof ALL_ENTITY_TYPES)[number];
 
 export interface Entity {
   id: string;
@@ -226,15 +230,10 @@ export function createEntityStore(db: Database.Database): EntityStore {
     countByType(): Record<EntityType, number> {
       const rows = countByTypeStmt.all() as { type: string; count: number }[];
 
-      // Initialize all types to 0
-      const result: Record<EntityType, number> = {
-        function: 0,
-        class: 0,
-        method: 0,
-        module: 0,
-        file: 0,
-        type: 0,
-      };
+      // Initialize all types to 0 using the constant
+      const result = Object.fromEntries(
+        ALL_ENTITY_TYPES.map(t => [t, 0])
+      ) as Record<EntityType, number>;
 
       // Fill in actual counts from database
       for (const row of rows) {

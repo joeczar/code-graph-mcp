@@ -17,6 +17,9 @@ import { type ToolDefinition, createSuccessResponse } from './types.js';
 // Empty schema - no inputs required
 const graphStatusInputSchema = z.object({});
 
+/** Maximum number of recent files to display */
+const RECENT_FILES_LIMIT = 10;
+
 /**
  * Graph status tool definition
  *
@@ -41,7 +44,7 @@ export const graphStatusTool: ToolDefinition<typeof graphStatusInputSchema> = {
     const totalRelationships = relationshipStore.count();
     const entityCounts = entityStore.countByType();
     const relationshipCounts = relationshipStore.countByType();
-    const recentFiles = entityStore.getRecentFiles(10);
+    const recentFiles = entityStore.getRecentFiles(RECENT_FILES_LIMIT);
 
     // Format output
     const lines: string[] = [];

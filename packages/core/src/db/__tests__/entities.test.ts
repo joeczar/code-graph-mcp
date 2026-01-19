@@ -253,17 +253,15 @@ describe('EntityStore', () => {
 
       const recent = store.getRecentFiles(10);
 
-      expect(recent.length).toBeGreaterThan(0);
-      expect(recent[0]?.filePath).toBeDefined();
-      expect(recent[0]?.entityCount).toBeGreaterThan(0);
-      expect(recent[0]?.lastUpdated).toBeDefined();
+      expect(recent).toHaveLength(2);
 
-      // Check that we have correct counts
-      const newFile = recent.find(f => f.filePath === '/src/new.ts');
-      const oldFile = recent.find(f => f.filePath === '/src/old.ts');
+      // Verify sorting: new.ts should be first (most recently updated)
+      expect(recent[0]?.filePath).toBe('/src/new.ts');
+      expect(recent[0]?.entityCount).toBe(3);
 
-      expect(newFile?.entityCount).toBe(3);
-      expect(oldFile?.entityCount).toBe(2);
+      // old.ts should be second
+      expect(recent[1]?.filePath).toBe('/src/old.ts');
+      expect(recent[1]?.entityCount).toBe(2);
     });
 
     it('respects limit parameter', () => {
