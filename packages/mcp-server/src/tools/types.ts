@@ -83,7 +83,18 @@ export function createErrorResponse(error: unknown): ErrorResponse {
     // Handle custom error types with metadata
     message = `${error.name}: ${error.message}`;
     if (Object.keys(error.metadata).length > 0) {
-      const metadataStr = JSON.stringify(error.metadata, null, 2);
+      // Use replacer to properly serialize Error objects in metadata
+      const replacer = (_key: string, value: unknown): unknown => {
+        if (value instanceof Error) {
+          return {
+            name: value.name,
+            message: value.message,
+            stack: value.stack,
+          };
+        }
+        return value;
+      };
+      const metadataStr = JSON.stringify(error.metadata, replacer, 2);
       message += `\nMetadata: ${metadataStr}`;
     }
   } else if (error instanceof Error) {

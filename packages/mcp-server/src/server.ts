@@ -69,6 +69,7 @@ export function createServer(): McpServer {
           logger.error('Unknown error in tool execution', {
             toolName: echoTool.metadata.name,
             error,
+            params,
           });
         }
 

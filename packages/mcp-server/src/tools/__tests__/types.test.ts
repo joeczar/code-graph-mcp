@@ -192,6 +192,19 @@ describe('createErrorResponse with custom error types', () => {
     expect(response.content[0]?.text).toContain('INSERT');
     expect(response.content[0]?.text).toContain('nodes');
   });
+
+  it('should handle ToolExecutionError with an Error object in metadata', () => {
+    const originalError = new Error('Network timeout');
+    const error = new ToolExecutionError('Execution failed', {
+      toolName: 'ping',
+      originalError,
+    });
+    const response = createErrorResponse(error);
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain('Execution failed');
+    expect(response.content[0]?.text).toContain('Network timeout');
+  });
 });
 
 describe('formatToolResponse', () => {

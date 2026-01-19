@@ -20,53 +20,29 @@ export class ToolError extends Error {
 /**
  * Thrown when tool input validation fails (e.g., Zod validation)
  */
-export class ToolValidationError extends ToolError {
-  constructor(message: string, metadata: Record<string, unknown> = {}) {
-    super(message, metadata);
-  }
-}
+export class ToolValidationError extends ToolError {}
 
 /**
  * Thrown when a requested tool does not exist
  */
-export class ToolNotFoundError extends ToolError {
-  constructor(message: string, metadata: Record<string, unknown> = {}) {
-    super(message, metadata);
-  }
-}
+export class ToolNotFoundError extends ToolError {}
 
 /**
  * Thrown when tool execution fails at runtime
  */
-export class ToolExecutionError extends ToolError {
-  constructor(message: string, metadata: Record<string, unknown> = {}) {
-    super(message, metadata);
-  }
-}
+export class ToolExecutionError extends ToolError {}
 
 /**
  * Thrown when tool execution exceeds timeout threshold
  */
-export class ToolTimeoutError extends ToolError {
-  constructor(message: string, metadata: Record<string, unknown> = {}) {
-    super(message, metadata);
-  }
-}
+export class ToolTimeoutError extends ToolError {}
 
 /**
  * Thrown when a requested resource cannot be found
  */
-export class ResourceNotFoundError extends ToolError {
-  constructor(message: string, metadata: Record<string, unknown> = {}) {
-    super(message, metadata);
-  }
-}
+export class ResourceNotFoundError extends ToolError {}
 
 /**
  * Thrown when a database operation fails
  */
-export class DatabaseError extends ToolError {
-  constructor(message: string, metadata: Record<string, unknown> = {}) {
-    super(message, metadata);
-  }
-}
+export class DatabaseError extends ToolError {}
