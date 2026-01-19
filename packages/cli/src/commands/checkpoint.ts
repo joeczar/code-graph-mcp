@@ -25,12 +25,12 @@ import {
 // Default database path - in .claude directory (gitignored)
 const DEFAULT_DB_PATH = join(process.cwd(), '.claude', 'execution-state.db');
 
-function getDb() {
+function getDb(): ReturnType<typeof getCheckpointDb> {
   const envPath = process.env['CHECKPOINT_DB_PATH'];
   return getCheckpointDb(envPath ?? DEFAULT_DB_PATH);
 }
 
-export async function runCheckpointCommand(args: string[]): Promise<void> {
+export function runCheckpointCommand(args: string[]): void {
   const subcommand = args[0];
 
   if (!subcommand || subcommand === 'help') {
@@ -50,13 +50,13 @@ export async function runCheckpointCommand(args: string[]): Promise<void> {
   const actionArgs = args.slice(2);
 
   try {
-    await handleWorkflowAction(action, actionArgs);
+    handleWorkflowAction(action, actionArgs);
   } finally {
     closeCheckpointDb();
   }
 }
 
-async function handleWorkflowAction(action: string, args: string[]): Promise<void> {
+function handleWorkflowAction(action: string, args: string[]): void {
   const db = getDb();
 
   switch (action) {
@@ -74,7 +74,7 @@ async function handleWorkflowAction(action: string, args: string[]): Promise<voi
       const existing = findWorkflowByIssue(db, issueNumber);
       if (existing) {
         console.log(JSON.stringify(existing, null, 2));
-        throw new Error(`Workflow already exists for issue #${issueNumber}`);
+        throw new Error(`Workflow already exists for issue #${String(issueNumber)}`);
       }
 
       const workflow = createWorkflow(db, { issue_number: issueNumber, branch_name: branchName });
