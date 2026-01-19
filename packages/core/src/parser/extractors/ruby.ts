@@ -115,8 +115,14 @@ export class RubyExtractor {
     };
 
     if (superclassNode) {
+      // The superclass field includes '< ClassName', extract just the class name
+      const superclassText = superclassNode.text.trim();
+      const superclassName = superclassText.startsWith('<')
+        ? superclassText.slice(1).trim()
+        : superclassText;
+
       entity.metadata = {
-        superclass: superclassNode.text,
+        superclass: superclassName,
       };
     }
 
