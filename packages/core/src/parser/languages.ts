@@ -39,6 +39,11 @@ export async function loadLanguage(
   language: SupportedLanguage
 ): Promise<Language> {
   const config = languageConfigs[language];
+  // Defensive check for runtime safety (JS consumers, incorrect casting)
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (!config) {
+    throw new Error(`Unsupported language: ${language}`);
+  }
   const wasmPath = getWasmPath(config.wasmFile);
   try {
     return await Language.load(wasmPath);
