@@ -29,9 +29,78 @@ export class RubyRelationshipExtractor {
     relationships: ExtractedRelationship[],
     sourceCode: string
   ): void {
-    // Base implementation - will be expanded
+    // Extract relationships based on node type
+    if (node.type === 'call') {
+      this.extractRequireRelationship(node, relationships, sourceCode);
+    }
+
+    // Recursively walk children
     for (const child of node.children) {
       this.walkNode(child, relationships, sourceCode);
     }
+  }
+
+  /**
+   * Extract require/require_relative relationships
+   */
+  private extractRequireRelationship(
+    callNode: SyntaxNode,
+    relationships: ExtractedRelationship[],
+    sourceCode: string
+  ): void {
+    const methodNode = callNode.childForFieldName('method');
+    if (!methodNode) return;
+
+    const methodName = methodNode.text;
+    if (methodName !== 'require' && methodName !== 'require_relative') return;
+
+    // Get the arguments
+    const argumentsNode = callNode.childForFieldName('arguments');
+    if (!argumentsNode) return;
+
+    // Find string argument (usually first child that's a string)
+    let modulePath: string | null = null;
+    for (const arg of argumentsNode.children) {
+      if (arg.type === 'string' || arg.type === 'simple_symbol') {
+        // Extract text and remove quotes
+        const text = arg.text;
+        modulePath = text.replace(/^['":]+|['":]+$/g, '');
+        break;
+      }
+    }
+
+    if (!modulePath) return;
+
+    relationships.push({
+      type: 'imports',
+      sourceName: this.getCurrentContext(callNode) || '<top-level>',
+      sourceLocation: {
+        line: callNode.startPosition.row + 1,
+        column: callNode.startPosition.column,
+      },
+      targetName: modulePath,
+      metadata: {
+        requireType: methodName,
+      },
+    });
+  }
+
+  /**
+   * Get the current context (class, module, or method name)
+   */
+  private getCurrentContext(node: SyntaxNode): string | null {
+    let current = node.parent;
+    while (current) {
+      if (current.type === 'class' || current.type === 'module') {
+        const nameNode = current.childForFieldName('name');
+        return nameNode?.text || null;
+      }
+      if (current.type === 'method') {
+        const nameNode = current.childForFieldName('name');
+        return nameNode?.text || null;
+      }
+      current = current.parent;
+    }
+    return null;
   }
 }
