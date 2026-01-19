@@ -21,3 +21,5 @@ export type {
   ExtractedRelationship,
   ExtractedRelationshipType,
 } from './extractors/typescript-relationships.js';
+export { RubyExtractor } from './extractors/ruby.js';
+export type { RubyExtractorOptions } from './extractors/ruby.js';
