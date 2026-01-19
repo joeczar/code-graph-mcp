@@ -170,18 +170,21 @@ export class TypeScriptExtractor {
   }
 
   private isExported(node: Node): boolean {
-    // Check if node has export keyword
+    // Check if node or parent has export keyword
     let current: Node | null = node;
     while (current) {
-      if (current.type === 'export_statement') {
+      if (
+        current.type === 'export_statement' ||
+        current.type === 'export_default_declaration'
+      ) {
         return true;
       }
       current = current.parent;
     }
 
-    // Check children for export keyword
+    // Check children for export keyword (e.g., export function)
     for (const child of node.children) {
-      if (child.type === 'export') {
+      if (child.type === 'export' || child.text === 'export') {
         return true;
       }
     }
