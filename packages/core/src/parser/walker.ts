@@ -27,12 +27,11 @@ export interface WalkerContext {
 }
 
 /**
- * Visitor callback invoked when entering a node
+ * Visitor callback invoked when entering a node.
+ * Return WalkControl to modify traversal, or return nothing to continue.
  */
-export type EnterCallback = (
-  node: Node,
-  context: WalkerContext
-) => WalkControl | void;
+// eslint-disable-next-line @typescript-eslint/no-invalid-void-type
+export type EnterCallback = (node: Node, context: WalkerContext) => WalkControl | void;
 
 /**
  * Visitor callback invoked when exiting a node
@@ -154,7 +153,7 @@ export class Walker {
     const ancestors: Node[] = [];
     let depth = 0;
 
-    const goToNextNode = (callExitOnParents: boolean = true): boolean => {
+    const goToNextNode = (callExitOnParents = true): boolean => {
       // Try to go to next sibling
       if (cursor.gotoNextSibling()) {
         return true;
@@ -189,8 +188,8 @@ export class Walker {
       return false;
     };
 
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
+    let hasMoreNodes = true;
+    while (hasMoreNodes) {
       const node = cursor.currentNode;
       const shouldVisit = this.shouldVisitNode(node);
 
@@ -202,7 +201,7 @@ export class Walker {
         fieldName: cursor.currentFieldName,
       };
 
-      let control: WalkControl | void = WalkControl.Continue;
+      let control = WalkControl.Continue;
 
       // Call enter callback if we should visit this node
       if (shouldVisit) {
@@ -210,16 +209,15 @@ export class Walker {
 
         // Handle control flow
         if (control === WalkControl.Stop) {
-          break;
+          hasMoreNodes = false;
+          continue;
         }
 
         if (control === WalkControl.SkipSubtree) {
           // Call exit callback before skipping
           this.callExitVisitor(node, context);
           // Skip subtree, go to next node
-          if (!goToNextNode()) {
-            break;
-          }
+          hasMoreNodes = goToNextNode();
           continue;
         }
       }
@@ -237,9 +235,7 @@ export class Walker {
       }
 
       // Go to next node
-      if (!goToNextNode()) {
-        break;
-      }
+      hasMoreNodes = goToNextNode();
     }
   }
 
@@ -265,10 +261,7 @@ export class Walker {
   /**
    * Invoke enter callbacks for a node
    */
-  private callEnterVisitor(
-    node: Node,
-    context: WalkerContext
-  ): WalkControl | void {
+  private callEnterVisitor(node: Node, context: WalkerContext): WalkControl {
     // Type-specific visitor
     const visitor = this.visitors.get(node.type);
     if (visitor?.enter) {

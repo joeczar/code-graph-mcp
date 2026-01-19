@@ -459,7 +459,7 @@ describe('Walker', () => {
       const inner = functions.find((f) => f.name === 'inner');
       expect(inner).toBeDefined();
       expect(inner?.hasParams).toBe(true);
-      expect(inner!.depth).toBeGreaterThan(outer!.depth);
+      expect(inner?.depth).toBeGreaterThan(outer?.depth ?? 0);
     });
   });
 });

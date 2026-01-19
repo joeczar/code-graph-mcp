@@ -27,6 +27,11 @@ export default tseslint.config(
         'error',
         { ignoreArrowShorthand: true },
       ],
+      // Allow void in union types for callback return types (e.g., () => T | void)
+      '@typescript-eslint/no-invalid-void-type': [
+        'error',
+        { allowInGenericTypeArguments: true, allowAsThisParameter: true },
+      ],
     },
   },
   {
