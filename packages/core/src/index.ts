@@ -38,6 +38,7 @@ export type {
   NewEntity,
   EntityType,
   EntityStore,
+  RecentFile,
   Relationship,
   NewRelationship,
   RelationshipType,
