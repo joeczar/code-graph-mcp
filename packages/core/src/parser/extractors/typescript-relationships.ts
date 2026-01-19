@@ -29,7 +29,7 @@ export class TypeScriptRelationshipExtractor {
     return relationships;
   }
 
-  private extractImports(tree: Tree, sourceCode: string): ExtractedRelationship[] {
+  private extractImports(tree: Tree, _sourceCode: string): ExtractedRelationship[] {
     const relationships: ExtractedRelationship[] = [];
     const importStatements = tree.rootNode.descendantsOfType('import_statement');
 
@@ -86,7 +86,7 @@ export class TypeScriptRelationshipExtractor {
     return relationships;
   }
 
-  private extractCalls(tree: Tree, sourceCode: string): ExtractedRelationship[] {
+  private extractCalls(tree: Tree, _sourceCode: string): ExtractedRelationship[] {
     const relationships: ExtractedRelationship[] = [];
     const callExpressions = tree.rootNode.descendantsOfType('call_expression');
 
@@ -119,7 +119,7 @@ export class TypeScriptRelationshipExtractor {
     return relationships;
   }
 
-  private extractClassInheritance(tree: Tree, sourceCode: string): ExtractedRelationship[] {
+  private extractClassInheritance(tree: Tree, _sourceCode: string): ExtractedRelationship[] {
     const relationships: ExtractedRelationship[] = [];
     const classDeclarations = tree.rootNode.descendantsOfType('class_declaration');
 
@@ -157,7 +157,7 @@ export class TypeScriptRelationshipExtractor {
     return relationships;
   }
 
-  private extractInterfaceImplementations(tree: Tree, sourceCode: string): ExtractedRelationship[] {
+  private extractInterfaceImplementations(tree: Tree, _sourceCode: string): ExtractedRelationship[] {
     const relationships: ExtractedRelationship[] = [];
     const classDeclarations = tree.rootNode.descendantsOfType('class_declaration');
 
