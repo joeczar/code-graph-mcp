@@ -199,7 +199,96 @@ export class TypeScriptExtractor {
   }
 
   private extractClass(node: Node, entities: NewEntity[]): void {
-    // Placeholder - will implement in Step 3
+    const nameNode = node.childForFieldName('name');
+    if (!nameNode) {
+      return;
+    }
+
+    const name = nameNode.text;
+    const isExported = this.isExported(node);
+    const typeParameters = this.extractTypeParameters(node);
+
+    // Extract the class entity
+    entities.push({
+      type: 'class',
+      name,
+      filePath: this.filePath,
+      startLine: node.startPosition.row + 1,
+      endLine: node.endPosition.row + 1,
+      language: 'typescript',
+      metadata: {
+        exported: isExported,
+        typeParameters,
+      },
+    });
+
+    // Extract methods within the class
+    this.extractClassMethods(node, entities, name);
+  }
+
+  private extractClassMethods(
+    classNode: Node,
+    entities: NewEntity[],
+    className: string
+  ): void {
+    const bodyNode = classNode.childForFieldName('body');
+    if (!bodyNode) {
+      return;
+    }
+
+    for (const child of bodyNode.children) {
+      if (child.type === 'method_definition') {
+        const methodName = child.childForFieldName('name');
+        if (!methodName) {
+          continue;
+        }
+
+        const name = methodName.text;
+        const isAsync = this.hasModifier(child, 'async');
+        const isGenerator = this.hasModifier(child, 'generator');
+        const isStatic = this.hasModifier(child, 'static');
+
+        const parameters = this.extractParameters(child);
+        const returnType = this.extractReturnType(child);
+
+        entities.push({
+          type: 'method',
+          name: `${className}.${name}`,
+          filePath: this.filePath,
+          startLine: child.startPosition.row + 1,
+          endLine: child.endPosition.row + 1,
+          language: 'typescript',
+          metadata: {
+            className,
+            methodName: name,
+            async: isAsync,
+            generator: isGenerator,
+            static: isStatic,
+            parameters,
+            returnType,
+          },
+        });
+      }
+    }
+  }
+
+  private extractTypeParameters(node: Node): string[] | undefined {
+    const typeParamsNode = node.childForFieldName('type_parameters');
+    if (!typeParamsNode) {
+      return undefined;
+    }
+
+    const params: string[] = [];
+    for (const child of typeParamsNode.children) {
+      if (child.type === 'type_parameter') {
+        const nameNode = child.childForFieldName('name');
+        if (nameNode) {
+          params.push(nameNode.text);
+        }
+      }
+    }
+
+    return params.length > 0 ? params : undefined;
   }
 
   private extractTypeAlias(node: Node, entities: NewEntity[]): void {
