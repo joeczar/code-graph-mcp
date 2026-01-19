@@ -151,7 +151,8 @@ export class RubyRelationshipExtractor {
     const superclassNode = classNode.childForFieldName('superclass');
     if (!superclassNode) return;
 
-    const superclassName = superclassNode.text;
+    // Remove leading '< ' from superclass text
+    const superclassName = superclassNode.text.replace(/^<\s*/, '');
 
     relationships.push({
       type: 'extends',
