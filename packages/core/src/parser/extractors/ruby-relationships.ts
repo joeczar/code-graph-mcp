@@ -32,6 +32,7 @@ export class RubyRelationshipExtractor {
     // Extract relationships based on node type
     if (node.type === 'call') {
       this.extractRequireRelationship(node, relationships, sourceCode);
+      this.extractMethodCallRelationship(node, relationships, sourceCode);
     }
 
     // Recursively walk children
@@ -81,6 +82,48 @@ export class RubyRelationshipExtractor {
       targetName: modulePath,
       metadata: {
         requireType: methodName,
+      },
+    });
+  }
+
+  /**
+   * Extract method call relationships
+   */
+  private extractMethodCallRelationship(
+    callNode: SyntaxNode,
+    relationships: ExtractedRelationship[],
+    sourceCode: string
+  ): void {
+    const methodNode = callNode.childForFieldName('method');
+    if (!methodNode) return;
+
+    const methodName = methodNode.text;
+
+    // Skip require/require_relative as they're handled separately
+    if (methodName === 'require' || methodName === 'require_relative') return;
+
+    // Skip module operations (handled separately)
+    if (methodName === 'include' || methodName === 'extend' || methodName === 'prepend') {
+      return;
+    }
+
+    const sourceName = this.getCurrentContext(callNode);
+    if (!sourceName) return; // Only track calls within a named context
+
+    // Get receiver if present (e.g., obj.method_name)
+    const receiverNode = callNode.childForFieldName('receiver');
+    const receiverName = receiverNode?.text || 'self';
+
+    relationships.push({
+      type: 'calls',
+      sourceName,
+      sourceLocation: {
+        line: callNode.startPosition.row + 1,
+        column: callNode.startPosition.column,
+      },
+      targetName: methodName,
+      metadata: {
+        receiver: receiverName,
       },
     });
   }
