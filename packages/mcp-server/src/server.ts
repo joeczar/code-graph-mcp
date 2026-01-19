@@ -3,16 +3,8 @@ import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { echoTool } from './tools/echo.js';
 import { createErrorResponse } from './tools/types.js';
-
-/**
- * Log an error with context for debugging
- */
-function logToolError(toolName: string, error: unknown, params?: unknown): void {
-  console.error(`[mcp-server] Tool "${toolName}" failed:`, {
-    error: error instanceof Error ? error.stack ?? error.message : error,
-    params,
-  });
-}
+import { logger } from './tools/logger.js';
+import { ToolExecutionError, ToolValidationError } from './tools/errors.js';
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -59,10 +51,45 @@ export function createServer(): McpServer {
           content: result.content.map(item => ({ ...item, type: 'text' as const })),
         };
       } catch (error) {
-        // Only log unexpected errors, not validation errors
-        if (!(error instanceof z.ZodError)) {
-          logToolError(echoTool.metadata.name, error, params);
+        // Convert unknown errors to typed errors for consistent handling
+        let typedError: Error;
+
+        if (error instanceof z.ZodError) {
+          // Wrap Zod validation errors
+          typedError = new ToolValidationError('Input validation failed', {
+            toolName: echoTool.metadata.name,
+            zodError: error.errors,
+          });
+          logger.warn('Tool validation failed', {
+            toolName: echoTool.metadata.name,
+            error: error.errors,
+          });
+        } else if (error instanceof Error) {
+          // Wrap runtime errors
+          typedError = new ToolExecutionError('Tool execution failed', {
+            toolName: echoTool.metadata.name,
+            originalError: error.message,
+            stack: error.stack,
+          });
+          logger.error('Tool execution failed', {
+            toolName: echoTool.metadata.name,
+            error,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            params,
+          });
+        } else {
+          // Wrap completely unknown errors
+          typedError = new ToolExecutionError('Unknown error occurred', {
+            toolName: echoTool.metadata.name,
+            originalError: String(error),
+          });
+          logger.error('Unknown error in tool execution', {
+            toolName: echoTool.metadata.name,
+            error,
+          });
         }
+
+        // For backward compatibility, still use Zod error for response formatting
         const errorResult = createErrorResponse(error);
         return {
           ...errorResult,
