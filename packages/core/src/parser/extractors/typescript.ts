@@ -292,10 +292,51 @@ export class TypeScriptExtractor {
   }
 
   private extractTypeAlias(node: Node, entities: NewEntity[]): void {
-    // Placeholder - will implement in Step 4
+    const nameNode = node.childForFieldName('name');
+    if (!nameNode) {
+      return;
+    }
+
+    const name = nameNode.text;
+    const isExported = this.isExported(node);
+    const typeParameters = this.extractTypeParameters(node);
+
+    entities.push({
+      type: 'type',
+      name,
+      filePath: this.filePath,
+      startLine: node.startPosition.row + 1,
+      endLine: node.endPosition.row + 1,
+      language: 'typescript',
+      metadata: {
+        exported: isExported,
+        typeParameters,
+      },
+    });
   }
 
   private extractInterface(node: Node, entities: NewEntity[]): void {
-    // Placeholder - will implement in Step 4
+    const nameNode = node.childForFieldName('name');
+    if (!nameNode) {
+      return;
+    }
+
+    const name = nameNode.text;
+    const isExported = this.isExported(node);
+    const typeParameters = this.extractTypeParameters(node);
+
+    entities.push({
+      type: 'type',
+      name,
+      filePath: this.filePath,
+      startLine: node.startPosition.row + 1,
+      endLine: node.endPosition.row + 1,
+      language: 'typescript',
+      metadata: {
+        exported: isExported,
+        typeParameters,
+        interface: true,
+      },
+    });
   }
 }
