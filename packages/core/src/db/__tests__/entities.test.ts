@@ -240,4 +240,48 @@ describe('EntityStore', () => {
       expect(counts['type']).toBe(0);
     });
   });
+
+  describe('getRecentFiles', () => {
+    it('returns files with entity counts sorted by last updated', () => {
+      // Create entities in different files
+      store.create({ ...sampleEntity, filePath: '/src/old.ts', name: 'old1' });
+      store.create({ ...sampleEntity, filePath: '/src/old.ts', name: 'old2' });
+
+      // Sleep to ensure different timestamps
+      const later = new Date(Date.now() + 100).toISOString();
+
+      store.create({ ...sampleEntity, filePath: '/src/new.ts', name: 'new1' });
+      store.create({ ...sampleEntity, filePath: '/src/new.ts', name: 'new2' });
+      store.create({ ...sampleEntity, filePath: '/src/new.ts', name: 'new3' });
+
+      const recent = store.getRecentFiles(10);
+
+      expect(recent.length).toBeGreaterThan(0);
+      expect(recent[0]?.filePath).toBeDefined();
+      expect(recent[0]?.entityCount).toBeGreaterThan(0);
+      expect(recent[0]?.lastUpdated).toBeDefined();
+
+      // Check that we have correct counts
+      const newFile = recent.find(f => f.filePath === '/src/new.ts');
+      const oldFile = recent.find(f => f.filePath === '/src/old.ts');
+
+      expect(newFile?.entityCount).toBe(3);
+      expect(oldFile?.entityCount).toBe(2);
+    });
+
+    it('respects limit parameter', () => {
+      store.create({ ...sampleEntity, filePath: '/src/a.ts' });
+      store.create({ ...sampleEntity, filePath: '/src/b.ts' });
+      store.create({ ...sampleEntity, filePath: '/src/c.ts' });
+
+      const recent = store.getRecentFiles(2);
+
+      expect(recent).toHaveLength(2);
+    });
+
+    it('returns empty array for empty database', () => {
+      const recent = store.getRecentFiles(10);
+      expect(recent).toHaveLength(0);
+    });
+  });
 });

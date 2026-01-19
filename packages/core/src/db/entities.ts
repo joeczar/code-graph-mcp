@@ -63,6 +63,12 @@ function rowToEntity(row: EntityRow): Entity {
   return entity;
 }
 
+export interface RecentFile {
+  filePath: string;
+  entityCount: number;
+  lastUpdated: string;
+}
+
 export interface EntityStore {
   create(entity: NewEntity): Entity;
   findById(id: string): Entity | null;
@@ -74,6 +80,7 @@ export interface EntityStore {
   deleteByFile(filePath: string): number;
   count(): number;
   countByType(): Record<EntityType, number>;
+  getRecentFiles(limit: number): RecentFile[];
 }
 
 export function createEntityStore(db: Database.Database): EntityStore {
@@ -96,6 +103,16 @@ export function createEntityStore(db: Database.Database): EntityStore {
   const countByTypeStmt = db.prepare(
     'SELECT type, COUNT(*) as count FROM entities GROUP BY type'
   );
+  const recentFilesStmt = db.prepare(`
+    SELECT
+      file_path as filePath,
+      COUNT(*) as entityCount,
+      MAX(updated_at) as lastUpdated
+    FROM entities
+    GROUP BY file_path
+    ORDER BY lastUpdated DESC
+    LIMIT ?
+  `);
 
   return {
     create(entity: NewEntity): Entity {
@@ -225,6 +242,11 @@ export function createEntityStore(db: Database.Database): EntityStore {
       }
 
       return result;
+    },
+
+    getRecentFiles(limit: number): RecentFile[] {
+      const rows = recentFilesStmt.all(limit) as RecentFile[];
+      return rows;
     },
   };
 }
