@@ -14,7 +14,28 @@ export {
   type SuccessResponse,
   createErrorResponse,
   createSuccessResponse,
+  formatToolResponse,
 } from './types.js';
+
+// Error classes
+export {
+  ToolError,
+  ToolValidationError,
+  ToolNotFoundError,
+  ToolExecutionError,
+  ToolTimeoutError,
+  ResourceNotFoundError,
+  DatabaseError,
+} from './errors.js';
+
+// Logging utilities
+export {
+  logger,
+  createLogger,
+  type Logger,
+  type LogLevel,
+  type LogContext,
+} from './logger.js';
 
 // Tool definitions
 export { echoTool } from './echo.js';
