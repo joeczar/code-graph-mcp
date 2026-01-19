@@ -176,3 +176,32 @@ ELSE:
 2. **No open issues**: Report milestone complete
 3. **All issues blocked**: Report deadlock with dependency chain
 4. **Issue not found**: Report "Issue #X not found"
+
+## Setting Up Dependencies
+
+After identifying the dependency graph, use skills to configure native GitHub dependencies:
+
+### Single Dependency
+
+```
+/add-dependency 11 10
+```
+
+### Multiple Dependencies (Batch)
+
+```
+/batch-dependencies 11:10 10:12 10:13 10:14
+```
+
+### Verify Setup
+
+```
+/query-dependencies 10
+```
+
+### Workflow
+
+1. Analyze milestone → identify dependency graph
+2. Use `/batch-dependencies` to set all relationships
+3. Use `/query-dependencies` to verify each blocked issue
+4. Dependencies now show in GitHub UI and auto-clear on close

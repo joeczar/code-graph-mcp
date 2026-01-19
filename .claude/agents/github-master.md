@@ -203,6 +203,30 @@ gh issue edit <number> --milestone "<milestone-name>"
 gh issue list --milestone "<milestone-name>" --state all
 ```
 
+## Issue Dependencies
+
+Use GitHub's native dependency tracking for automatic "Blocked" indicators.
+
+### Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `/add-dependency <blocked> <blocking>` | Add single dependency |
+| `/query-dependencies <issue>` | View what blocks/is blocked |
+| `/batch-dependencies <pairs>` | Set multiple dependencies |
+
+### When to Use
+
+- After creating related issues
+- When setting up milestone execution order
+- When an issue should wait for another
+
+### Notes
+
+- Native dependencies auto-clear when blocking issue closes
+- Max 50 dependencies per issue; same repo only
+- Keep text markers in issue body for human readability
+
 ## Safety Rules
 
 1. **Never force push to main**
