@@ -14,3 +14,5 @@ export type {
   Visitor,
   WalkOptions,
 } from './walker.js';
+export { TypeScriptExtractor } from './extractors/typescript.js';
+export type { TypeScriptExtractorOptions } from './extractors/typescript.js';
