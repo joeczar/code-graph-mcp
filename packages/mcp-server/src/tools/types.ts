@@ -37,8 +37,30 @@ export interface ToolDefinition<TInput extends z.ZodType> {
  * Tool response format for MCP protocol
  */
 export interface ToolResponse {
-  content: { type: string; text: string }[];
+  content: { type: 'text'; text: string }[];
   isError?: boolean;
+}
+
+/**
+ * Error response type with isError always true
+ */
+export type ErrorResponse = ToolResponse & { isError: true };
+
+/**
+ * Success response type with isError always false or undefined
+ */
+export type SuccessResponse = ToolResponse & { isError?: false };
+
+/**
+ * Creates a standardized success response for tool results
+ *
+ * @param text - The text content to return
+ * @returns Formatted success response for MCP protocol
+ */
+export function createSuccessResponse(text: string): SuccessResponse {
+  return {
+    content: [{ type: 'text', text }],
+  };
 }
 
 /**
@@ -47,24 +69,25 @@ export interface ToolResponse {
  * @param error - Error object, string, or unknown error
  * @returns Formatted error response for MCP protocol
  */
-export function createErrorResponse(error: unknown): ToolResponse {
+export function createErrorResponse(error: unknown): ErrorResponse {
   let message: string;
 
-  if (error instanceof Error) {
+  if (error instanceof z.ZodError) {
+    // Provide detailed validation error messages
+    const issues = error.errors
+      .map(e => `${e.path.join('.')}: ${e.message}`)
+      .join('; ');
+    message = `Validation error: ${issues}`;
+  } else if (error instanceof Error) {
     message = `Error: ${error.message}`;
   } else if (typeof error === 'string') {
     message = `Error: ${error}`;
   } else {
-    message = 'Error: Unknown error';
+    message = 'Error: An unexpected error occurred';
   }
 
   return {
-    content: [
-      {
-        type: 'text',
-        text: message,
-      },
-    ],
+    content: [{ type: 'text', text: message }],
     isError: true,
   };
 }

@@ -10,7 +10,10 @@ export {
   type ToolHandler,
   type ToolDefinition,
   type ToolResponse,
+  type ErrorResponse,
+  type SuccessResponse,
   createErrorResponse,
+  createSuccessResponse,
 } from './types.js';
 
 // Tool definitions

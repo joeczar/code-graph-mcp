@@ -79,8 +79,9 @@ describe('yourTool', () => {
   });
 
   describe('handler', () => {
-    it('should process valid input', async () => {
-      const response = await yourTool.handler({
+    it('should process valid input', () => {
+      // Handler can be sync or async - await works for both
+      const response = yourTool.handler({
         param1: 'test',
         param2: 42,
       });
@@ -147,6 +148,7 @@ server.registerTool(
 
 ### ping
 Simple connectivity test tool. Returns "pong" to verify server is responsive.
+Defined inline in `server.ts` as it requires no validation.
 
 ### echo
 Demonstration tool that echoes back a message. Useful as a template for new tools.

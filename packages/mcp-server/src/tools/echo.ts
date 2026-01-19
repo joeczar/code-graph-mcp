@@ -8,7 +8,6 @@
 import { z } from 'zod';
 import { type ToolDefinition } from './types.js';
 
-// Define input schema with Zod
 const echoInputSchema = z.object({
   message: z.string().describe('The message to echo back'),
 });

@@ -1,6 +1,17 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import { echoTool } from './tools/echo.js';
 import { createErrorResponse } from './tools/types.js';
+
+/**
+ * Log an error with context for debugging
+ */
+function logToolError(toolName: string, error: unknown, params?: unknown): void {
+  console.error(`[mcp-server] Tool "${toolName}" failed:`, {
+    error: error instanceof Error ? error.stack ?? error.message : error,
+    params,
+  });
+}
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -58,6 +69,10 @@ export function createServer(): McpServer {
           content: result.content.map(item => ({ ...item, type: 'text' as const })),
         };
       } catch (error) {
+        // Only log unexpected errors, not validation errors
+        if (!(error instanceof z.ZodError)) {
+          logToolError(echoTool.metadata.name, error, params);
+        }
         const errorResult = createErrorResponse(error);
         return {
           ...errorResult,
