@@ -132,9 +132,13 @@ describe('Custom Error Classes', () => {
         metadata: error.metadata,
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const parsed = JSON.parse(serialized);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(parsed.name).toBe('ToolValidationError');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(parsed.message).toBe('Invalid input');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(parsed.metadata).toEqual({ field: 'age', value: -1 });
     });
   });

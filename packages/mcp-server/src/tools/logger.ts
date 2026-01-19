@@ -7,9 +7,7 @@ export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 /**
  * Log context with optional metadata
  */
-export interface LogContext {
-  [key: string]: unknown;
-}
+export type LogContext = Record<string, unknown>;
 
 /**
  * Logger interface for structured logging
@@ -44,7 +42,7 @@ export function createLogger(minLevel: LogLevel = 'info'): Logger {
     return LOG_LEVEL_PRIORITY[level] >= minPriority;
   }
 
-  function formatMessage(level: LogLevel, message: string): string {
+  function formatMessage(level: LogLevel): string {
     const timestamp = new Date().toISOString();
     return `${timestamp} [${level.toUpperCase()}]`;
   }
@@ -59,7 +57,7 @@ export function createLogger(minLevel: LogLevel = 'info'): Logger {
       return;
     }
 
-    const formattedPrefix = formatMessage(level, message);
+    const formattedPrefix = formatMessage(level);
 
     if (context !== undefined) {
       consoleFn(formattedPrefix, message, context);

@@ -10,6 +10,7 @@ export class ToolError extends Error {
     this.metadata = metadata;
 
     // Maintains proper stack trace for where our error was thrown (V8 only)
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, this.constructor);
     }

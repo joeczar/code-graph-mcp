@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-empty-function */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { logger, createLogger, type LogLevel } from '../logger.js';
+import { logger, createLogger } from '../logger.js';
 import { ToolExecutionError } from '../errors.js';
 
 describe('logger', () => {
@@ -145,7 +146,7 @@ describe('logger', () => {
       const spy = vi.spyOn(console, 'info').mockImplementation(() => {});
       logger.info('Test message');
 
-      const logMessage = spy.mock.calls[0]?.[0] as string;
+      const logMessage = String(spy.mock.calls[0]?.[0]);
       expect(logMessage).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z \[INFO\]$/);
     });
 
@@ -153,7 +154,7 @@ describe('logger', () => {
       const spy = vi.spyOn(console, 'info').mockImplementation(() => {});
       logger.info('Test message');
 
-      const message = spy.mock.calls[0]?.[1];
+      const message = String(spy.mock.calls[0]?.[1]);
       expect(message).toBe('Test message');
     });
   });
