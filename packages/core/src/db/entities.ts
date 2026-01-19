@@ -1,13 +1,17 @@
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 
-export type EntityType =
-  | 'function'
-  | 'class'
-  | 'method'
-  | 'module'
-  | 'file'
-  | 'type';
+/** All valid entity types */
+export const ALL_ENTITY_TYPES = [
+  'function',
+  'class',
+  'method',
+  'module',
+  'file',
+  'type',
+] as const;
+
+export type EntityType = (typeof ALL_ENTITY_TYPES)[number];
 
 export interface Entity {
   id: string;
@@ -63,6 +67,12 @@ function rowToEntity(row: EntityRow): Entity {
   return entity;
 }
 
+export interface RecentFile {
+  filePath: string;
+  entityCount: number;
+  lastUpdated: string;
+}
+
 export interface EntityStore {
   create(entity: NewEntity): Entity;
   findById(id: string): Entity | null;
@@ -73,6 +83,8 @@ export interface EntityStore {
   delete(id: string): boolean;
   deleteByFile(filePath: string): number;
   count(): number;
+  countByType(): Record<EntityType, number>;
+  getRecentFiles(limit: number): RecentFile[];
 }
 
 export function createEntityStore(db: Database.Database): EntityStore {
@@ -92,6 +104,19 @@ export function createEntityStore(db: Database.Database): EntityStore {
     'DELETE FROM entities WHERE file_path = ?'
   );
   const countStmt = db.prepare('SELECT COUNT(*) as count FROM entities');
+  const countByTypeStmt = db.prepare(
+    'SELECT type, COUNT(*) as count FROM entities GROUP BY type'
+  );
+  const recentFilesStmt = db.prepare(`
+    SELECT
+      file_path as filePath,
+      COUNT(*) as entityCount,
+      MAX(updated_at) as lastUpdated
+    FROM entities
+    GROUP BY file_path
+    ORDER BY lastUpdated DESC
+    LIMIT ?
+  `);
 
   return {
     create(entity: NewEntity): Entity {
@@ -200,6 +225,27 @@ export function createEntityStore(db: Database.Database): EntityStore {
     count(): number {
       const row = countStmt.get() as { count: number };
       return row.count;
+    },
+
+    countByType(): Record<EntityType, number> {
+      const rows = countByTypeStmt.all() as { type: string; count: number }[];
+
+      // Initialize all types to 0 using the constant
+      const result = Object.fromEntries(
+        ALL_ENTITY_TYPES.map(t => [t, 0])
+      ) as Record<EntityType, number>;
+
+      // Fill in actual counts from database
+      for (const row of rows) {
+        result[row.type as EntityType] = row.count;
+      }
+
+      return result;
+    },
+
+    getRecentFiles(limit: number): RecentFile[] {
+      const rows = recentFilesStmt.all(limit) as RecentFile[];
+      return rows;
     },
   };
 }

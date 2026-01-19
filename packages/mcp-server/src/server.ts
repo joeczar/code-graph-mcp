@@ -2,8 +2,70 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { echoTool } from './tools/echo.js';
-import { createErrorResponse } from './tools/types.js';
+import { graphStatusTool } from './tools/graph-status.js';
+import { createErrorResponse, type ToolDefinition } from './tools/types.js';
 import { logger } from './tools/logger.js';
+
+/**
+ * Register a tool with the MCP server using the standard pattern
+ *
+ * Handles:
+ * - JSON Schema generation from Zod schema
+ * - Input validation with Zod
+ * - Error logging for non-validation errors
+ * - Consistent response formatting
+ */
+function registerTool<T extends z.ZodType>(
+  server: McpServer,
+  tool: ToolDefinition<T>
+): void {
+  server.registerTool(
+    tool.metadata.name,
+    {
+      title: tool.metadata.name,
+      description: tool.metadata.description,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+      inputSchema: zodToJsonSchema(tool.metadata.inputSchema) as any,
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async (params: any) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+        const validated = tool.metadata.inputSchema.parse(params.params);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        const result = await tool.handler(validated);
+        return {
+          ...result,
+          content: result.content.map(item => ({ ...item, type: 'text' as const })),
+        };
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          logger.warn('Tool validation failed', {
+            toolName: tool.metadata.name,
+            error: error.errors,
+          });
+        } else if (error instanceof Error) {
+          logger.error('Tool execution failed', {
+            toolName: tool.metadata.name,
+            error,
+            params,
+          });
+        } else {
+          logger.error('Unknown error in tool execution', {
+            toolName: tool.metadata.name,
+            error,
+            params,
+          });
+        }
+        const errorResult = createErrorResponse(error);
+        return {
+          ...errorResult,
+          content: errorResult.content.map(item => ({ ...item, type: 'text' as const })),
+        };
+      }
+    }
+  );
+}
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -26,62 +88,9 @@ export function createServer(): McpServer {
     }
   );
 
-  // Register echo tool using the tool registration pattern
-  server.registerTool(
-    echoTool.metadata.name,
-    {
-      title: echoTool.metadata.name,
-      description: echoTool.metadata.description,
-      // Generate JSON Schema from Zod schema - single source of truth
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-      inputSchema: zodToJsonSchema(echoTool.metadata.inputSchema) as any,
-    },
-    // MCP SDK handler signature uses any for params
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    async (params: any) => {
-      try {
-        // Validate input with Zod
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        const validated = echoTool.metadata.inputSchema.parse(params.params);
-        // Call the tool handler with validated input
-        const result = await echoTool.handler(validated);
-        return {
-          ...result,
-          content: result.content.map(item => ({ ...item, type: 'text' as const })),
-        };
-      } catch (error) {
-        // Convert unknown errors to typed errors for consistent handling
-        if (error instanceof z.ZodError) {
-          // Wrap Zod validation errors
-          logger.warn('Tool validation failed', {
-            toolName: echoTool.metadata.name,
-            error: error.errors,
-          });
-        } else if (error instanceof Error) {
-          // Wrap runtime errors
-          logger.error('Tool execution failed', {
-            toolName: echoTool.metadata.name,
-            error,
-            params,
-          });
-        } else {
-          // Wrap completely unknown errors
-          logger.error('Unknown error in tool execution', {
-            toolName: echoTool.metadata.name,
-            error,
-            params,
-          });
-        }
-
-        // For backward compatibility, still use original error for response formatting
-        const errorResult = createErrorResponse(error);
-        return {
-          ...errorResult,
-          content: errorResult.content.map(item => ({ ...item, type: 'text' as const })),
-        };
-      }
-    }
-  );
+  // Register tools using the standard pattern
+  registerTool(server, echoTool);
+  registerTool(server, graphStatusTool);
 
   return server;
 }

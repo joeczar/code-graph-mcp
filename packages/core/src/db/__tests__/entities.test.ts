@@ -211,4 +211,72 @@ describe('EntityStore', () => {
       expect(store.count()).toBe(2);
     });
   });
+
+  describe('countByType', () => {
+    it('returns counts grouped by entity type', () => {
+      store.create({ ...sampleEntity, type: 'function', name: 'fn1' });
+      store.create({ ...sampleEntity, type: 'function', name: 'fn2' });
+      store.create({ ...sampleEntity, type: 'class', name: 'Class1' });
+      store.create({ ...sampleEntity, type: 'method', name: 'method1' });
+
+      const counts = store.countByType();
+
+      expect(counts.function).toBe(2);
+      expect(counts.class).toBe(1);
+      expect(counts.method).toBe(1);
+      expect(counts.module).toBe(0);
+      expect(counts.file).toBe(0);
+      expect(counts.type).toBe(0);
+    });
+
+    it('returns all zeros for empty database', () => {
+      const counts = store.countByType();
+
+      expect(counts.function).toBe(0);
+      expect(counts.class).toBe(0);
+      expect(counts.method).toBe(0);
+      expect(counts.module).toBe(0);
+      expect(counts.file).toBe(0);
+      expect(counts.type).toBe(0);
+    });
+  });
+
+  describe('getRecentFiles', () => {
+    it('returns files with entity counts sorted by last updated', () => {
+      // Create entities in different files
+      store.create({ ...sampleEntity, filePath: '/src/old.ts', name: 'old1' });
+      store.create({ ...sampleEntity, filePath: '/src/old.ts', name: 'old2' });
+
+      store.create({ ...sampleEntity, filePath: '/src/new.ts', name: 'new1' });
+      store.create({ ...sampleEntity, filePath: '/src/new.ts', name: 'new2' });
+      store.create({ ...sampleEntity, filePath: '/src/new.ts', name: 'new3' });
+
+      const recent = store.getRecentFiles(10);
+
+      expect(recent).toHaveLength(2);
+
+      // Verify sorting: new.ts should be first (most recently updated)
+      expect(recent[0]?.filePath).toBe('/src/new.ts');
+      expect(recent[0]?.entityCount).toBe(3);
+
+      // old.ts should be second
+      expect(recent[1]?.filePath).toBe('/src/old.ts');
+      expect(recent[1]?.entityCount).toBe(2);
+    });
+
+    it('respects limit parameter', () => {
+      store.create({ ...sampleEntity, filePath: '/src/a.ts' });
+      store.create({ ...sampleEntity, filePath: '/src/b.ts' });
+      store.create({ ...sampleEntity, filePath: '/src/c.ts' });
+
+      const recent = store.getRecentFiles(2);
+
+      expect(recent).toHaveLength(2);
+    });
+
+    it('returns empty array for empty database', () => {
+      const recent = store.getRecentFiles(10);
+      expect(recent).toHaveLength(0);
+    });
+  });
 });

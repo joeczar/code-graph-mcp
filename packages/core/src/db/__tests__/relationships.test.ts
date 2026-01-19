@@ -245,6 +245,43 @@ describe('RelationshipStore', () => {
     });
   });
 
+  describe('countByType', () => {
+    it('returns counts grouped by relationship type', () => {
+      // Create additional entities
+      const other = entityStore.create({
+        type: 'class',
+        name: 'Base',
+        filePath: '/src/base.ts',
+        startLine: 1,
+        endLine: 20,
+        language: 'typescript',
+      });
+
+      store.create({ sourceId, targetId, type: 'calls' });
+      store.create({ sourceId, targetId: other.id, type: 'imports' });
+      store.create({ sourceId: other.id, targetId, type: 'imports' });
+      store.create({ sourceId: other.id, targetId, type: 'extends' });
+
+      const counts = store.countByType();
+
+      expect(counts.calls).toBe(1);
+      expect(counts.imports).toBe(2);
+      expect(counts.extends).toBe(1);
+      expect(counts.implements).toBe(0);
+      expect(counts.contains).toBe(0);
+    });
+
+    it('returns all zeros for empty database', () => {
+      const counts = store.countByType();
+
+      expect(counts.calls).toBe(0);
+      expect(counts.imports).toBe(0);
+      expect(counts.extends).toBe(0);
+      expect(counts.implements).toBe(0);
+      expect(counts.contains).toBe(0);
+    });
+  });
+
   describe('cascading delete', () => {
     it('deletes relationships when source entity is deleted', () => {
       store.create(createSampleRelationship());

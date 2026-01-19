@@ -1,12 +1,16 @@
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 
-export type RelationshipType =
-  | 'calls'
-  | 'imports'
-  | 'extends'
-  | 'implements'
-  | 'contains';
+/** All valid relationship types */
+export const ALL_RELATIONSHIP_TYPES = [
+  'calls',
+  'imports',
+  'extends',
+  'implements',
+  'contains',
+] as const;
+
+export type RelationshipType = (typeof ALL_RELATIONSHIP_TYPES)[number];
 
 export interface Relationship {
   id: string;
@@ -60,6 +64,7 @@ export interface RelationshipStore {
   delete(id: string): boolean;
   deleteByEntity(entityId: string): number;
   count(): number;
+  countByType(): Record<RelationshipType, number>;
 }
 
 export function createRelationshipStore(db: Database.Database): RelationshipStore {
@@ -86,6 +91,9 @@ export function createRelationshipStore(db: Database.Database): RelationshipStor
     'DELETE FROM relationships WHERE source_id = ? OR target_id = ?'
   );
   const countStmt = db.prepare('SELECT COUNT(*) as count FROM relationships');
+  const countByTypeStmt = db.prepare(
+    'SELECT type, COUNT(*) as count FROM relationships GROUP BY type'
+  );
 
   return {
     create(rel: NewRelationship): Relationship {
@@ -136,6 +144,22 @@ export function createRelationshipStore(db: Database.Database): RelationshipStor
     count(): number {
       const row = countStmt.get() as { count: number };
       return row.count;
+    },
+
+    countByType(): Record<RelationshipType, number> {
+      const rows = countByTypeStmt.all() as { type: string; count: number }[];
+
+      // Initialize all types to 0 using the constant
+      const result = Object.fromEntries(
+        ALL_RELATIONSHIP_TYPES.map(t => [t, 0])
+      ) as Record<RelationshipType, number>;
+
+      // Fill in actual counts from database
+      for (const row of rows) {
+        result[row.type as RelationshipType] = row.count;
+      }
+
+      return result;
     },
   };
 }
