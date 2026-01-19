@@ -152,7 +152,7 @@ export class RubyExtractor {
     const params: string[] = [];
     for (let i = 0; i < paramsNode.childCount; i++) {
       const child = paramsNode.child(i);
-      if (child && child.type === 'identifier') {
+      if (child?.type === 'identifier') {
         params.push(child.text);
       }
     }
