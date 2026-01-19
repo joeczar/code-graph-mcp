@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Build packages
+        run: pnpm build
+
       - name: Run ESLint
         run: pnpm lint
 
@@ -46,6 +49,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Build packages
+        run: pnpm build
+
       - name: Run TypeScript type check
         run: pnpm typecheck
 
@@ -66,6 +72,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
+
+      - name: Build packages
+        run: pnpm build
 
       - name: Run tests
         run: pnpm test
