@@ -60,6 +60,7 @@ export interface RelationshipStore {
   delete(id: string): boolean;
   deleteByEntity(entityId: string): number;
   count(): number;
+  countByType(): Record<RelationshipType, number>;
 }
 
 export function createRelationshipStore(db: Database.Database): RelationshipStore {
@@ -86,6 +87,9 @@ export function createRelationshipStore(db: Database.Database): RelationshipStor
     'DELETE FROM relationships WHERE source_id = ? OR target_id = ?'
   );
   const countStmt = db.prepare('SELECT COUNT(*) as count FROM relationships');
+  const countByTypeStmt = db.prepare(
+    'SELECT type, COUNT(*) as count FROM relationships GROUP BY type'
+  );
 
   return {
     create(rel: NewRelationship): Relationship {
@@ -136,6 +140,26 @@ export function createRelationshipStore(db: Database.Database): RelationshipStor
     count(): number {
       const row = countStmt.get() as { count: number };
       return row.count;
+    },
+
+    countByType(): Record<RelationshipType, number> {
+      const rows = countByTypeStmt.all() as Array<{ type: string; count: number }>;
+
+      // Initialize all types to 0
+      const result: Record<RelationshipType, number> = {
+        calls: 0,
+        imports: 0,
+        extends: 0,
+        implements: 0,
+        contains: 0,
+      };
+
+      // Fill in actual counts from database
+      for (const row of rows) {
+        result[row.type as RelationshipType] = row.count;
+      }
+
+      return result;
     },
   };
 }

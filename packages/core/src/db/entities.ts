@@ -73,6 +73,7 @@ export interface EntityStore {
   delete(id: string): boolean;
   deleteByFile(filePath: string): number;
   count(): number;
+  countByType(): Record<EntityType, number>;
 }
 
 export function createEntityStore(db: Database.Database): EntityStore {
@@ -92,6 +93,9 @@ export function createEntityStore(db: Database.Database): EntityStore {
     'DELETE FROM entities WHERE file_path = ?'
   );
   const countStmt = db.prepare('SELECT COUNT(*) as count FROM entities');
+  const countByTypeStmt = db.prepare(
+    'SELECT type, COUNT(*) as count FROM entities GROUP BY type'
+  );
 
   return {
     create(entity: NewEntity): Entity {
@@ -200,6 +204,27 @@ export function createEntityStore(db: Database.Database): EntityStore {
     count(): number {
       const row = countStmt.get() as { count: number };
       return row.count;
+    },
+
+    countByType(): Record<EntityType, number> {
+      const rows = countByTypeStmt.all() as Array<{ type: string; count: number }>;
+
+      // Initialize all types to 0
+      const result: Record<EntityType, number> = {
+        function: 0,
+        class: 0,
+        method: 0,
+        module: 0,
+        file: 0,
+        type: 0,
+      };
+
+      // Fill in actual counts from database
+      for (const row of rows) {
+        result[row.type as EntityType] = row.count;
+      }
+
+      return result;
     },
   };
 }

@@ -211,4 +211,33 @@ describe('EntityStore', () => {
       expect(store.count()).toBe(2);
     });
   });
+
+  describe('countByType', () => {
+    it('returns counts grouped by entity type', () => {
+      store.create({ ...sampleEntity, type: 'function', name: 'fn1' });
+      store.create({ ...sampleEntity, type: 'function', name: 'fn2' });
+      store.create({ ...sampleEntity, type: 'class', name: 'Class1' });
+      store.create({ ...sampleEntity, type: 'method', name: 'method1' });
+
+      const counts = store.countByType();
+
+      expect(counts['function']).toBe(2);
+      expect(counts['class']).toBe(1);
+      expect(counts['method']).toBe(1);
+      expect(counts['module']).toBe(0);
+      expect(counts['file']).toBe(0);
+      expect(counts['type']).toBe(0);
+    });
+
+    it('returns all zeros for empty database', () => {
+      const counts = store.countByType();
+
+      expect(counts['function']).toBe(0);
+      expect(counts['class']).toBe(0);
+      expect(counts['method']).toBe(0);
+      expect(counts['module']).toBe(0);
+      expect(counts['file']).toBe(0);
+      expect(counts['type']).toBe(0);
+    });
+  });
 });
