@@ -47,6 +47,10 @@ export type {
   MigrationRunner,
 } from './db/index.js';
 
+// Graph exports
+export { FileProcessor } from './graph/index.js';
+export type { ProcessFileOptions, ProcessFileResult } from './graph/index.js';
+
 // Checkpoint exports
 export {
   getCheckpointDb,
