@@ -5,6 +5,7 @@
  */
 
 import { z } from 'zod';
+import { ToolError } from './errors.js';
 
 /**
  * Tool metadata defining how to register a tool with the MCP server
@@ -78,6 +79,24 @@ export function createErrorResponse(error: unknown): ErrorResponse {
       .map(e => `${e.path.join('.')}: ${e.message}`)
       .join('; ');
     message = `Validation error: ${issues}`;
+  } else if (error instanceof ToolError) {
+    // Handle custom error types with metadata
+    message = `${error.name}: ${error.message}`;
+    if (Object.keys(error.metadata).length > 0) {
+      // Use replacer to properly serialize Error objects in metadata
+      const replacer = (_key: string, value: unknown): unknown => {
+        if (value instanceof Error) {
+          return {
+            name: value.name,
+            message: value.message,
+            stack: value.stack,
+          };
+        }
+        return value;
+      };
+      const metadataStr = JSON.stringify(error.metadata, replacer, 2);
+      message += `\nMetadata: ${metadataStr}`;
+    }
   } else if (error instanceof Error) {
     message = `Error: ${error.message}`;
   } else if (typeof error === 'string') {
@@ -90,4 +109,31 @@ export function createErrorResponse(error: unknown): ErrorResponse {
     content: [{ type: 'text', text: message }],
     isError: true,
   };
+}
+
+/**
+ * Formats any value into a standardized tool response
+ *
+ * Handles strings, objects, arrays, primitives with appropriate formatting.
+ *
+ * @param value - Value to format
+ * @returns Formatted success response
+ */
+export function formatToolResponse(value: unknown): SuccessResponse {
+  let text: string;
+
+  if (value === undefined) {
+    text = '';
+  } else if (value === null) {
+    text = 'null';
+  } else if (typeof value === 'string') {
+    text = value;
+  } else if (typeof value === 'number' || typeof value === 'boolean') {
+    text = String(value);
+  } else {
+    // Format objects and arrays as pretty-printed JSON
+    text = JSON.stringify(value, null, 2);
+  }
+
+  return createSuccessResponse(text);
 }

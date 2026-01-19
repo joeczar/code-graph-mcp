@@ -52,14 +52,17 @@ describe('ping tool', () => {
 
 describe('echo tool integration', () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    // Suppress console.error during tests
+    // Suppress console.error and console.warn during tests
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   it('should register echo tool with correct metadata', () => {
@@ -114,13 +117,13 @@ describe('echo tool integration', () => {
     }
   });
 
-  it('should log unexpected errors but not validation errors', async () => {
+  it('should log errors appropriately based on type', async () => {
     // This tests the error logging behavior in server.ts
-    // The logToolError function should only be called for non-ZodError exceptions
+    // Validation errors should log as warnings, runtime errors as errors
     const { createErrorResponse } = await import('./tools/types.js');
     const { z } = await import('zod');
 
-    // Create a validation error - should NOT trigger logging
+    // Create a validation error - should trigger warning log
     const zodError = new z.ZodError([
       { code: 'invalid_type', expected: 'string', received: 'number', path: ['message'], message: 'Expected string' },
     ]);
@@ -128,7 +131,7 @@ describe('echo tool integration', () => {
     expect(validationResponse.isError).toBe(true);
     expect(validationResponse.content[0]?.text).toContain('Validation error:');
 
-    // Create a regular error - would trigger logging in the actual handler
+    // Create a regular error - would trigger error log in the actual handler
     const regularError = new Error('Something went wrong');
     const errorResponse = createErrorResponse(regularError);
     expect(errorResponse.isError).toBe(true);
