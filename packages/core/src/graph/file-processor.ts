@@ -321,22 +321,29 @@ export class FileProcessor {
     // Extract class inheritance
     if (node.type === 'class_declaration') {
       const nameNode = node.childForFieldName('name');
-      const heritageNode = node.childForFieldName('heritage');
 
-      if (nameNode && heritageNode) {
-        const extendsClause = heritageNode.children.find(
-          (child: SyntaxNode) => child.type === 'extends_clause'
-        );
-        if (extendsClause) {
-          const superClass = extendsClause.children.find(
-            (child: SyntaxNode) => child.type === 'identifier'
-          );
-          if (superClass) {
-            relationships.push({
-              sourceId: nameNode.text,
-              targetId: superClass.text,
-              type: 'extends',
-            });
+      // Look for class_heritage child
+      for (let i = 0; i < node.childCount; i++) {
+        const child = node.child(i);
+        if (child && child.type === 'class_heritage') {
+          // class_heritage contains extends_clause
+          for (let j = 0; j < child.childCount; j++) {
+            const heritageChild = child.child(j);
+            if (heritageChild && heritageChild.type === 'extends_clause') {
+              // extends_clause has: [extends keyword, identifier]
+              // We want the identifier (usually second child)
+              for (let k = 0; k < heritageChild.childCount; k++) {
+                const extendsChild = heritageChild.child(k);
+                if (extendsChild && extendsChild.type === 'identifier' && nameNode) {
+                  relationships.push({
+                    sourceId: nameNode.text,
+                    targetId: extendsChild.text,
+                    type: 'extends',
+                  });
+                  break;
+                }
+              }
+            }
           }
         }
       }
@@ -366,11 +373,19 @@ export class FileProcessor {
       const superclassNode = node.childForFieldName('superclass');
 
       if (nameNode && superclassNode) {
-        relationships.push({
-          sourceId: nameNode.text,
-          targetId: superclassNode.text,
-          type: 'extends',
-        });
+        // Superclass node contains: ["<", "constant"]
+        // Find the constant child
+        for (let i = 0; i < superclassNode.childCount; i++) {
+          const child = superclassNode.child(i);
+          if (child && child.type === 'constant') {
+            relationships.push({
+              sourceId: nameNode.text,
+              targetId: child.text,
+              type: 'extends',
+            });
+            break;
+          }
+        }
       }
     }
 
