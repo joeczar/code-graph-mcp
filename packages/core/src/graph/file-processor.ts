@@ -2,7 +2,7 @@ import type Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import type { Tree } from 'web-tree-sitter';
-import { CodeParser, type ParseResult } from '../parser/parser.js';
+import { CodeParser } from '../parser/parser.js';
 import { type Entity, type NewEntity, createEntityStore } from '../db/entities.js';
 import {
   type Relationship,
@@ -294,8 +294,8 @@ export class FileProcessor {
     node: SyntaxNode,
     filePath: string,
     language: string
-  ): Array<Omit<NewRelationship, 'sourceId' | 'targetId'> & { sourceId: string; targetId: string }> {
-    const relationships: Array<Omit<NewRelationship, 'sourceId' | 'targetId'> & { sourceId: string; targetId: string }> = [];
+  ): (Omit<NewRelationship, 'sourceId' | 'targetId'> & { sourceId: string; targetId: string })[] {
+    const relationships: (Omit<NewRelationship, 'sourceId' | 'targetId'> & { sourceId: string; targetId: string })[] = [];
 
     // TypeScript/JavaScript relationships
     if (language === 'typescript' || language === 'javascript') {
@@ -316,7 +316,7 @@ export class FileProcessor {
   private extractTypeScriptRelationships(
     node: SyntaxNode,
     filePath: string,
-    relationships: Array<Omit<NewRelationship, 'sourceId' | 'targetId'> & { sourceId: string; targetId: string }>
+    relationships: (Omit<NewRelationship, 'sourceId' | 'targetId'> & { sourceId: string; targetId: string })[]
   ): void {
     // Extract class inheritance
     if (node.type === 'class_declaration') {
@@ -325,16 +325,16 @@ export class FileProcessor {
       // Look for class_heritage child
       for (let i = 0; i < node.childCount; i++) {
         const child = node.child(i);
-        if (child && child.type === 'class_heritage') {
+        if (child?.type === 'class_heritage') {
           // class_heritage contains extends_clause
           for (let j = 0; j < child.childCount; j++) {
             const heritageChild = child.child(j);
-            if (heritageChild && heritageChild.type === 'extends_clause') {
+            if (heritageChild?.type === 'extends_clause') {
               // extends_clause has: [extends keyword, identifier]
               // We want the identifier (usually second child)
               for (let k = 0; k < heritageChild.childCount; k++) {
                 const extendsChild = heritageChild.child(k);
-                if (extendsChild && extendsChild.type === 'identifier' && nameNode) {
+                if (extendsChild?.type === 'identifier' && nameNode) {
                   relationships.push({
                     sourceId: nameNode.text,
                     targetId: extendsChild.text,
@@ -365,7 +365,7 @@ export class FileProcessor {
   private extractRubyRelationships(
     node: SyntaxNode,
     filePath: string,
-    relationships: Array<Omit<NewRelationship, 'sourceId' | 'targetId'> & { sourceId: string; targetId: string }>
+    relationships: (Omit<NewRelationship, 'sourceId' | 'targetId'> & { sourceId: string; targetId: string })[]
   ): void {
     // Extract class inheritance
     if (node.type === 'class') {
@@ -377,7 +377,7 @@ export class FileProcessor {
         // Find the constant child
         for (let i = 0; i < superclassNode.childCount; i++) {
           const child = superclassNode.child(i);
-          if (child && child.type === 'constant') {
+          if (child?.type === 'constant') {
             relationships.push({
               sourceId: nameNode.text,
               targetId: child.text,
