@@ -15,11 +15,11 @@ export class RubyRelationshipExtractor {
   /**
    * Extract all relationships from a Ruby AST
    */
-  extract(rootNode: SyntaxNode, sourceCode: string): ExtractedRelationship[] {
+  extract(rootNode: SyntaxNode, _sourceCode: string): ExtractedRelationship[] {
     const relationships: ExtractedRelationship[] = [];
 
     // Will implement extraction logic in subsequent steps
-    this.walkNode(rootNode, relationships, sourceCode);
+    this.walkNode(rootNode, relationships, _sourceCode);
 
     return relationships;
   }
@@ -27,20 +27,20 @@ export class RubyRelationshipExtractor {
   private walkNode(
     node: SyntaxNode,
     relationships: ExtractedRelationship[],
-    sourceCode: string
+    _sourceCode: string
   ): void {
     // Extract relationships based on node type
     if (node.type === 'call') {
-      this.extractRequireRelationship(node, relationships, sourceCode);
-      this.extractModuleOperationRelationship(node, relationships, sourceCode);
-      this.extractMethodCallRelationship(node, relationships, sourceCode);
+      this.extractRequireRelationship(node, relationships, _sourceCode);
+      this.extractModuleOperationRelationship(node, relationships, _sourceCode);
+      this.extractMethodCallRelationship(node, relationships, _sourceCode);
     } else if (node.type === 'class') {
-      this.extractClassInheritanceRelationship(node, relationships, sourceCode);
+      this.extractClassInheritanceRelationship(node, relationships, _sourceCode);
     }
 
     // Recursively walk children
     for (const child of node.children) {
-      this.walkNode(child, relationships, sourceCode);
+      this.walkNode(child, relationships, _sourceCode);
     }
   }
 
@@ -50,7 +50,7 @@ export class RubyRelationshipExtractor {
   private extractRequireRelationship(
     callNode: SyntaxNode,
     relationships: ExtractedRelationship[],
-    sourceCode: string
+    _sourceCode: string
   ): void {
     const methodNode = callNode.childForFieldName('method');
     if (!methodNode) return;
@@ -77,7 +77,7 @@ export class RubyRelationshipExtractor {
 
     relationships.push({
       type: 'imports',
-      sourceName: this.getCurrentContext(callNode) || '<top-level>',
+      sourceName: this.getCurrentContext(callNode) ?? '<top-level>',
       sourceLocation: {
         line: callNode.startPosition.row + 1,
         column: callNode.startPosition.column,
@@ -95,7 +95,7 @@ export class RubyRelationshipExtractor {
   private extractModuleOperationRelationship(
     callNode: SyntaxNode,
     relationships: ExtractedRelationship[],
-    sourceCode: string
+    _sourceCode: string
   ): void {
     const methodNode = callNode.childForFieldName('method');
     if (!methodNode) return;
@@ -140,7 +140,7 @@ export class RubyRelationshipExtractor {
   private extractClassInheritanceRelationship(
     classNode: SyntaxNode,
     relationships: ExtractedRelationship[],
-    sourceCode: string
+    _sourceCode: string
   ): void {
     const nameNode = classNode.childForFieldName('name');
     if (!nameNode) return;
@@ -171,7 +171,7 @@ export class RubyRelationshipExtractor {
   private extractMethodCallRelationship(
     callNode: SyntaxNode,
     relationships: ExtractedRelationship[],
-    sourceCode: string
+    _sourceCode: string
   ): void {
     const methodNode = callNode.childForFieldName('method');
     if (!methodNode) return;
@@ -191,7 +191,7 @@ export class RubyRelationshipExtractor {
 
     // Get receiver if present (e.g., obj.method_name)
     const receiverNode = callNode.childForFieldName('receiver');
-    const receiverName = receiverNode?.text || 'self';
+    const receiverName = receiverNode?.text ?? 'self';
 
     relationships.push({
       type: 'calls',
@@ -215,11 +215,11 @@ export class RubyRelationshipExtractor {
     while (current) {
       if (current.type === 'class' || current.type === 'module') {
         const nameNode = current.childForFieldName('name');
-        return nameNode?.text || null;
+        return nameNode?.text ?? null;
       }
       if (current.type === 'method') {
         const nameNode = current.childForFieldName('name');
-        return nameNode?.text || null;
+        return nameNode?.text ?? null;
       }
       current = current.parent;
     }
