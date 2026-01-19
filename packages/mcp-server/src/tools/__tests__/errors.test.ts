@@ -40,7 +40,7 @@ describe('Custom Error Classes', () => {
 
       expect(error.name).toBe('ToolNotFoundError');
       expect(error.message).toBe('Tool not found');
-      expect(error.metadata.toolName).toBe('nonexistent_tool');
+      expect(error.metadata['toolName']).toBe('nonexistent_tool');
     });
   });
 
@@ -53,8 +53,8 @@ describe('Custom Error Classes', () => {
 
       expect(error.name).toBe('ToolExecutionError');
       expect(error.message).toBe('Execution failed');
-      expect(error.metadata.toolName).toBe('ping');
-      expect(error.metadata.originalError).toBe('Network timeout');
+      expect(error.metadata['toolName']).toBe('ping');
+      expect(error.metadata['originalError']).toBe('Network timeout');
     });
 
     it('should handle Error objects in metadata', () => {
@@ -63,7 +63,7 @@ describe('Custom Error Classes', () => {
         originalError,
       });
 
-      expect(error.metadata.originalError).toBe(originalError);
+      expect(error.metadata['originalError']).toBe(originalError);
     });
   });
 
@@ -76,8 +76,8 @@ describe('Custom Error Classes', () => {
 
       expect(error.name).toBe('ToolTimeoutError');
       expect(error.message).toBe('Operation timed out');
-      expect(error.metadata.timeoutMs).toBe(5000);
-      expect(error.metadata.toolName).toBe('slow_operation');
+      expect(error.metadata['timeoutMs']).toBe(5000);
+      expect(error.metadata['toolName']).toBe('slow_operation');
     });
   });
 
@@ -90,8 +90,8 @@ describe('Custom Error Classes', () => {
 
       expect(error.name).toBe('ResourceNotFoundError');
       expect(error.message).toBe('Resource not found');
-      expect(error.metadata.resourceType).toBe('file');
-      expect(error.metadata.resourceId).toBe('/path/to/file.ts');
+      expect(error.metadata['resourceType']).toBe('file');
+      expect(error.metadata['resourceId']).toBe('/path/to/file.ts');
     });
   });
 
@@ -105,9 +105,9 @@ describe('Custom Error Classes', () => {
 
       expect(error.name).toBe('DatabaseError');
       expect(error.message).toBe('Database operation failed');
-      expect(error.metadata.operation).toBe('INSERT');
-      expect(error.metadata.table).toBe('nodes');
-      expect(error.metadata.originalError).toBe('UNIQUE constraint failed');
+      expect(error.metadata['operation']).toBe('INSERT');
+      expect(error.metadata['table']).toBe('nodes');
+      expect(error.metadata['originalError']).toBe('UNIQUE constraint failed');
     });
   });
 
