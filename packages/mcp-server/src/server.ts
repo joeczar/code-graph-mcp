@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import { echoTool } from './tools/echo.js';
 import { createErrorResponse } from './tools/types.js';
 
@@ -40,20 +41,9 @@ export function createServer(): McpServer {
     {
       title: echoTool.metadata.name,
       description: echoTool.metadata.description,
-      // Use plain object schema - MCP SDK expects JSON Schema format
-      // MCP SDK has strict types that don't match JSON Schema well
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      inputSchema: {
-        type: 'object',
-        properties: {
-          message: {
-            type: 'string',
-            description: 'The message to echo back',
-          },
-        },
-        required: ['message'],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
+      // Generate JSON Schema from Zod schema - single source of truth
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+      inputSchema: zodToJsonSchema(echoTool.metadata.inputSchema) as any,
     },
     // MCP SDK handler signature uses any for params
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

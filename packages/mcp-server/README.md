@@ -97,6 +97,7 @@ describe('yourTool', () => {
 Add tool registration to `src/server.ts`:
 
 ```typescript
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import { yourTool } from './tools/your-tool.js';
 
 // In createServer():
@@ -105,17 +106,9 @@ server.registerTool(
   {
     title: yourTool.metadata.name,
     description: yourTool.metadata.description,
-    // Convert Zod schema to JSON Schema format
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    inputSchema: {
-      type: 'object',
-      properties: {
-        param1: { type: 'string', description: 'Description of param1' },
-        param2: { type: 'number', description: 'Optional numeric parameter' },
-      },
-      required: ['param1'],
+    // Generate JSON Schema from Zod schema - single source of truth
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any,
+    inputSchema: zodToJsonSchema(yourTool.metadata.inputSchema) as any,
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async (params: any) => {
