@@ -32,6 +32,7 @@ export class RubyRelationshipExtractor {
     // Extract relationships based on node type
     if (node.type === 'call') {
       this.extractRequireRelationship(node, relationships, sourceCode);
+      this.extractModuleOperationRelationship(node, relationships, sourceCode);
       this.extractMethodCallRelationship(node, relationships, sourceCode);
     } else if (node.type === 'class') {
       this.extractClassInheritanceRelationship(node, relationships, sourceCode);
@@ -86,6 +87,51 @@ export class RubyRelationshipExtractor {
         requireType: methodName,
       },
     });
+  }
+
+  /**
+   * Extract module operation relationships (include/extend/prepend)
+   */
+  private extractModuleOperationRelationship(
+    callNode: SyntaxNode,
+    relationships: ExtractedRelationship[],
+    sourceCode: string
+  ): void {
+    const methodNode = callNode.childForFieldName('method');
+    if (!methodNode) return;
+
+    const methodName = methodNode.text;
+    if (methodName !== 'include' && methodName !== 'extend' && methodName !== 'prepend') {
+      return;
+    }
+
+    const sourceName = this.getCurrentContext(callNode);
+    if (!sourceName) return; // Module operations must be within a context
+
+    // Get the arguments (modules being included/extended/prepended)
+    const argumentsNode = callNode.childForFieldName('arguments');
+    if (!argumentsNode) return;
+
+    // Process each module argument
+    for (const arg of argumentsNode.children) {
+      // Skip non-identifier nodes (like parentheses, commas)
+      if (arg.type === 'identifier' || arg.type === 'constant') {
+        const moduleName = arg.text;
+
+        relationships.push({
+          type: 'implements',
+          sourceName,
+          sourceLocation: {
+            line: callNode.startPosition.row + 1,
+            column: callNode.startPosition.column,
+          },
+          targetName: moduleName,
+          metadata: {
+            operation: methodName,
+          },
+        });
+      }
+    }
   }
 
   /**
