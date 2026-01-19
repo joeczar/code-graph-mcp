@@ -264,21 +264,21 @@ describe('RelationshipStore', () => {
 
       const counts = store.countByType();
 
-      expect(counts['calls']).toBe(1);
-      expect(counts['imports']).toBe(2);
-      expect(counts['extends']).toBe(1);
-      expect(counts['implements']).toBe(0);
-      expect(counts['contains']).toBe(0);
+      expect(counts.calls).toBe(1);
+      expect(counts.imports).toBe(2);
+      expect(counts.extends).toBe(1);
+      expect(counts.implements).toBe(0);
+      expect(counts.contains).toBe(0);
     });
 
     it('returns all zeros for empty database', () => {
       const counts = store.countByType();
 
-      expect(counts['calls']).toBe(0);
-      expect(counts['imports']).toBe(0);
-      expect(counts['extends']).toBe(0);
-      expect(counts['implements']).toBe(0);
-      expect(counts['contains']).toBe(0);
+      expect(counts.calls).toBe(0);
+      expect(counts.imports).toBe(0);
+      expect(counts.extends).toBe(0);
+      expect(counts.implements).toBe(0);
+      expect(counts.contains).toBe(0);
     });
   });
 

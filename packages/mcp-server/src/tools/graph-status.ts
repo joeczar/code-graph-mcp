@@ -59,8 +59,8 @@ export const graphStatusTool: ToolDefinition<typeof graphStatusInputSchema> = {
 
     // Overall counts
     lines.push('=== Overview ===');
-    lines.push(`Total Entities: ${totalEntities}`);
-    lines.push(`Total Relationships: ${totalRelationships}`);
+    lines.push(`Total Entities: ${totalEntities.toString()}`);
+    lines.push(`Total Relationships: ${totalRelationships.toString()}`);
     lines.push('');
 
     // Entity counts by type
@@ -70,7 +70,7 @@ export const graphStatusTool: ToolDefinition<typeof graphStatusInputSchema> = {
     } else {
       for (const [type, count] of Object.entries(entityCounts)) {
         if (count > 0) {
-          lines.push(`  ${type}: ${count}`);
+          lines.push(`  ${type}: ${count.toString()}`);
         }
       }
     }
@@ -83,7 +83,7 @@ export const graphStatusTool: ToolDefinition<typeof graphStatusInputSchema> = {
     } else {
       for (const [type, count] of Object.entries(relationshipCounts)) {
         if (count > 0) {
-          lines.push(`  ${type}: ${count}`);
+          lines.push(`  ${type}: ${count.toString()}`);
         }
       }
     }
@@ -97,7 +97,7 @@ export const graphStatusTool: ToolDefinition<typeof graphStatusInputSchema> = {
       for (const file of recentFiles) {
         const timestamp = new Date(file.lastUpdated).toLocaleString();
         lines.push(`  ${file.filePath}`);
-        lines.push(`    Entities: ${file.entityCount} | Last Updated: ${timestamp}`);
+        lines.push(`    Entities: ${file.entityCount.toString()} | Last Updated: ${timestamp}`);
       }
     }
 

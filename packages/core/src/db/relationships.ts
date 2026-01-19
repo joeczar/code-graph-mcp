@@ -143,7 +143,7 @@ export function createRelationshipStore(db: Database.Database): RelationshipStor
     },
 
     countByType(): Record<RelationshipType, number> {
-      const rows = countByTypeStmt.all() as Array<{ type: string; count: number }>;
+      const rows = countByTypeStmt.all() as { type: string; count: number }[];
 
       // Initialize all types to 0
       const result: Record<RelationshipType, number> = {

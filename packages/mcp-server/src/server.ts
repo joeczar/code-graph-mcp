@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { echoTool } from './tools/echo.js';
+import { graphStatusTool } from './tools/graph-status.js';
 import { createErrorResponse } from './tools/types.js';
 import { logger } from './tools/logger.js';
 
@@ -74,6 +75,38 @@ export function createServer(): McpServer {
         }
 
         // For backward compatibility, still use original error for response formatting
+        const errorResult = createErrorResponse(error);
+        return {
+          ...errorResult,
+          content: errorResult.content.map(item => ({ ...item, type: 'text' as const })),
+        };
+      }
+    }
+  );
+
+  // Register graph_status tool
+  server.registerTool(
+    graphStatusTool.metadata.name,
+    {
+      title: graphStatusTool.metadata.name,
+      description: graphStatusTool.metadata.description,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+      inputSchema: zodToJsonSchema(graphStatusTool.metadata.inputSchema) as any,
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async (params: any) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const validated = graphStatusTool.metadata.inputSchema.parse(params.params);
+        const result = await graphStatusTool.handler(validated);
+        return {
+          ...result,
+          content: result.content.map(item => ({ ...item, type: 'text' as const })),
+        };
+      } catch (error) {
+        if (!(error instanceof z.ZodError)) {
+          logToolError(graphStatusTool.metadata.name, error, params);
+        }
         const errorResult = createErrorResponse(error);
         return {
           ...errorResult,

@@ -224,7 +224,7 @@ export function createEntityStore(db: Database.Database): EntityStore {
     },
 
     countByType(): Record<EntityType, number> {
-      const rows = countByTypeStmt.all() as Array<{ type: string; count: number }>;
+      const rows = countByTypeStmt.all() as { type: string; count: number }[];
 
       // Initialize all types to 0
       const result: Record<EntityType, number> = {

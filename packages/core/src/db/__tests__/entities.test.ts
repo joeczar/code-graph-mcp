@@ -221,23 +221,23 @@ describe('EntityStore', () => {
 
       const counts = store.countByType();
 
-      expect(counts['function']).toBe(2);
-      expect(counts['class']).toBe(1);
-      expect(counts['method']).toBe(1);
-      expect(counts['module']).toBe(0);
-      expect(counts['file']).toBe(0);
-      expect(counts['type']).toBe(0);
+      expect(counts.function).toBe(2);
+      expect(counts.class).toBe(1);
+      expect(counts.method).toBe(1);
+      expect(counts.module).toBe(0);
+      expect(counts.file).toBe(0);
+      expect(counts.type).toBe(0);
     });
 
     it('returns all zeros for empty database', () => {
       const counts = store.countByType();
 
-      expect(counts['function']).toBe(0);
-      expect(counts['class']).toBe(0);
-      expect(counts['method']).toBe(0);
-      expect(counts['module']).toBe(0);
-      expect(counts['file']).toBe(0);
-      expect(counts['type']).toBe(0);
+      expect(counts.function).toBe(0);
+      expect(counts.class).toBe(0);
+      expect(counts.method).toBe(0);
+      expect(counts.module).toBe(0);
+      expect(counts.file).toBe(0);
+      expect(counts.type).toBe(0);
     });
   });
 
@@ -246,9 +246,6 @@ describe('EntityStore', () => {
       // Create entities in different files
       store.create({ ...sampleEntity, filePath: '/src/old.ts', name: 'old1' });
       store.create({ ...sampleEntity, filePath: '/src/old.ts', name: 'old2' });
-
-      // Sleep to ensure different timestamps
-      const later = new Date(Date.now() + 100).toISOString();
 
       store.create({ ...sampleEntity, filePath: '/src/new.ts', name: 'new1' });
       store.create({ ...sampleEntity, filePath: '/src/new.ts', name: 'new2' });
