@@ -46,7 +46,8 @@ Complete the work: final validation, create PR, update board, and clean up.
 
 ### Checkpoint Actions Logged
 
-- `pr_created`: { pr_number, pr_url } (logged after PR creation)
+- `set-pr`: Records PR number, sets pr_state to "open" (enables /auto-merge resume)
+- `pr_created`: action logged after PR creation
 - Workflow status set to "completed"
 
 ### Skills Used
@@ -174,7 +175,12 @@ gh pr view --json number,url,title
 
 ### Step 8: Log PR and Complete Workflow
 
-Log PR creation to checkpoint:
+Set PR number on workflow (enables resume with /auto-merge):
+```bash
+pnpm checkpoint workflow set-pr "{workflow_id}" {pr_number}
+```
+
+Log PR creation action:
 ```bash
 pnpm checkpoint workflow log-action "{workflow_id}" "pr_created" success
 ```
