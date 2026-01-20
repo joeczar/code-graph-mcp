@@ -185,17 +185,19 @@ export class VueExtractor {
    */
   private extractPropsFromOptions(scriptContent: string): string[] | undefined {
     // Simple regex to find props definition
-    const propsMatch = scriptContent.match(/props:\s*\{([^}]+)\}/s);
+    const propsRegex = /props:\s*\{([^}]+)\}/s;
+    const propsMatch = propsRegex.exec(scriptContent);
     if (!propsMatch) return undefined;
 
     const propsContent = propsMatch[1];
     if (!propsContent) return undefined;
 
     // Extract prop names (handles both object and array syntax)
+    const propNameRegex = /^(['"])?(\w+)\1?\s*:/;
     const propNames = propsContent
       .split(',')
       .map((line) => {
-        const match = line.trim().match(/^(['"])?(\w+)\1?\s*:/);
+        const match = propNameRegex.exec(line.trim());
         return match?.[2];
       })
       .filter((name): name is string => name !== undefined);
@@ -208,17 +210,19 @@ export class VueExtractor {
    */
   private extractEmitsFromOptions(scriptContent: string): string[] | undefined {
     // Simple regex to find emits definition
-    const emitsMatch = scriptContent.match(/emits:\s*\[([^\]]+)\]/);
+    const emitsRegex = /emits:\s*\[([^\]]+)\]/;
+    const emitsMatch = emitsRegex.exec(scriptContent);
     if (!emitsMatch) return undefined;
 
     const emitsContent = emitsMatch[1];
     if (!emitsContent) return undefined;
 
     // Extract emit names
+    const emitNameRegex = /['"](\w+)['"]/;
     const emitNames = emitsContent
       .split(',')
       .map((item) => {
-        const match = item.trim().match(/['"](\w+)['"]/);
+        const match = emitNameRegex.exec(item.trim());
         return match?.[1];
       })
       .filter((name): name is string => name !== undefined);
