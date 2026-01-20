@@ -60,6 +60,23 @@ export function runCheckpointCommand(args: string[]): void {
   }
 }
 
+/**
+ * Helper to update a workflow and log the result.
+ * Reduces duplication across set-* commands.
+ */
+function updateWorkflowAndLog(
+  db: ReturnType<typeof getCheckpointDb>,
+  workflowId: string,
+  updateFn: () => boolean
+): void {
+  if (updateFn()) {
+    const workflow = getWorkflow(db, workflowId);
+    console.log(JSON.stringify(workflow, null, 2));
+  } else {
+    throw new Error(`Workflow not found: ${workflowId}`);
+  }
+}
+
 function handleWorkflowAction(action: string, args: string[]): void {
   const db = getDb();
 
@@ -152,13 +169,7 @@ function handleWorkflowAction(action: string, args: string[]): void {
         throw new Error(`Invalid phase: ${phase}\nValid phases: ${validPhases.join(', ')}`);
       }
 
-      const success = setWorkflowPhase(db, workflowId, phase as WorkflowPhase);
-      if (success) {
-        const workflow = getWorkflow(db, workflowId);
-        console.log(JSON.stringify(workflow, null, 2));
-      } else {
-        throw new Error(`Workflow not found: ${workflowId}`);
-      }
+      updateWorkflowAndLog(db, workflowId, () => setWorkflowPhase(db, workflowId, phase as WorkflowPhase));
       break;
     }
 
@@ -173,13 +184,7 @@ function handleWorkflowAction(action: string, args: string[]): void {
         throw new Error(`Invalid status: ${status}\nValid statuses: ${validStatuses.join(', ')}`);
       }
 
-      const success = setWorkflowStatus(db, workflowId, status as WorkflowStatus);
-      if (success) {
-        const workflow = getWorkflow(db, workflowId);
-        console.log(JSON.stringify(workflow, null, 2));
-      } else {
-        throw new Error(`Workflow not found: ${workflowId}`);
-      }
+      updateWorkflowAndLog(db, workflowId, () => setWorkflowStatus(db, workflowId, status as WorkflowStatus));
       break;
     }
 
@@ -194,13 +199,7 @@ function handleWorkflowAction(action: string, args: string[]): void {
         throw new Error('pr_number must be a number');
       }
 
-      const success = setWorkflowPr(db, workflowId, prNumber);
-      if (success) {
-        const workflow = getWorkflow(db, workflowId);
-        console.log(JSON.stringify(workflow, null, 2));
-      } else {
-        throw new Error(`Workflow not found: ${workflowId}`);
-      }
+      updateWorkflowAndLog(db, workflowId, () => setWorkflowPr(db, workflowId, prNumber));
       break;
     }
 
@@ -210,13 +209,7 @@ function handleWorkflowAction(action: string, args: string[]): void {
         throw new Error('Usage: checkpoint workflow set-merged <workflow_id> <merged_sha>');
       }
 
-      const success = setWorkflowMerged(db, workflowId, mergedSha);
-      if (success) {
-        const workflow = getWorkflow(db, workflowId);
-        console.log(JSON.stringify(workflow, null, 2));
-      } else {
-        throw new Error(`Workflow not found: ${workflowId}`);
-      }
+      updateWorkflowAndLog(db, workflowId, () => setWorkflowMerged(db, workflowId, mergedSha));
       break;
     }
 
@@ -231,13 +224,7 @@ function handleWorkflowAction(action: string, args: string[]): void {
         throw new Error(`Invalid PR state: ${prState}\nValid states: ${validPrStates.join(', ')}`);
       }
 
-      const success = setWorkflowPrState(db, workflowId, prState as PrState);
-      if (success) {
-        const workflow = getWorkflow(db, workflowId);
-        console.log(JSON.stringify(workflow, null, 2));
-      } else {
-        throw new Error(`Workflow not found: ${workflowId}`);
-      }
+      updateWorkflowAndLog(db, workflowId, () => setWorkflowPrState(db, workflowId, prState as PrState));
       break;
     }
 

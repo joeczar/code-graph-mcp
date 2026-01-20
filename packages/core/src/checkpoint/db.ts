@@ -97,12 +97,8 @@ const INDEXES = [
   'CREATE INDEX IF NOT EXISTS idx_commits_sha ON workflow_commits(sha)',
 ];
 
-// Migration: Add new columns to existing databases
-const MIGRATIONS = [
-  `ALTER TABLE workflows ADD COLUMN pr_number INTEGER`,
-  `ALTER TABLE workflows ADD COLUMN pr_state TEXT`,
-  `ALTER TABLE workflows ADD COLUMN merged_sha TEXT`,
-];
+// Columns to add via migration (for existing databases)
+const MIGRATION_COLUMNS = ['pr_number', 'pr_state', 'merged_sha'] as const;
 
 // ============================================================================
 // Database Connection
@@ -154,12 +150,20 @@ function initializeCheckpointSchema(db: Database.Database): void {
     db.exec(index);
   }
 
-  // Run migrations for existing databases (safely ignores if columns exist)
-  for (const migration of MIGRATIONS) {
-    try {
-      db.exec(migration);
-    } catch {
-      // Column already exists, ignore
+  // Run migrations for existing databases - check column existence before adding
+  runMigrations(db);
+}
+
+function runMigrations(db: Database.Database): void {
+  // Get existing column names from workflows table
+  const tableInfo = db.pragma('table_info(workflows)') as { name: string }[];
+  const existingColumns = new Set(tableInfo.map((col) => col.name));
+
+  // Add missing columns
+  for (const column of MIGRATION_COLUMNS) {
+    if (!existingColumns.has(column)) {
+      const columnType = column === 'pr_number' ? 'INTEGER' : 'TEXT';
+      db.exec(`ALTER TABLE workflows ADD COLUMN ${column} ${columnType}`);
     }
   }
 }
