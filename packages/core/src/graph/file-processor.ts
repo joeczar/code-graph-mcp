@@ -130,6 +130,8 @@ export class FileProcessor {
     const relationshipStore = createRelationshipStore(db);
 
     const storedEntities: Entity[] = [];
+    const storedRelationships: Relationship[] = [];
+
     // Use name as key for relationship resolution.
     // Note: Names are not guaranteed unique within a file (e.g., same method name in different classes).
     // For now, we warn about collisions and use the last entity with that name.
@@ -137,42 +139,58 @@ export class FileProcessor {
     const entityNameToId = new Map<string, string>();
     const nameCollisions: string[] = [];
 
-    // Store entities
-    for (const entity of entities) {
-      const stored = entityStore.create(entity);
-      storedEntities.push(stored);
-      if (entityNameToId.has(entity.name)) {
-        nameCollisions.push(entity.name);
-      }
-      entityNameToId.set(entity.name, stored.id);
-    }
+    try {
+      // Wrap database operations in a transaction for atomicity
+      const transaction = db.transaction(() => {
+        // Store entities
+        for (const entity of entities) {
+          const stored = entityStore.create(entity);
+          storedEntities.push(stored);
+          if (entityNameToId.has(entity.name)) {
+            nameCollisions.push(entity.name);
+          }
+          entityNameToId.set(entity.name, stored.id);
+        }
 
-    // Log warning for name collisions (indicates potential data quality issues)
-    if (nameCollisions.length > 0) {
-      console.warn(
-        `[FileProcessor] Name collisions detected in ${filePath}: ${nameCollisions.join(', ')}. ` +
-        'Relationships may be incorrectly resolved.'
-      );
-    }
+        // Log warning for name collisions (indicates potential data quality issues)
+        if (nameCollisions.length > 0) {
+          console.warn(
+            `[FileProcessor] Name collisions detected in ${filePath}: ${nameCollisions.join(', ')}. ` +
+            'Relationships may be incorrectly resolved.'
+          );
+        }
 
-    // Store relationships (resolve names to IDs)
-    const storedRelationships: Relationship[] = [];
-    for (const rel of relationships) {
-      const sourceId = entityNameToId.get(rel.sourceName);
-      const targetId = entityNameToId.get(rel.targetName);
+        // Store relationships (resolve names to IDs)
+        for (const rel of relationships) {
+          const sourceId = entityNameToId.get(rel.sourceName);
+          const targetId = entityNameToId.get(rel.targetName);
 
-      // Skip relationships where we can't resolve both entities
-      if (!sourceId || !targetId) {
-        continue;
-      }
+          // Skip relationships where we can't resolve both entities
+          if (!sourceId || !targetId) {
+            continue;
+          }
 
-      const stored = relationshipStore.create({
-        sourceId,
-        targetId,
-        type: rel.type,
-        ...(rel.metadata && { metadata: rel.metadata }),
+          const stored = relationshipStore.create({
+            sourceId,
+            targetId,
+            type: rel.type,
+            ...(rel.metadata && { metadata: rel.metadata }),
+          });
+          storedRelationships.push(stored);
+        }
       });
-      storedRelationships.push(stored);
+
+      transaction();
+    } catch (error) {
+      return {
+        filePath,
+        fileHash,
+        language,
+        entities: [],
+        relationships: [],
+        success: false,
+        error: `Database transaction failed: ${error instanceof Error ? error.message : String(error)}`,
+      };
     }
 
     return {
