@@ -13,12 +13,16 @@ export {
   getSupportedLanguages,
   detectLanguage,
   getLanguageConfig,
+  createFileProcessor,
 } from './parser/index.js';
 export type {
   ParseResult,
   ParseError,
   ParseOutcome,
   SupportedLanguage,
+  FileProcessor,
+  FileProcessorOptions,
+  ProcessFileResult,
 } from './parser/index.js';
 
 // Database exports
