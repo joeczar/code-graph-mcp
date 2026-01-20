@@ -5,6 +5,8 @@ import { echoTool } from './tools/echo.js';
 import { graphStatusTool } from './tools/graph-status.js';
 import { whatCallsTool } from './tools/what-calls.js';
 import { whatDoesCallTool } from './tools/what-does-call.js';
+import { blastRadiusTool } from './tools/blast-radius.js';
+import { findEntityTool } from './tools/find-entity.js';
 import { createErrorResponse, type ToolDefinition } from './tools/types.js';
 import { logger } from './tools/logger.js';
 
@@ -95,6 +97,8 @@ export function createServer(): McpServer {
   registerTool(server, graphStatusTool);
   registerTool(server, whatCallsTool);
   registerTool(server, whatDoesCallTool);
+  registerTool(server, blastRadiusTool);
+  registerTool(server, findEntityTool);
 
   return server;
 }

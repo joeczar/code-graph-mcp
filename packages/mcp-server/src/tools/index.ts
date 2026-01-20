@@ -42,3 +42,5 @@ export { echoTool } from './echo.js';
 export { graphStatusTool } from './graph-status.js';
 export { whatCallsTool } from './what-calls.js';
 export { whatDoesCallTool } from './what-does-call.js';
+export { blastRadiusTool } from './blast-radius.js';
+export { findEntityTool } from './find-entity.js';
