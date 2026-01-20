@@ -16,3 +16,8 @@ export type {
 } from './walker.js';
 export { TypeScriptExtractor } from './extractors/typescript.js';
 export type { TypeScriptExtractorOptions } from './extractors/typescript.js';
+export { TypeScriptRelationshipExtractor } from './extractors/typescript-relationships.js';
+export type {
+  ExtractedRelationship,
+  ExtractedRelationshipType,
+} from './extractors/typescript-relationships.js';
