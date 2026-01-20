@@ -306,6 +306,11 @@ Title: {pr_title}
 2. Address any review feedback
 3. Merge when approved
 4. Issue #{issue_number} will close automatically
+
+## Auto-Merge Ready
+
+PR #{pr_number} ready for /auto-merge
+Command: /auto-merge {pr_number}
 ```
 
 ## Completion Criteria

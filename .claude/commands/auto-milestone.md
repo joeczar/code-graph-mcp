@@ -86,7 +86,28 @@ Will process 16 issues in 6 waves:
 Proceed? [y/N]
 ```
 
-For each free issue, spawn `/auto-issue`:
+### Wave Execution Pattern
+
+**CRITICAL: Each wave must be fully merged before starting the next wave.**
+
+This prevents rebase conflicts when dependent issues build on earlier work.
+
+```
+WRONG (causes conflicts):
+  Wave 1: /auto-issue #12 → PR #30 created
+  Wave 2: /auto-issue #13 → PR #31 created (base: main without #12!)
+  Later: merge all → CONFLICTS
+
+CORRECT:
+  Wave 1: /auto-issue #12 → PR #30 created → /auto-merge #30 → MERGED
+  Wave 2: /auto-issue #13 → PR #31 created (base: main WITH #12) → /auto-merge #31 → MERGED
+```
+
+### For Each Wave:
+
+#### Step 1: Create PRs
+
+For each issue in the wave, spawn `/auto-issue`:
 
 ```
 Task(auto-issue):
@@ -94,10 +115,30 @@ Task(auto-issue):
   Output: { status, pr_number, error? }
 ```
 
-After each issue completes:
-1. Check if any blocked issues are now free
-2. Add newly free issues to queue
-3. Continue until all done
+Issues within a wave can run in parallel (they don't depend on each other).
+
+#### Step 2: Merge PRs
+
+**After ALL issues in the wave have PRs created**, merge them sequentially:
+
+```
+For each PR created in this wave:
+  /auto-merge {pr_number}
+```
+
+Sequential merge ensures:
+- Each merge lands cleanly on updated main
+- CI runs on final integrated state
+- No parallel merge race conditions
+
+#### Step 3: Verify and Continue
+
+After all PRs in the wave are merged:
+1. Pull latest main: `git pull origin main`
+2. Check which blocked issues are now free
+3. Proceed to next wave
+
+**Only start the next wave after ALL PRs from current wave are merged.**
 
 ---
 
