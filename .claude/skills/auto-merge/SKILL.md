@@ -107,7 +107,34 @@ Verify before proceeding: `git status` shows clean working tree on PR branch.
 
 ---
 
-### Step 3: Run Review Pass (MANDATORY)
+### Step 3: Check Review Comments
+
+**Entry:** On PR branch, rebased, clean working tree
+**Exit:** All existing review comments addressed or noted
+
+Check for existing review comments BEFORE running review agents:
+
+```bash
+gh api repos/{owner}/{repo}/pulls/<PR#>/comments --jq '.[] | select(.position != null) | {user: .user.login, body: .body, path: .path, line: .line}'
+```
+
+For each comment:
+1. Read the comment content and suggestion
+2. If valid and actionable: apply the fix now
+3. If already addressed or outdated: note as resolved
+4. If needs clarification: note for later
+
+**If fixes applied:**
+```bash
+git add -A
+git commit -m "fix: address review comments"
+```
+
+Verify before proceeding: All actionable comments addressed.
+
+---
+
+### Step 4: Run Review Pass (MANDATORY)
 
 **Entry:** On PR branch, rebased, clean working tree
 **Exit:** Review agents completed, findings addressed, any fixes committed
@@ -135,7 +162,7 @@ git commit -m "refactor: address review findings"
 
 ---
 
-### Step 4: Push Updates
+### Step 5: Push Updates
 
 **Entry:** Review pass complete, any fixes committed locally
 **Exit:** Branch pushed to remote with all local commits
@@ -150,7 +177,7 @@ Verify before proceeding: Push succeeded (check exit code), remote branch update
 
 ---
 
-### Step 5: Verify CI Status
+### Step 6: Verify CI Status
 
 **Entry:** Branch pushed to remote
 **Exit:** All CI checks green
@@ -170,7 +197,7 @@ Verify before proceeding: `gh pr checks <PR#>` shows all checks passed.
 
 ---
 
-### Step 6: Handle Review Comments
+### Step 7: Handle Review Comments (Post-CI)
 
 **Entry:** CI checks green
 **Exit:** No unresolved blocking comments, or all comments addressed
@@ -186,13 +213,13 @@ For each unresolved comment:
 3. If valid: make the fix, commit, push
 4. If resolved or outdated: note as addressed
 
-**If changes were made:** Return to Step 5 (Verify CI) before proceeding. Changes may have broken the build.
+**If changes were made:** Return to Step 6 (Verify CI) before proceeding. Changes may have broken the build.
 
 Verify before proceeding: No pending review comments requiring action.
 
 ---
 
-### Step 7: Verify Merge Readiness
+### Step 8: Verify Merge Readiness
 
 **Entry:** CI green, no unresolved comments
 **Exit:** PR confirmed mergeable
@@ -211,7 +238,7 @@ Verify before proceeding: `mergeable == "MERGEABLE"` and `mergeStateStatus == "C
 
 ---
 
-### Step 8: Merge PR
+### Step 9: Merge PR
 
 **Entry:** PR verified mergeable
 **Exit:** PR merged, branch deleted, checkpoint updated
@@ -244,7 +271,7 @@ This enables `/auto-milestone --continue` to know the issue is complete.
 
 ---
 
-### Step 9: Cleanup
+### Step 10: Cleanup
 
 **Entry:** PR merged
 **Exit:** On main branch, pulled latest, ready for next operation

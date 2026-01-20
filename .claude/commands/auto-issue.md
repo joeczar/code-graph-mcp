@@ -147,15 +147,16 @@ If no TypeScript/JavaScript files changed, skip to validation.
 
 ### Step 2: Run Review Agents (in sequence)
 
-| Agent | Purpose |
-|-------|---------|
-| `code-simplifier:code-simplifier` | Simplify and clarify code |
-| `pr-review-toolkit:code-reviewer` | Check bugs, style, quality |
-| `pr-review-toolkit:silent-failure-hunter` | Find silent failures |
+| Agent | Purpose | Status |
+|-------|---------|--------|
+| `code-simplifier:code-simplifier` | Simplify and clarify code | ☐ |
+| `pr-review-toolkit:code-reviewer` | Check bugs, style, quality | ☐ |
+| `pr-review-toolkit:silent-failure-hunter` | Find silent failures | ☐ |
 
 For each agent:
 1. Launch via Task tool
 2. Apply fixes with confidence >= 60%
+3. Mark agent as complete (☑)
 
 ### Step 3: Commit Review Fixes
 

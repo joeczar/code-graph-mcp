@@ -73,7 +73,7 @@ Confirm validation and review agents ran in Phase 4:
 
 ```bash
 # Quick validation check (should already pass from Phase 4)
-pnpm typecheck && pnpm test
+pnpm typecheck && pnpm lint && pnpm test && pnpm build
 ```
 
 If this fails, return to Phase 4 - do not proceed with broken code.
