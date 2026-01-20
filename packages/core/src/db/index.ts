@@ -4,7 +4,7 @@ export type { DatabaseOptions } from './connection.js';
 export { initializeSchema } from './schema.js';
 
 export { createEntityStore } from './entities.js';
-export type { Entity, NewEntity, EntityType, EntityStore, RecentFile } from './entities.js';
+export type { Entity, NewEntity, EntityType, EntityStore, RecentFile, EntityQuery } from './entities.js';
 
 export { createRelationshipStore } from './relationships.js';
 export type {
