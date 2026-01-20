@@ -12,6 +12,15 @@ import {
 // SyntaxNode type is not exported, we'll use Tree['rootNode']
 type SyntaxNode = Tree['rootNode'];
 
+/**
+ * Relationship with entity names instead of database IDs.
+ * Names are resolved to IDs during storage.
+ */
+type PendingRelationship = Omit<NewRelationship, 'sourceId' | 'targetId'> & {
+  sourceName: string;
+  targetName: string;
+};
+
 export interface ProcessFileOptions {
   filePath: string;
   db: Database.Database;
@@ -106,8 +115,8 @@ export class FileProcessor {
     // Store relationships (resolve names to IDs)
     const storedRelationships: Relationship[] = [];
     for (const rel of relationships) {
-      const sourceId = entityNameToId.get(rel.sourceId);
-      const targetId = entityNameToId.get(rel.targetId);
+      const sourceId = entityNameToId.get(rel.sourceName);
+      const targetId = entityNameToId.get(rel.targetName);
 
       // Skip relationships where we can't resolve both entities
       if (!sourceId || !targetId) {
@@ -293,8 +302,8 @@ export class FileProcessor {
     node: SyntaxNode,
     filePath: string,
     language: string
-  ): (Omit<NewRelationship, 'sourceId' | 'targetId'> & { sourceId: string; targetId: string })[] {
-    const relationships: (Omit<NewRelationship, 'sourceId' | 'targetId'> & { sourceId: string; targetId: string })[] = [];
+  ): PendingRelationship[] {
+    const relationships: PendingRelationship[] = [];
 
     // TypeScript/JavaScript relationships
     if (language === 'typescript' || language === 'javascript') {
@@ -315,7 +324,7 @@ export class FileProcessor {
   private extractTypeScriptRelationships(
     node: SyntaxNode,
     filePath: string,
-    relationships: (Omit<NewRelationship, 'sourceId' | 'targetId'> & { sourceId: string; targetId: string })[]
+    relationships: PendingRelationship[]
   ): void {
     // Extract class inheritance
     if (node.type === 'class_declaration') {
@@ -332,8 +341,8 @@ export class FileProcessor {
           );
           if (identifier) {
             relationships.push({
-              sourceId: nameNode.text,
-              targetId: identifier.text,
+              sourceName: nameNode.text,
+              targetName: identifier.text,
               type: 'extends',
             });
           }
@@ -357,7 +366,7 @@ export class FileProcessor {
   private extractRubyRelationships(
     node: SyntaxNode,
     filePath: string,
-    relationships: (Omit<NewRelationship, 'sourceId' | 'targetId'> & { sourceId: string; targetId: string })[]
+    relationships: PendingRelationship[]
   ): void {
     // Extract class inheritance
     if (node.type === 'class') {
@@ -371,8 +380,8 @@ export class FileProcessor {
           const child = superclassNode.child(i);
           if (child?.type === 'constant') {
             relationships.push({
-              sourceId: nameNode.text,
-              targetId: child.text,
+              sourceName: nameNode.text,
+              targetName: child.text,
               type: 'extends',
             });
             break;
