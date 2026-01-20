@@ -342,8 +342,7 @@ describe('Walker', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const walker = new Walker(result.result.tree);
-      const functions = walker.collect(['function_declaration']);
+      const functions = Walker.collect(result.result.tree, ['function_declaration']);
 
       expect(functions.length).toBe(2);
       expect(functions.every((n) => n.type === 'function_declaration')).toBe(true);
@@ -358,8 +357,7 @@ describe('Walker', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const walker = new Walker(result.result.tree);
-      const declarations = walker.collect(['function_declaration', 'class_declaration']);
+      const declarations = Walker.collect(result.result.tree, ['function_declaration', 'class_declaration']);
 
       expect(declarations.length).toBe(2);
       const types = declarations.map((n) => n.type);

@@ -124,14 +124,15 @@ export class Walker {
   }
 
   /**
-   * Collect all nodes of specified types
+   * Collect all nodes of specified types from a tree or node
    *
+   * @param source - Tree or Node to search
    * @param nodeTypes - Array of node types to collect
    * @returns Array of matching nodes
    */
-  collect(nodeTypes: string[]): Node[] {
+  static collect(source: Tree | Node, nodeTypes: string[]): Node[] {
     const collected: Node[] = [];
-    const walker = new Walker(this.rootNode, { nodeTypes });
+    const walker = new Walker(source, { nodeTypes });
 
     walker.visitAll({
       enter: (node) => {
@@ -162,12 +163,7 @@ export class Walker {
         depth--;
 
         if (this.shouldVisitNode(parentNode)) {
-          const parentContext: WalkerContext = {
-            depth,
-            parent: ancestors[ancestors.length - 1] ?? null,
-            ancestors: [...ancestors],
-            fieldName: cursor.currentFieldName,
-          };
+          const parentContext = this.createContext(depth, ancestors, cursor.currentFieldName);
           this.callExitVisitor(parentNode, parentContext);
         }
 
@@ -183,13 +179,7 @@ export class Walker {
     while (hasMoreNodes) {
       const node = cursor.currentNode;
       const shouldVisit = this.shouldVisitNode(node);
-
-      const context: WalkerContext = {
-        depth,
-        parent: ancestors[ancestors.length - 1] ?? null,
-        ancestors: [...ancestors],
-        fieldName: cursor.currentFieldName,
-      };
+      const context = this.createContext(depth, ancestors, cursor.currentFieldName);
 
       if (shouldVisit) {
         const control = this.callEnterVisitor(node, context);
@@ -260,5 +250,27 @@ export class Walker {
     const visitor = this.visitors.get(node.type);
     visitor?.exit?.(node, context);
     this.wildcardVisitor?.exit?.(node, context);
+  }
+
+  /**
+   * Create a context object with lazy ancestors array.
+   * The ancestors array is only copied when accessed, improving performance
+   * for visitors that don't need ancestor information.
+   */
+  private createContext(
+    depth: number,
+    ancestors: Node[],
+    fieldName: string | null
+  ): WalkerContext {
+    let cachedAncestors: Node[] | undefined;
+    return {
+      depth,
+      parent: ancestors[ancestors.length - 1] ?? null,
+      get ancestors(): Node[] {
+        cachedAncestors ??= [...ancestors];
+        return cachedAncestors;
+      },
+      fieldName,
+    };
   }
 }
