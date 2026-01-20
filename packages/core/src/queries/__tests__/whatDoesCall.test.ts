@@ -51,9 +51,9 @@ describe('whatDoesCall', () => {
     const result = whatDoesCall('processData', entityStore, relationshipStore);
 
     expect(result).toHaveLength(1);
-    expect(result[0]!.name).toBe('validateInput');
-    expect(result[0]!.type).toBe('function');
-    expect(result[0]!.filePath).toBe('/src/utils.ts');
+    expect(result[0]?.name).toBe('validateInput');
+    expect(result[0]?.type).toBe('function');
+    expect(result[0]?.filePath).toBe('/src/utils.ts');
   });
 
   it('should return multiple callees', () => {
@@ -186,7 +186,7 @@ describe('whatDoesCall', () => {
 
     // Should only include the "calls" relationship
     expect(result).toHaveLength(1);
-    expect(result[0]!.name).toBe('helper');
+    expect(result[0]?.name).toBe('helper');
   });
 
   it('should handle multiple entities with same name', () => {
