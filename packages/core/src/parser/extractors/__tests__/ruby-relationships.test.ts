@@ -85,7 +85,7 @@ describe('RubyRelationshipExtractor', () => {
       const relationships = extractor.extract(result.result.tree.rootNode, code);
       const calls = relationships.filter(r => r.type === 'calls');
 
-      expect(calls.length).toBeGreaterThanOrEqual(2);
+      expect(calls).toHaveLength(2);
 
       const putsCall = calls.find(c => c.targetName === 'puts');
       expect(putsCall).toBeDefined();
@@ -113,7 +113,7 @@ describe('RubyRelationshipExtractor', () => {
       const relationships = extractor.extract(result.result.tree.rootNode, code);
       const calls = relationships.filter(r => r.type === 'calls');
 
-      expect(calls.length).toBeGreaterThanOrEqual(2);
+      expect(calls).toHaveLength(2);
 
       const addCall = calls.find(c => c.targetName === 'add');
       expect(addCall).toBeDefined();
@@ -213,7 +213,7 @@ describe('RubyRelationshipExtractor', () => {
       const relationships = extractor.extract(result.result.tree.rootNode, code);
       const implements_ = relationships.filter(r => r.type === 'implements');
 
-      expect(implements_.length).toBeGreaterThanOrEqual(2);
+      expect(implements_).toHaveLength(2);
 
       const enumerable = implements_.find(i => i.targetName === 'Enumerable');
       expect(enumerable).toBeDefined();
@@ -276,7 +276,7 @@ describe('RubyRelationshipExtractor', () => {
       const relationships = extractor.extract(result.result.tree.rootNode, code);
       const implements_ = relationships.filter(r => r.type === 'implements');
 
-      expect(implements_.length).toBeGreaterThanOrEqual(3);
+      expect(implements_).toHaveLength(3);
       expect(implements_.some(i => i.targetName === 'ModuleA')).toBe(true);
       expect(implements_.some(i => i.targetName === 'ModuleB')).toBe(true);
       expect(implements_.some(i => i.targetName === 'ModuleC')).toBe(true);
@@ -316,10 +316,11 @@ describe('RubyRelationshipExtractor', () => {
       const calls = relationships.filter(r => r.type === 'calls');
 
       // Verify all relationship types are present
-      expect(imports.length).toBeGreaterThanOrEqual(2);
-      expect(extends_.length).toBeGreaterThanOrEqual(1);
-      expect(implements_.length).toBeGreaterThanOrEqual(2);
-      expect(calls.length).toBeGreaterThanOrEqual(1); // At least one call should be found
+      expect(imports).toHaveLength(2);
+      expect(extends_).toHaveLength(1);
+      expect(implements_).toHaveLength(2);
+      // Note: Ruby bare method calls may be parsed as identifiers, not call nodes
+      expect(calls.length).toBeGreaterThanOrEqual(1);
 
       // Verify specific relationships
       expect(imports.some(i => i.targetName === 'json')).toBe(true);

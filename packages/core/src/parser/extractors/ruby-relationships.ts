@@ -31,11 +31,23 @@ export class RubyRelationshipExtractor {
   ): void {
     // Extract relationships based on node type
     if (node.type === 'call') {
-      this.extractRequireRelationship(node, relationships, _sourceCode);
-      this.extractModuleOperationRelationship(node, relationships, _sourceCode);
-      this.extractMethodCallRelationship(node, relationships, _sourceCode);
+      const methodNode = node.childForFieldName('method');
+      if (methodNode) {
+        const methodName = methodNode.text;
+        if (methodName === 'require' || methodName === 'require_relative') {
+          this.extractRequireRelationship(node, methodName, relationships);
+        } else if (
+          methodName === 'include' ||
+          methodName === 'extend' ||
+          methodName === 'prepend'
+        ) {
+          this.extractModuleOperationRelationship(node, methodName, relationships);
+        } else {
+          this.extractMethodCallRelationship(node, methodName, relationships);
+        }
+      }
     } else if (node.type === 'class') {
-      this.extractClassInheritanceRelationship(node, relationships, _sourceCode);
+      this.extractClassInheritanceRelationship(node, relationships);
     }
 
     // Recursively walk children
@@ -49,15 +61,9 @@ export class RubyRelationshipExtractor {
    */
   private extractRequireRelationship(
     callNode: SyntaxNode,
-    relationships: ExtractedRelationship[],
-    _sourceCode: string
+    methodName: string,
+    relationships: ExtractedRelationship[]
   ): void {
-    const methodNode = callNode.childForFieldName('method');
-    if (!methodNode) return;
-
-    const methodName = methodNode.text;
-    if (methodName !== 'require' && methodName !== 'require_relative') return;
-
     // Get the arguments
     const argumentsNode = callNode.childForFieldName('arguments');
     if (!argumentsNode) return;
@@ -65,10 +71,14 @@ export class RubyRelationshipExtractor {
     // Find string argument (usually first child that's a string)
     let modulePath: string | null = null;
     for (const arg of argumentsNode.children) {
-      if (arg.type === 'string' || arg.type === 'simple_symbol') {
-        // Extract text and remove quotes
-        const text = arg.text;
-        modulePath = text.replace(/^['":]+|['":]+$/g, '');
+      if (arg.type === 'string') {
+        // Remove leading/trailing quotes
+        modulePath = arg.text.slice(1, -1);
+        break;
+      }
+      if (arg.type === 'simple_symbol') {
+        // Remove leading colon
+        modulePath = arg.text.slice(1);
         break;
       }
     }
@@ -94,17 +104,9 @@ export class RubyRelationshipExtractor {
    */
   private extractModuleOperationRelationship(
     callNode: SyntaxNode,
-    relationships: ExtractedRelationship[],
-    _sourceCode: string
+    methodName: string,
+    relationships: ExtractedRelationship[]
   ): void {
-    const methodNode = callNode.childForFieldName('method');
-    if (!methodNode) return;
-
-    const methodName = methodNode.text;
-    if (methodName !== 'include' && methodName !== 'extend' && methodName !== 'prepend') {
-      return;
-    }
-
     const sourceName = this.getCurrentContext(callNode);
     if (!sourceName) return; // Module operations must be within a context
 
@@ -139,8 +141,7 @@ export class RubyRelationshipExtractor {
    */
   private extractClassInheritanceRelationship(
     classNode: SyntaxNode,
-    relationships: ExtractedRelationship[],
-    _sourceCode: string
+    relationships: ExtractedRelationship[]
   ): void {
     const nameNode = classNode.childForFieldName('name');
     if (!nameNode) return;
@@ -151,8 +152,9 @@ export class RubyRelationshipExtractor {
     const superclassNode = classNode.childForFieldName('superclass');
     if (!superclassNode) return;
 
-    // Remove leading '< ' from superclass text
-    const superclassName = superclassNode.text.replace(/^<\s*/, '');
+    // Get superclass name from the last child (the expression after '<')
+    const superclassName = superclassNode.lastChild?.text;
+    if (!superclassName) return;
 
     relationships.push({
       type: 'extends',
@@ -170,22 +172,9 @@ export class RubyRelationshipExtractor {
    */
   private extractMethodCallRelationship(
     callNode: SyntaxNode,
-    relationships: ExtractedRelationship[],
-    _sourceCode: string
+    methodName: string,
+    relationships: ExtractedRelationship[]
   ): void {
-    const methodNode = callNode.childForFieldName('method');
-    if (!methodNode) return;
-
-    const methodName = methodNode.text;
-
-    // Skip require/require_relative as they're handled separately
-    if (methodName === 'require' || methodName === 'require_relative') return;
-
-    // Skip module operations (handled separately)
-    if (methodName === 'include' || methodName === 'extend' || methodName === 'prepend') {
-      return;
-    }
-
     const sourceName = this.getCurrentContext(callNode);
     if (!sourceName) return; // Only track calls within a named context
 
@@ -213,11 +202,11 @@ export class RubyRelationshipExtractor {
   private getCurrentContext(node: SyntaxNode): string | null {
     let current = node.parent;
     while (current) {
-      if (current.type === 'class' || current.type === 'module') {
-        const nameNode = current.childForFieldName('name');
-        return nameNode?.text ?? null;
-      }
-      if (current.type === 'method') {
+      if (
+        current.type === 'class' ||
+        current.type === 'module' ||
+        current.type === 'method'
+      ) {
         const nameNode = current.childForFieldName('name');
         return nameNode?.text ?? null;
       }
