@@ -163,7 +163,7 @@ export const blastRadiusTool: ToolDefinition<typeof blastRadiusInputSchema> = {
       // Group by depth
       const byDepth = new Map<number, AffectedEntity[]>();
       for (const affected of affectedEntities) {
-        const existing = byDepth.get(affected.depth) || [];
+        const existing = byDepth.get(affected.depth) ?? [];
         existing.push(affected);
         byDepth.set(affected.depth, existing);
       }
@@ -171,7 +171,7 @@ export const blastRadiusTool: ToolDefinition<typeof blastRadiusInputSchema> = {
       // Sort depths and display
       const depths = Array.from(byDepth.keys()).sort((a, b) => a - b);
       for (const depth of depths) {
-        const entities = byDepth.get(depth) || [];
+        const entities = byDepth.get(depth) ?? [];
         lines.push(`Depth ${depth.toString()}:`);
         for (const { entity } of entities) {
           lines.push(
@@ -184,7 +184,7 @@ export const blastRadiusTool: ToolDefinition<typeof blastRadiusInputSchema> = {
       // Summary
       lines.push('Summary:');
       const maxDepthReached = Math.max(...depths);
-      const directDependents = byDepth.get(1)?.length || 0;
+      const directDependents = byDepth.get(1)?.length ?? 0;
       lines.push(`- Total affected: ${affectedEntities.length.toString()} entities`);
       lines.push(`- Max depth reached: ${maxDepthReached.toString()}`);
       lines.push(`- Direct dependents: ${directDependents.toString()}`);

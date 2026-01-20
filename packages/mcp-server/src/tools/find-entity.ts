@@ -77,7 +77,7 @@ export const findEntityTool: ToolDefinition<typeof findEntityInputSchema> = {
     if (input.filePath) {
       entities = entityStore.findByFile(input.filePath);
     } else if (input.type) {
-      entities = entityStore.findByType(input.type as EntityType);
+      entities = entityStore.findByType(input.type);
     } else {
       // Need to get all entities - do this by getting each type
       const types: EntityType[] = [
@@ -99,8 +99,9 @@ export const findEntityTool: ToolDefinition<typeof findEntityInputSchema> = {
     }
 
     if (input.namePattern) {
+      const pattern = input.namePattern;
       entities = entities.filter((e) =>
-        matchesPattern(e.name, input.namePattern!, input.matchMode)
+        matchesPattern(e.name, pattern, input.matchMode)
       );
     }
 
@@ -134,6 +135,9 @@ export const findEntityTool: ToolDefinition<typeof findEntityInputSchema> = {
 
       for (let i = 0; i < entities.length; i++) {
         const entity = entities[i];
+        if (!entity) {
+          continue;
+        }
         lines.push(
           `${(i + 1).toString()}. ${entity.name} (${entity.type})`
         );

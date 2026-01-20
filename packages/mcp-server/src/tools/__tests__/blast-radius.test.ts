@@ -291,7 +291,7 @@ describe('blastRadiusTool', () => {
         language: 'typescript',
       });
 
-      const util2 = entityStore.create({
+      entityStore.create({
         type: 'function',
         name: 'util2',
         filePath: '/utils.ts',
