@@ -35,6 +35,27 @@ code-graph-mcp/
 
 **Dependencies flow one way:** `cli` → `mcp-server` → `core`
 
+## MCP Composability
+
+This server is designed to be **one tool among many**. MCP's architecture enables composition:
+
+```
+Claude Code (or any MCP client)
+    │
+    ├── code-graph-mcp        ← Our server (structure, persistence)
+    ├── filesystem-mcp        ← File operations
+    ├── github-mcp            ← Issue/PR management
+    └── [other servers]       ← Future tools
+```
+
+**Design principle**: Don't try to do everything. Focus on pre-computed structure and cross-session memory. Let other servers (or the model itself) handle:
+
+- Raw file exploration
+- Arbitrary code execution
+- RLM-style dynamic context management
+
+The model orchestrates; we provide fast, persistent answers to anticipated questions.
+
 ## The Core Insight
 
 Everything is a node. Everything connects.

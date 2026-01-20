@@ -125,6 +125,76 @@ After working on a codebase for a week:
 | **Parsing** | Tree-sitter | One framework for all languages, mature ecosystem |
 | **Structure** | Monorepo | Separate packages for core, MCP server, CLI |
 
+## Relationship to RLMs and Context Management
+
+### What Are Recursive Language Models (RLMs)?
+
+RLMs are an inference-time scaffolding approach introduced by MIT researchers (Zhang, Kraska, Khattab) in late 2025. Instead of stuffing massive context into the model directly, RLMs:
+
+1. Store context in a Python REPL as a string variable
+2. Let the model write code to grep, slice, and explore the text
+3. Spawn sub-LLM calls on relevant chunks
+4. Aggregate results without polluting the main context
+
+This allows handling 10M+ tokens while avoiding "context rot" (performance degradation as context grows).
+
+### Why This Matters for Code Graph
+
+RLMs and code-graph-mcp solve **adjacent but different problems**:
+
+| Aspect | RLMs | Code Graph |
+|--------|------|------------|
+| **Problem solved** | Context rot within a session | Amnesia across sessions |
+| **Approach** | Dynamic exploration at inference time | Pre-computed persistent structure |
+| **Query flexibility** | Unlimited (any Python code) | Fixed (schema-defined queries) |
+| **Setup cost** | Zero | Parse entire codebase |
+| **Speed for known patterns** | Slow (re-discovers each time) | Fast (pre-computed, indexed) |
+| **Persistence** | None | Full cross-session memory |
+
+### Our Unique Value
+
+**RLMs don't solve persistence.** When a session ends, everything discovered is lost. Our moat is:
+
+- Learnings that survive sessions
+- Patterns and mistakes that prevent repeating errors
+- Workflow state for resumption after compaction
+
+### Complementary, Not Competing
+
+The graph makes **frequent, predictable queries** fast. RLMs enable **novel, unpredictable exploration**. Together:
+
+```
+Claude (or RLM scaffold)
+    │
+    ├── Known patterns → graph.whatCalls("X")     ← FAST (pre-computed)
+    ├── Known patterns → graph.blastRadius("Y")   ← FAST (pre-computed)
+    ├── Recall memory → graph.recall("auth")      ← PERSISTENT (survives sessions)
+    │
+    └── Novel questions → explore raw code        ← FLEXIBLE (when graph can't answer)
+```
+
+### Design Implications
+
+1. **Stay focused**: Don't try to incorporate RLM capabilities. MCP provides composition—users can run multiple servers.
+
+2. **Maximize callability**: Make graph queries useful to ANY context management approach—native Claude, RLMs, future paradigms.
+
+3. **Persistence is the moat**: Context management approaches will evolve. Cross-session memory remains uniquely valuable.
+
+4. **Schema humility**: The graph can only answer anticipated questions. Accept this limitation rather than over-engineering.
+
+### Open Question: Graph-Guided Exploration
+
+Future consideration: Could the graph *hint* where to explore?
+
+```python
+# Hypothetical: graph suggests starting points for novel queries
+relevant_files = graph.suggest_files("authentication bug")
+# Then exploration focuses there first
+```
+
+This could bridge structured queries and flexible exploration without coupling implementations.
+
 ## Open Questions
 
 1. **Embedding strategy**: Local models vs API? Trade-offs?
