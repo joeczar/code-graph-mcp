@@ -10,8 +10,8 @@
  */
 
 import { z } from 'zod';
-import { getDatabase, createEntityStore } from '@code-graph/core';
 import { type ToolDefinition, createSuccessResponse } from './types.js';
+import { getStores } from './utils.js';
 
 const getExportsInputSchema = z.object({
   filePath: z.string().min(1).describe('Path to the file to list exports from'),
@@ -31,8 +31,7 @@ export const getExportsTool: ToolDefinition<typeof getExportsInputSchema> = {
   },
 
   handler: (input) => {
-    const db = getDatabase();
-    const entityStore = createEntityStore(db);
+    const { entityStore } = getStores();
 
     // Get all entities in the file
     const entities = entityStore.findByFile(input.filePath);

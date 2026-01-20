@@ -6,10 +6,9 @@
  */
 
 import { z } from 'zod';
-import { getDatabase } from '@code-graph/core';
-import { createEntityStore, createRelationshipStore } from '@code-graph/core';
-import type { Entity } from '@code-graph/core';
+import type { Entity, EntityStore, RelationshipStore } from '@code-graph/core';
 import { type ToolDefinition, createSuccessResponse } from './types.js';
+import { getStores } from './utils.js';
 
 const blastRadiusInputSchema = z.object({
   filePath: z.string().describe('Path to the file to analyze'),
@@ -27,19 +26,11 @@ interface AffectedEntity {
 
 /**
  * Recursively finds entities that depend on the given entity IDs
- *
- * @param entityIds - IDs to find dependents of
- * @param relationshipStore - Store to query relationships
- * @param entityStore - Store to query entities
- * @param currentDepth - Current recursion depth
- * @param maxDepth - Maximum depth to traverse
- * @param visited - Set of already visited entity IDs
- * @param results - Accumulated results
  */
 function findDependents(
   entityIds: string[],
-  relationshipStore: ReturnType<typeof createRelationshipStore>,
-  entityStore: ReturnType<typeof createEntityStore>,
+  relationshipStore: RelationshipStore,
+  entityStore: EntityStore,
   currentDepth: number,
   maxDepth: number,
   visited: Set<string>,
@@ -52,31 +43,25 @@ function findDependents(
   const nextLevelIds: string[] = [];
 
   for (const entityId of entityIds) {
-    // Find all relationships where this entity is the target (i.e., something depends on it)
+    // Find all relationships where this entity is the target (something depends on it)
     const relationships = relationshipStore.findByTarget(entityId);
 
     for (const rel of relationships) {
-      // Skip if we've already visited this source entity
       if (visited.has(rel.sourceId)) {
         continue;
       }
 
-      // Get the source entity that depends on our target
       const sourceEntity = entityStore.findById(rel.sourceId);
       if (!sourceEntity) {
         continue;
       }
 
       visited.add(rel.sourceId);
-      results.push({
-        entity: sourceEntity,
-        depth: currentDepth,
-      });
+      results.push({ entity: sourceEntity, depth: currentDepth });
       nextLevelIds.push(rel.sourceId);
     }
   }
 
-  // Recurse to next depth level
   if (nextLevelIds.length > 0) {
     findDependents(
       nextLevelIds,
@@ -105,9 +90,7 @@ export const blastRadiusTool: ToolDefinition<typeof blastRadiusInputSchema> = {
   },
 
   handler: (input) => {
-    const db = getDatabase();
-    const entityStore = createEntityStore(db);
-    const relationshipStore = createRelationshipStore(db);
+    const { entityStore, relationshipStore } = getStores();
 
     // Find all entities in the specified file
     const sourceEntities = entityStore.findByFile(input.filePath);

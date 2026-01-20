@@ -92,8 +92,15 @@ export type {
 } from './checkpoint/index.js';
 
 // Query exports
-export { whatCalls, whatDoesCall, blastRadius, getExports } from './queries/index.js';
+export {
+  findRelatedEntities,
+  whatCalls,
+  whatDoesCall,
+  blastRadius,
+  getExports,
+} from './queries/index.js';
 export type {
+  RelationDirection,
   AffectedEntity,
   BlastRadiusResult,
   ExportType,

@@ -1,3 +1,4 @@
+import { existsSync, statSync } from 'node:fs';
 import { globby } from 'globby';
 import { CodeParser, type ParseResult } from './parser.js';
 import { getSupportedLanguages, getLanguageConfig } from './languages.js';
@@ -53,16 +54,32 @@ export class DirectoryParser {
       onProgress,
     } = options;
 
+    // Validate directory exists
+    if (!existsSync(directory)) {
+      throw new Error(`Directory not found: ${directory}`);
+    }
+
+    const stats = statSync(directory);
+    if (!stats.isDirectory()) {
+      throw new Error(`Path is not a directory: ${directory}`);
+    }
+
     // Build glob patterns for supported extensions
     const patterns = extensions.map((ext) => `**/*${ext}`);
 
     // Find all matching files, respecting .gitignore
-    const files = await globby(patterns, {
-      cwd: directory,
-      absolute: true,
-      gitignore: true,
-      ignore: ignorePatterns,
-    });
+    let files: string[];
+    try {
+      files = await globby(patterns, {
+        cwd: directory,
+        absolute: true,
+        gitignore: true,
+        ignore: ignorePatterns,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to scan directory ${directory}: ${message}`);
+    }
 
     const results: FileParseResult[] = [];
     let successCount = 0;
