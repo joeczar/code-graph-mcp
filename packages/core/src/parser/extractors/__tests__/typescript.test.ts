@@ -24,7 +24,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -57,7 +56,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -80,7 +78,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -103,7 +100,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -128,7 +124,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -156,7 +151,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -189,7 +183,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -216,7 +209,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -239,7 +231,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -262,7 +253,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -288,7 +278,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -314,7 +303,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -334,7 +322,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -359,7 +346,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -386,7 +372,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -408,7 +393,6 @@ describe('TypeScriptExtractor', () => {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -436,7 +420,6 @@ function second() {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -457,7 +440,6 @@ function second() {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/src/index.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -484,7 +466,6 @@ function second() {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -509,7 +490,6 @@ function second() {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -532,7 +512,6 @@ function second() {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
@@ -556,7 +535,6 @@ function second() {
 
       const extractor = new TypeScriptExtractor({
         filePath: '/test/file.ts',
-        sourceCode: code,
       });
 
       const entities = extractor.extract(result.result.tree.rootNode);
