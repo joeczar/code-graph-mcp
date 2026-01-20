@@ -9,8 +9,9 @@ import {
   createRelationshipStore,
 } from '../db/relationships.js';
 
-// SyntaxNode type is not exported, we'll use Tree['rootNode']
 type SyntaxNode = Tree['rootNode'];
+
+type EntityType = NewEntity['type'];
 
 /**
  * Relationship with entity names instead of database IDs.
@@ -20,6 +21,52 @@ type PendingRelationship = Omit<NewRelationship, 'sourceId' | 'targetId'> & {
   sourceName: string;
   targetName: string;
 };
+
+/**
+ * Creates an entity from an AST node if it has a name field.
+ */
+function createEntityFromNode(
+  node: SyntaxNode,
+  type: EntityType,
+  filePath: string,
+  language: string
+): NewEntity | null {
+  const nameNode = node.childForFieldName('name');
+  if (!nameNode) return null;
+
+  return {
+    type,
+    name: nameNode.text,
+    filePath,
+    startLine: node.startPosition.row + 1,
+    endLine: node.endPosition.row + 1,
+    language,
+  };
+}
+
+/**
+ * Iterates over all children of a node, calling the callback for each.
+ */
+function forEachChild(node: SyntaxNode, callback: (child: SyntaxNode) => void): void {
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i);
+    if (child) callback(child);
+  }
+}
+
+/**
+ * Finds a child node matching a predicate.
+ */
+function findChild(
+  node: SyntaxNode,
+  predicate: (child: SyntaxNode) => boolean
+): SyntaxNode | undefined {
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i);
+    if (child && predicate(child)) return child;
+  }
+  return undefined;
+}
 
 export interface ProcessFileOptions {
   filePath: string;
@@ -76,11 +123,7 @@ export class FileProcessor {
 
     // Step 3: Extract entities and relationships
     const entities = this.extractEntities(tree.rootNode, filePath, language);
-    const relationships = this.extractRelationships(
-      tree.rootNode,
-      filePath,
-      language
-    );
+    const relationships = this.extractRelationships(tree.rootNode, language);
 
     // Step 4: Store in database
     const entityStore = createEntityStore(db);
@@ -175,58 +218,21 @@ export class FileProcessor {
     language: string,
     entities: NewEntity[]
   ): void {
-    // Extract function declarations
-    if (node.type === 'function_declaration') {
-      const nameNode = node.childForFieldName('name');
-      if (nameNode) {
-        entities.push({
-          type: 'function',
-          name: nameNode.text,
-          filePath,
-          startLine: node.startPosition.row + 1,
-          endLine: node.endPosition.row + 1,
-          language,
-        });
-      }
+    const nodeTypeToEntityType: Record<string, EntityType> = {
+      function_declaration: 'function',
+      class_declaration: 'class',
+      method_definition: 'method',
+    };
+
+    const entityType = nodeTypeToEntityType[node.type];
+    if (entityType) {
+      const entity = createEntityFromNode(node, entityType, filePath, language);
+      if (entity) entities.push(entity);
     }
 
-    // Extract class declarations
-    if (node.type === 'class_declaration') {
-      const nameNode = node.childForFieldName('name');
-      if (nameNode) {
-        entities.push({
-          type: 'class',
-          name: nameNode.text,
-          filePath,
-          startLine: node.startPosition.row + 1,
-          endLine: node.endPosition.row + 1,
-          language,
-        });
-      }
-    }
-
-    // Extract method definitions
-    if (node.type === 'method_definition') {
-      const nameNode = node.childForFieldName('name');
-      if (nameNode) {
-        entities.push({
-          type: 'method',
-          name: nameNode.text,
-          filePath,
-          startLine: node.startPosition.row + 1,
-          endLine: node.endPosition.row + 1,
-          language,
-        });
-      }
-    }
-
-    // Recurse into children
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.child(i);
-      if (child) {
-        this.extractTypeScriptEntities(child, filePath, language, entities);
-      }
-    }
+    forEachChild(node, child => {
+      this.extractTypeScriptEntities(child, filePath, language, entities);
+    });
   }
 
   /**
@@ -238,58 +244,21 @@ export class FileProcessor {
     language: string,
     entities: NewEntity[]
   ): void {
-    // Extract method definitions
-    if (node.type === 'method') {
-      const nameNode = node.childForFieldName('name');
-      if (nameNode) {
-        entities.push({
-          type: 'method',
-          name: nameNode.text,
-          filePath,
-          startLine: node.startPosition.row + 1,
-          endLine: node.endPosition.row + 1,
-          language,
-        });
-      }
+    const nodeTypeToEntityType: Record<string, EntityType> = {
+      method: 'method',
+      class: 'class',
+      module: 'module',
+    };
+
+    const entityType = nodeTypeToEntityType[node.type];
+    if (entityType) {
+      const entity = createEntityFromNode(node, entityType, filePath, language);
+      if (entity) entities.push(entity);
     }
 
-    // Extract class definitions
-    if (node.type === 'class') {
-      const nameNode = node.childForFieldName('name');
-      if (nameNode) {
-        entities.push({
-          type: 'class',
-          name: nameNode.text,
-          filePath,
-          startLine: node.startPosition.row + 1,
-          endLine: node.endPosition.row + 1,
-          language,
-        });
-      }
-    }
-
-    // Extract module definitions
-    if (node.type === 'module') {
-      const nameNode = node.childForFieldName('name');
-      if (nameNode) {
-        entities.push({
-          type: 'module',
-          name: nameNode.text,
-          filePath,
-          startLine: node.startPosition.row + 1,
-          endLine: node.endPosition.row + 1,
-          language,
-        });
-      }
-    }
-
-    // Recurse into children
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.child(i);
-      if (child) {
-        this.extractRubyEntities(child, filePath, language, entities);
-      }
-    }
+    forEachChild(node, child => {
+      this.extractRubyEntities(child, filePath, language, entities);
+    });
   }
 
   /**
@@ -300,33 +269,26 @@ export class FileProcessor {
    */
   private extractRelationships(
     node: SyntaxNode,
-    filePath: string,
     language: string
   ): PendingRelationship[] {
     const relationships: PendingRelationship[] = [];
 
-    // TypeScript/JavaScript relationships
     if (language === 'typescript' || language === 'javascript') {
-      this.extractTypeScriptRelationships(node, filePath, relationships);
-    }
-    // Ruby relationships
-    else if (language === 'ruby') {
-      this.extractRubyRelationships(node, filePath, relationships);
+      this.extractTypeScriptRelationships(node, relationships);
+    } else if (language === 'ruby') {
+      this.extractRubyRelationships(node, relationships);
     }
 
     return relationships;
   }
 
   /**
-   * Extract TypeScript/JavaScript relationships.
-   * For now, just extracts class inheritance and imports.
+   * Extract TypeScript/JavaScript class inheritance relationships.
    */
   private extractTypeScriptRelationships(
     node: SyntaxNode,
-    filePath: string,
     relationships: PendingRelationship[]
   ): void {
-    // Extract class inheritance
     if (node.type === 'class_declaration') {
       const nameNode = node.childForFieldName('name');
       const heritageNode = node.children.find(c => c.type === 'class_heritage');
@@ -335,67 +297,49 @@ export class FileProcessor {
         const extendsClause = heritageNode.children.find(
           c => c.type === 'extends_clause'
         );
-        if (extendsClause) {
-          const identifier = extendsClause.children.find(
-            c => c.type === 'identifier'
-          );
-          if (identifier) {
-            relationships.push({
-              sourceName: nameNode.text,
-              targetName: identifier.text,
-              type: 'extends',
-            });
-          }
+        const identifier = extendsClause?.children.find(
+          c => c.type === 'identifier'
+        );
+        if (identifier) {
+          relationships.push({
+            sourceName: nameNode.text,
+            targetName: identifier.text,
+            type: 'extends',
+          });
         }
       }
     }
 
-    // Recurse into children
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.child(i);
-      if (child) {
-        this.extractTypeScriptRelationships(child, filePath, relationships);
-      }
-    }
+    forEachChild(node, child => {
+      this.extractTypeScriptRelationships(child, relationships);
+    });
   }
 
   /**
-   * Extract Ruby relationships.
-   * For now, just extracts class inheritance.
+   * Extract Ruby class inheritance relationships.
    */
   private extractRubyRelationships(
     node: SyntaxNode,
-    filePath: string,
     relationships: PendingRelationship[]
   ): void {
-    // Extract class inheritance
     if (node.type === 'class') {
       const nameNode = node.childForFieldName('name');
       const superclassNode = node.childForFieldName('superclass');
 
       if (nameNode && superclassNode) {
-        // Superclass node contains: ["<", "constant"]
-        // Find the constant child
-        for (let i = 0; i < superclassNode.childCount; i++) {
-          const child = superclassNode.child(i);
-          if (child?.type === 'constant') {
-            relationships.push({
-              sourceName: nameNode.text,
-              targetName: child.text,
-              type: 'extends',
-            });
-            break;
-          }
+        const constant = findChild(superclassNode, c => c.type === 'constant');
+        if (constant) {
+          relationships.push({
+            sourceName: nameNode.text,
+            targetName: constant.text,
+            type: 'extends',
+          });
         }
       }
     }
 
-    // Recurse into children
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.child(i);
-      if (child) {
-        this.extractRubyRelationships(child, filePath, relationships);
-      }
-    }
+    forEachChild(node, child => {
+      this.extractRubyRelationships(child, relationships);
+    });
   }
 }
