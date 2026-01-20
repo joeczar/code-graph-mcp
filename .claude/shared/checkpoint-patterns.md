@@ -65,7 +65,12 @@ pnpm checkpoint workflow set-phase "{workflow_id}" review
 
 # At START of finalization (first thing finalize-agent does)
 pnpm checkpoint workflow set-phase "{workflow_id}" finalize
+
+# At START of merge (first thing /auto-merge does)
+pnpm checkpoint workflow set-phase "{workflow_id}" merge
 ```
+
+**Phases:** setup → research → implement → review → finalize → merge
 
 **Phase semantics:** `current_phase` means "the phase we are currently working on"
 (or about to work on). This allows resume to correctly restart the interrupted phase.
@@ -80,10 +85,42 @@ Use these action types for consistency:
 | `dev_plan_created` | After plan approved |
 | `implementation_complete` | After all commits made |
 | `pr_created` | After PR successfully created |
+| `pr_merged` | After PR successfully merged |
+| `merge_conflict` | When merge blocked by conflicts |
 
 Example:
 ```bash
 pnpm checkpoint workflow log-action "{workflow_id}" "dev_plan_created" success
+```
+
+## PR Tracking
+
+Track the lifecycle of PRs associated with workflows:
+
+```bash
+# After creating a PR (in finalize-agent)
+pnpm checkpoint workflow set-pr "{workflow_id}" {pr_number}
+
+# After PR is merged (in /auto-merge)
+pnpm checkpoint workflow set-merged "{workflow_id}" {merge_sha}
+```
+
+**PR States:**
+- `open` - PR created, awaiting merge
+- `merged` - PR has been merged
+- `closed` - PR was closed without merging
+
+The `set-pr` command automatically sets state to `open`.
+The `set-merged` command automatically sets state to `merged` and records the squash commit SHA.
+
+**Querying PR status:**
+```bash
+# Get workflow to check pr_state
+pnpm checkpoint workflow get "{workflow_id}"
+
+# List workflows with open PRs
+pnpm checkpoint workflow list --status=completed
+# Then filter by pr_state in output
 ```
 
 ## Workflow Completion

@@ -12,6 +12,9 @@ export {
   listWorkflows,
   setWorkflowPhase,
   setWorkflowStatus,
+  setWorkflowPr,
+  setWorkflowMerged,
+  setWorkflowPrState,
   deleteWorkflow,
 
   // Action operations
@@ -29,6 +32,7 @@ export {
 export type {
   WorkflowStatus,
   WorkflowPhase,
+  PrState,
   Workflow,
   WorkflowAction,
   WorkflowCommit,

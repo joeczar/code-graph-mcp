@@ -8,7 +8,8 @@ import { dirname } from 'node:path';
 // ============================================================================
 
 export type WorkflowStatus = 'running' | 'paused' | 'completed' | 'failed';
-export type WorkflowPhase = 'setup' | 'research' | 'implement' | 'review' | 'finalize';
+export type WorkflowPhase = 'setup' | 'research' | 'implement' | 'review' | 'finalize' | 'merge';
+export type PrState = 'open' | 'merged' | 'closed';
 
 export interface Workflow {
   id: string;
@@ -16,6 +17,9 @@ export interface Workflow {
   branch_name: string;
   status: WorkflowStatus;
   current_phase: WorkflowPhase;
+  pr_number: number | null;
+  pr_state: PrState | null;
+  merged_sha: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -53,6 +57,9 @@ CREATE TABLE IF NOT EXISTS workflows (
   branch_name TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'running',
   current_phase TEXT NOT NULL DEFAULT 'setup',
+  pr_number INTEGER,
+  pr_state TEXT,
+  merged_sha TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 )
@@ -84,9 +91,17 @@ CREATE TABLE IF NOT EXISTS workflow_commits (
 const INDEXES = [
   'CREATE INDEX IF NOT EXISTS idx_workflows_issue ON workflows(issue_number)',
   'CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status)',
+  'CREATE INDEX IF NOT EXISTS idx_workflows_pr ON workflows(pr_number)',
   'CREATE INDEX IF NOT EXISTS idx_actions_workflow ON workflow_actions(workflow_id)',
   'CREATE INDEX IF NOT EXISTS idx_commits_workflow ON workflow_commits(workflow_id)',
   'CREATE INDEX IF NOT EXISTS idx_commits_sha ON workflow_commits(sha)',
+];
+
+// Migration: Add new columns to existing databases
+const MIGRATIONS = [
+  `ALTER TABLE workflows ADD COLUMN pr_number INTEGER`,
+  `ALTER TABLE workflows ADD COLUMN pr_state TEXT`,
+  `ALTER TABLE workflows ADD COLUMN merged_sha TEXT`,
 ];
 
 // ============================================================================
@@ -138,6 +153,15 @@ function initializeCheckpointSchema(db: Database.Database): void {
   for (const index of INDEXES) {
     db.exec(index);
   }
+
+  // Run migrations for existing databases (safely ignores if columns exist)
+  for (const migration of MIGRATIONS) {
+    try {
+      db.exec(migration);
+    } catch {
+      // Column already exists, ignore
+    }
+  }
 }
 
 // ============================================================================
@@ -149,8 +173,8 @@ export function createWorkflow(db: Database.Database, data: NewWorkflow): Workfl
   const now = new Date().toISOString();
 
   const stmt = db.prepare(`
-    INSERT INTO workflows (id, issue_number, branch_name, status, current_phase, created_at, updated_at)
-    VALUES (?, ?, ?, 'running', 'setup', ?, ?)
+    INSERT INTO workflows (id, issue_number, branch_name, status, current_phase, pr_number, pr_state, merged_sha, created_at, updated_at)
+    VALUES (?, ?, ?, 'running', 'setup', NULL, NULL, NULL, ?, ?)
   `);
 
   stmt.run(id, data.issue_number, data.branch_name, now, now);
@@ -161,6 +185,9 @@ export function createWorkflow(db: Database.Database, data: NewWorkflow): Workfl
     branch_name: data.branch_name,
     status: 'running',
     current_phase: 'setup',
+    pr_number: null,
+    pr_state: null,
+    merged_sha: null,
     created_at: now,
     updated_at: now,
   };
@@ -224,6 +251,45 @@ export function setWorkflowStatus(
     UPDATE workflows SET status = ?, updated_at = ? WHERE id = ?
   `);
   const result = stmt.run(status, now, id);
+  return result.changes > 0;
+}
+
+export function setWorkflowPr(
+  db: Database.Database,
+  id: string,
+  prNumber: number
+): boolean {
+  const now = new Date().toISOString();
+  const stmt = db.prepare(`
+    UPDATE workflows SET pr_number = ?, pr_state = 'open', updated_at = ? WHERE id = ?
+  `);
+  const result = stmt.run(prNumber, now, id);
+  return result.changes > 0;
+}
+
+export function setWorkflowMerged(
+  db: Database.Database,
+  id: string,
+  mergedSha: string
+): boolean {
+  const now = new Date().toISOString();
+  const stmt = db.prepare(`
+    UPDATE workflows SET pr_state = 'merged', merged_sha = ?, updated_at = ? WHERE id = ?
+  `);
+  const result = stmt.run(mergedSha, now, id);
+  return result.changes > 0;
+}
+
+export function setWorkflowPrState(
+  db: Database.Database,
+  id: string,
+  prState: PrState
+): boolean {
+  const now = new Date().toISOString();
+  const stmt = db.prepare(`
+    UPDATE workflows SET pr_state = ?, updated_at = ? WHERE id = ?
+  `);
+  const result = stmt.run(prState, now, id);
   return result.changes > 0;
 }
 

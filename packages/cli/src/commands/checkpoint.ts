@@ -14,12 +14,16 @@ import {
   listWorkflows,
   setWorkflowPhase,
   setWorkflowStatus,
+  setWorkflowPr,
+  setWorkflowMerged,
+  setWorkflowPrState,
   deleteWorkflow,
   logAction,
   logCommit,
   getWorkflowSummary,
   type WorkflowPhase,
   type WorkflowStatus,
+  type PrState,
 } from '@code-graph/core/checkpoint';
 
 // Default database path - in .claude directory (gitignored)
@@ -140,10 +144,10 @@ function handleWorkflowAction(action: string, args: string[]): void {
     case 'set-phase': {
       const [workflowId, phase] = args;
       if (!workflowId || !phase) {
-        throw new Error('Usage: checkpoint workflow set-phase <workflow_id> <phase>\nPhases: setup, research, implement, review, finalize');
+        throw new Error('Usage: checkpoint workflow set-phase <workflow_id> <phase>\nPhases: setup, research, implement, review, finalize, merge');
       }
 
-      const validPhases: WorkflowPhase[] = ['setup', 'research', 'implement', 'review', 'finalize'];
+      const validPhases: WorkflowPhase[] = ['setup', 'research', 'implement', 'review', 'finalize', 'merge'];
       if (!validPhases.includes(phase as WorkflowPhase)) {
         throw new Error(`Invalid phase: ${phase}\nValid phases: ${validPhases.join(', ')}`);
       }
@@ -170,6 +174,64 @@ function handleWorkflowAction(action: string, args: string[]): void {
       }
 
       const success = setWorkflowStatus(db, workflowId, status as WorkflowStatus);
+      if (success) {
+        const workflow = getWorkflow(db, workflowId);
+        console.log(JSON.stringify(workflow, null, 2));
+      } else {
+        throw new Error(`Workflow not found: ${workflowId}`);
+      }
+      break;
+    }
+
+    case 'set-pr': {
+      const [workflowId, prNumberStr] = args;
+      if (!workflowId || !prNumberStr) {
+        throw new Error('Usage: checkpoint workflow set-pr <workflow_id> <pr_number>');
+      }
+
+      const prNumber = parseInt(prNumberStr, 10);
+      if (isNaN(prNumber)) {
+        throw new Error('pr_number must be a number');
+      }
+
+      const success = setWorkflowPr(db, workflowId, prNumber);
+      if (success) {
+        const workflow = getWorkflow(db, workflowId);
+        console.log(JSON.stringify(workflow, null, 2));
+      } else {
+        throw new Error(`Workflow not found: ${workflowId}`);
+      }
+      break;
+    }
+
+    case 'set-merged': {
+      const [workflowId, mergedSha] = args;
+      if (!workflowId || !mergedSha) {
+        throw new Error('Usage: checkpoint workflow set-merged <workflow_id> <merged_sha>');
+      }
+
+      const success = setWorkflowMerged(db, workflowId, mergedSha);
+      if (success) {
+        const workflow = getWorkflow(db, workflowId);
+        console.log(JSON.stringify(workflow, null, 2));
+      } else {
+        throw new Error(`Workflow not found: ${workflowId}`);
+      }
+      break;
+    }
+
+    case 'set-pr-state': {
+      const [workflowId, prState] = args;
+      if (!workflowId || !prState) {
+        throw new Error('Usage: checkpoint workflow set-pr-state <workflow_id> <pr_state>\nPR states: open, merged, closed');
+      }
+
+      const validPrStates: PrState[] = ['open', 'merged', 'closed'];
+      if (!validPrStates.includes(prState as PrState)) {
+        throw new Error(`Invalid PR state: ${prState}\nValid states: ${validPrStates.join(', ')}`);
+      }
+
+      const success = setWorkflowPrState(db, workflowId, prState as PrState);
       if (success) {
         const workflow = getWorkflow(db, workflowId);
         console.log(JSON.stringify(workflow, null, 2));
@@ -260,11 +322,23 @@ ACTIONS:
 
   set-phase <workflow_id> <phase>
     Update workflow phase.
-    Phases: setup, research, implement, review, finalize
+    Phases: setup, research, implement, review, finalize, merge
 
   set-status <workflow_id> <status>
     Update workflow status.
     Statuses: running, paused, completed, failed
+
+  set-pr <workflow_id> <pr_number>
+    Set the PR number for a workflow (sets pr_state to 'open').
+    Call this after creating a PR for the workflow.
+
+  set-merged <workflow_id> <merged_sha>
+    Mark a workflow's PR as merged with the squash commit SHA.
+    Sets pr_state to 'merged'.
+
+  set-pr-state <workflow_id> <pr_state>
+    Update the PR state directly.
+    States: open, merged, closed
 
   log-action <workflow_id> <action_type> <status> [details]
     Log an action taken during the workflow.
@@ -288,6 +362,12 @@ EXAMPLES:
 
   # Log a commit
   code-graph checkpoint workflow log-commit abc-123 a1b2c3d "feat(parser): add TS support"
+
+  # Set PR number after creating PR
+  code-graph checkpoint workflow set-pr abc-123 42
+
+  # Mark PR as merged after /auto-merge
+  code-graph checkpoint workflow set-merged abc-123 a1b2c3d4e5f6
 
   # Mark workflow complete
   code-graph checkpoint workflow set-status abc-123 completed
