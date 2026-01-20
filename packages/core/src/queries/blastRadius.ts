@@ -1,4 +1,4 @@
-import type { Entity, EntityStore } from '../db/entities.js';
+import type { EntityStore } from '../db/entities.js';
 import type { RelationshipStore, RelationshipType } from '../db/relationships.js';
 import type { AffectedEntity, BlastRadiusResult } from './types.js';
 
@@ -65,7 +65,7 @@ export function blastRadius(
   let directDependents = 0;
 
   // Queue for breadth-first traversal: [entityId, currentDepth]
-  const queue: Array<[string, number]> = [];
+  const queue: [string, number][] = [];
 
   // Initialize queue with all source entities at depth -1
   // (their dependents will be at depth 0)
@@ -76,7 +76,10 @@ export function blastRadius(
 
   // Breadth-first traversal
   while (queue.length > 0) {
-    const [entityId, depth] = queue.shift()!;
+    const item = queue.shift();
+    if (!item) continue;
+
+    const [entityId, depth] = item;
     const nextDepth = depth + 1;
 
     // Stop if we've reached the max depth

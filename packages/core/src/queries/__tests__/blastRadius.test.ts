@@ -94,6 +94,9 @@ describe('blastRadius', () => {
     expect(result.sourceFile).toBe('/src/math.ts');
     expect(result.sourceEntities).toHaveLength(1);
     expect(result.affectedEntities).toHaveLength(1);
+    if (!result.affectedEntities[0]) {
+      throw new Error('affectedEntities[0] is undefined');
+    }
     expect(result.affectedEntities[0].entity.name).toBe('calculate');
     expect(result.affectedEntities[0].depth).toBe(0);
     expect(result.summary).toEqual({
@@ -154,12 +157,14 @@ describe('blastRadius', () => {
     // B should be at depth 0
     const bResult = result.affectedEntities.find(ae => ae.entity.name === 'b');
     expect(bResult).toBeDefined();
-    expect(bResult!.depth).toBe(0);
+    if (!bResult) throw new Error('bResult is undefined');
+    expect(bResult.depth).toBe(0);
 
     // C should be at depth 1
     const cResult = result.affectedEntities.find(ae => ae.entity.name === 'c');
     expect(cResult).toBeDefined();
-    expect(cResult!.depth).toBe(1);
+    if (!cResult) throw new Error('cResult is undefined');
+    expect(cResult.depth).toBe(1);
 
     expect(result.summary).toEqual({
       totalAffected: 2,
@@ -366,6 +371,7 @@ describe('blastRadius', () => {
     // D should be at depth 1
     const depth1 = result.affectedEntities.filter(ae => ae.depth === 1);
     expect(depth1).toHaveLength(1);
+    if (!depth1[0]) throw new Error('depth1[0] is undefined');
     expect(depth1[0].entity.name).toBe('d');
 
     expect(result.summary).toEqual({
@@ -483,6 +489,9 @@ describe('blastRadius', () => {
 
     // Should only find 'caller', not 'method' (contains is not a dependency)
     expect(result.affectedEntities).toHaveLength(1);
+    if (!result.affectedEntities[0]) {
+      throw new Error('affectedEntities[0] is undefined');
+    }
     expect(result.affectedEntities[0].entity.name).toBe('caller');
   });
 
