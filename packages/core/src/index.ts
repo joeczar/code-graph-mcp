@@ -89,3 +89,6 @@ export type {
   NewWorkflow,
   WorkflowSummary,
 } from './checkpoint/index.js';
+
+// Query exports
+export { whatCalls } from './queries/index.js';
