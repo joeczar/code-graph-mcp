@@ -36,7 +36,7 @@ export async function computeFileHashFromPath(
 }
 
 export interface IncrementalUpdater {
-  shouldReparse(filePath: string, currentHash: string): Promise<boolean>;
+  shouldReparse(filePath: string, currentHash: string): boolean;
   markFileUpdated(
     filePath: string,
     contentHash: string,
@@ -53,7 +53,7 @@ export function createIncrementalUpdater(
   const entityStore = createEntityStore(db);
 
   return {
-    async shouldReparse(filePath: string, currentHash: string): Promise<boolean> {
+    shouldReparse(filePath: string, currentHash: string): boolean {
       const existing = fileStore.findByPath(filePath);
       if (!existing) {
         return true; // New file, needs parsing

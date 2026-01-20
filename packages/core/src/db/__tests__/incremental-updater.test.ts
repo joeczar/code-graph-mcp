@@ -43,7 +43,7 @@ describe('IncrementalUpdater', () => {
 
   describe('computeFileHashFromPath', () => {
     it('should compute hash from file content', async () => {
-      const tempFile = join(tmpdir(), `test-${Date.now()}.txt`);
+      const tempFile = join(tmpdir(), `test-${String(Date.now())}.txt`);
       const content = 'test content';
       await writeFile(tempFile, content, 'utf-8');
 
@@ -62,25 +62,25 @@ describe('IncrementalUpdater', () => {
   });
 
   describe('shouldReparse', () => {
-    it('should return true for new file', async () => {
+    it('should return true for new file', () => {
       const updater = createIncrementalUpdater(db);
-      const shouldReparse = await updater.shouldReparse('/test/new.ts', 'hash123');
+      const shouldReparse = updater.shouldReparse('/test/new.ts', 'hash123');
       expect(shouldReparse).toBe(true);
     });
 
-    it('should return false if hash unchanged', async () => {
+    it('should return false if hash unchanged', () => {
       const updater = createIncrementalUpdater(db);
       updater.markFileUpdated('/test/file.ts', 'hash123', 'typescript');
 
-      const shouldReparse = await updater.shouldReparse('/test/file.ts', 'hash123');
+      const shouldReparse = updater.shouldReparse('/test/file.ts', 'hash123');
       expect(shouldReparse).toBe(false);
     });
 
-    it('should return true if hash changed', async () => {
+    it('should return true if hash changed', () => {
       const updater = createIncrementalUpdater(db);
       updater.markFileUpdated('/test/file.ts', 'hash123', 'typescript');
 
-      const shouldReparse = await updater.shouldReparse('/test/file.ts', 'hash456');
+      const shouldReparse = updater.shouldReparse('/test/file.ts', 'hash456');
       expect(shouldReparse).toBe(true);
     });
   });

@@ -40,7 +40,7 @@ function extractEntities(
   return [
     {
       type: 'file',
-      name: filePath.split('/').pop() || filePath,
+      name: filePath.split('/').pop() ?? filePath,
       filePath,
       startLine: 1,
       endLine: sourceCode.split('\n').length,
@@ -97,7 +97,7 @@ export function createFileProcessor(
 
       // Check if we should skip (hash-based incremental update)
       if (checkHash) {
-        const shouldReparse = await updater.shouldReparse(filePath, contentHash);
+        const shouldReparse = updater.shouldReparse(filePath, contentHash);
         if (!shouldReparse) {
           return {
             filePath,

@@ -32,7 +32,7 @@ describe('FileProcessor', () => {
 
   describe('processFile', () => {
     it('should process a new file', async () => {
-      tempFile = join(tmpdir(), `test-${Date.now()}.ts`);
+      tempFile = join(tmpdir(), `test-${String(Date.now())}.ts`);
       await writeFile(tempFile, 'const x = 1;', 'utf-8');
 
       const processor = createFileProcessor(db);
@@ -50,7 +50,7 @@ describe('FileProcessor', () => {
     });
 
     it('should update an existing file', async () => {
-      tempFile = join(tmpdir(), `test-${Date.now()}.ts`);
+      tempFile = join(tmpdir(), `test-${String(Date.now())}.ts`);
       await writeFile(tempFile, 'const x = 1;', 'utf-8');
 
       const processor = createFileProcessor(db);
@@ -58,7 +58,7 @@ describe('FileProcessor', () => {
       // First process
       const result1 = await processor.processFile(tempFile);
       expect(result1.action).toBe('created');
-      const entityCount1 = result1.entities?.length || 0;
+      const entityCount1 = result1.entities?.length ?? 0;
 
       // Update file content
       await writeFile(tempFile, 'const x = 1;\nconst y = 2;', 'utf-8');
@@ -74,7 +74,7 @@ describe('FileProcessor', () => {
     });
 
     it('should skip unchanged file when checkHash is true', async () => {
-      tempFile = join(tmpdir(), `test-${Date.now()}.ts`);
+      tempFile = join(tmpdir(), `test-${String(Date.now())}.ts`);
       await writeFile(tempFile, 'const x = 1;', 'utf-8');
 
       const processor = createFileProcessor(db, { checkHash: true });
@@ -90,7 +90,7 @@ describe('FileProcessor', () => {
     });
 
     it('should reprocess changed file when checkHash is true', async () => {
-      tempFile = join(tmpdir(), `test-${Date.now()}.ts`);
+      tempFile = join(tmpdir(), `test-${String(Date.now())}.ts`);
       await writeFile(tempFile, 'const x = 1;', 'utf-8');
 
       const processor = createFileProcessor(db, { checkHash: true });
@@ -108,7 +108,7 @@ describe('FileProcessor', () => {
     });
 
     it('should return error for unsupported language', async () => {
-      tempFile = join(tmpdir(), `test-${Date.now()}.xyz`);
+      tempFile = join(tmpdir(), `test-${String(Date.now())}.xyz`);
       await writeFile(tempFile, 'some content', 'utf-8');
 
       const processor = createFileProcessor(db);
@@ -129,9 +129,9 @@ describe('FileProcessor', () => {
 
   describe('removeStaleFiles', () => {
     it('should remove files not in current paths', async () => {
-      const file1 = join(tmpdir(), `test1-${Date.now()}.ts`);
-      const file2 = join(tmpdir(), `test2-${Date.now()}.ts`);
-      const file3 = join(tmpdir(), `test3-${Date.now()}.ts`);
+      const file1 = join(tmpdir(), `test1-${String(Date.now())}.ts`);
+      const file2 = join(tmpdir(), `test2-${String(Date.now())}.ts`);
+      const file3 = join(tmpdir(), `test3-${String(Date.now())}.ts`);
 
       await writeFile(file1, 'const x = 1;', 'utf-8');
       await writeFile(file2, 'const y = 2;', 'utf-8');
@@ -165,7 +165,7 @@ describe('FileProcessor', () => {
     });
 
     it('should return empty array when no stale files', async () => {
-      tempFile = join(tmpdir(), `test-${Date.now()}.ts`);
+      tempFile = join(tmpdir(), `test-${String(Date.now())}.ts`);
       await writeFile(tempFile, 'const x = 1;', 'utf-8');
 
       const processor = createFileProcessor(db);
