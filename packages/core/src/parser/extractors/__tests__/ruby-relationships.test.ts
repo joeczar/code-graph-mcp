@@ -117,7 +117,7 @@ describe('RubyRelationshipExtractor', () => {
 
       const addCall = calls.find(c => c.targetName === 'add');
       expect(addCall).toBeDefined();
-      expect(addCall?.sourceName).toBe('compute');
+      expect(addCall?.sourceName).toBe('Calculator#compute');
     });
 
     it('does not extract calls outside of named contexts', async () => {
