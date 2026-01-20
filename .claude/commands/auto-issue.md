@@ -133,9 +133,40 @@ The atomic-developer will:
 
 ---
 
-## Phase 4: Review
+## Phase 4: Review Agents (MANDATORY)
 
-Run validation and review tools:
+**CRITICAL:** This phase runs automated review agents. Do NOT skip.
+
+### Step 1: Identify Changed Files
+
+```bash
+git diff origin/main --name-only | grep -E '\.(ts|tsx|js|jsx)$'
+```
+
+If no TypeScript/JavaScript files changed, skip to validation.
+
+### Step 2: Run Review Agents (in sequence)
+
+| Agent | Purpose | Status |
+|-------|---------|--------|
+| `code-simplifier:code-simplifier` | Simplify and clarify code | ☐ |
+| `pr-review-toolkit:code-reviewer` | Check bugs, style, quality | ☐ |
+| `pr-review-toolkit:silent-failure-hunter` | Find silent failures | ☐ |
+
+For each agent:
+1. Launch via Task tool
+2. Apply fixes with confidence >= 60%
+3. Mark agent as complete (☑)
+
+### Step 3: Commit Review Fixes
+
+If any changes:
+```bash
+git add -A
+git commit -m "refactor: address review findings"
+```
+
+### Step 4: Final Validation
 
 ```bash
 pnpm typecheck
@@ -146,7 +177,8 @@ pnpm build
 
 **Auto-proceed check:**
 - If any validation fails: STOP and report failures
-- If all pass: Proceed immediately to Phase 5
+- If review agents were skipped (for TS/JS changes): STOP and run them
+- If all pass AND review complete: Proceed to Phase 5
 
 ---
 
