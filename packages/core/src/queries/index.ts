@@ -4,6 +4,8 @@
  * These functions provide high-level queries over the entity and relationship stores.
  */
 
+export { findRelatedEntities } from './findRelatedEntities.js';
+export type { RelationDirection } from './findRelatedEntities.js';
 export { whatCalls } from './whatCalls.js';
 export { whatDoesCall } from './whatDoesCall.js';
 export { blastRadius } from './blastRadius.js';
