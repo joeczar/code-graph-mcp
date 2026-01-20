@@ -16,3 +16,6 @@ export type {
 
 export { createMigrationRunner, migrations } from './migrations.js';
 export type { Migration, MigrationRunner } from './migrations.js';
+
+export { createFileStore } from './files.js';
+export type { FileRecord, FileStore } from './files.js';
