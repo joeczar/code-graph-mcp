@@ -36,10 +36,7 @@ export type EnterCallback = (node: Node, context: WalkerContext) => WalkControl 
 /**
  * Visitor callback invoked when exiting a node
  */
-export type ExitCallback = (
-  node: Node,
-  context: WalkerContext
-) => void;
+export type ExitCallback = (node: Node, context: WalkerContext) => void;
 
 /**
  * Visitor definition for AST traversal
@@ -153,8 +150,7 @@ export class Walker {
     const ancestors: Node[] = [];
     let depth = 0;
 
-    const goToNextNode = (callExitOnParents = true): boolean => {
-      // Try to go to next sibling
+    const goToNextNode = (): boolean => {
       if (cursor.gotoNextSibling()) {
         return true;
       }
@@ -162,13 +158,10 @@ export class Walker {
       // Go back up, calling exit callbacks as we go
       while (cursor.gotoParent()) {
         const parentNode = cursor.currentNode;
-        if (ancestors.length > 0) {
-          ancestors.pop();
-        }
+        ancestors.pop();
         depth--;
 
-        // Call exit callback for parent if we should visit it and caller requested it
-        if (callExitOnParents && this.shouldVisitNode(parentNode)) {
+        if (this.shouldVisitNode(parentNode)) {
           const parentContext: WalkerContext = {
             depth,
             parent: ancestors[ancestors.length - 1] ?? null,
@@ -178,13 +171,11 @@ export class Walker {
           this.callExitVisitor(parentNode, parentContext);
         }
 
-        // Try next sibling of parent
         if (cursor.gotoNextSibling()) {
           return true;
         }
       }
 
-      // Reached root with no more siblings
       return false;
     };
 
@@ -193,7 +184,6 @@ export class Walker {
       const node = cursor.currentNode;
       const shouldVisit = this.shouldVisitNode(node);
 
-      // Build context
       const context: WalkerContext = {
         depth,
         parent: ancestors[ancestors.length - 1] ?? null,
@@ -201,40 +191,30 @@ export class Walker {
         fieldName: cursor.currentFieldName,
       };
 
-      let control = WalkControl.Continue;
-
-      // Call enter callback if we should visit this node
       if (shouldVisit) {
-        control = this.callEnterVisitor(node, context);
+        const control = this.callEnterVisitor(node, context);
 
-        // Handle control flow
         if (control === WalkControl.Stop) {
-          hasMoreNodes = false;
-          continue;
+          break;
         }
 
         if (control === WalkControl.SkipSubtree) {
-          // Call exit callback before skipping
           this.callExitVisitor(node, context);
-          // Skip subtree, go to next node
           hasMoreNodes = goToNextNode();
           continue;
         }
       }
 
-      // Try to go to first child (even if we didn't visit this node)
       if (cursor.gotoFirstChild()) {
         ancestors.push(node);
         depth++;
         continue;
       }
 
-      // No children, call exit callback if we visited this node
       if (shouldVisit) {
         this.callExitVisitor(node, context);
       }
 
-      // Go to next node
       hasMoreNodes = goToNextNode();
     }
   }
@@ -247,11 +227,8 @@ export class Walker {
       return false;
     }
 
-    if (
-      this.options.nodeTypes &&
-      this.options.nodeTypes.length > 0 &&
-      !this.options.nodeTypes.includes(node.type)
-    ) {
+    const { nodeTypes } = this.options;
+    if (nodeTypes && nodeTypes.length > 0 && !nodeTypes.includes(node.type)) {
       return false;
     }
 
@@ -262,14 +239,12 @@ export class Walker {
    * Invoke enter callbacks for a node
    */
   private callEnterVisitor(node: Node, context: WalkerContext): WalkControl {
-    // Type-specific visitor
     const visitor = this.visitors.get(node.type);
     if (visitor?.enter) {
       const control = visitor.enter(node, context);
       if (control) return control;
     }
 
-    // Wildcard visitor
     if (this.wildcardVisitor?.enter) {
       const control = this.wildcardVisitor.enter(node, context);
       if (control) return control;
@@ -282,11 +257,8 @@ export class Walker {
    * Invoke exit callbacks for a node
    */
   private callExitVisitor(node: Node, context: WalkerContext): void {
-    // Type-specific visitor
     const visitor = this.visitors.get(node.type);
     visitor?.exit?.(node, context);
-
-    // Wildcard visitor
     this.wildcardVisitor?.exit?.(node, context);
   }
 }
