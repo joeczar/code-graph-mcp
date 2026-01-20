@@ -146,14 +146,8 @@ export class RubyExtractor {
     const paramsNode = node.childForFieldName('parameters');
     if (!paramsNode) return [];
 
-    const params: string[] = [];
-    for (let i = 0; i < paramsNode.childCount; i++) {
-      const child = paramsNode.child(i);
-      if (child?.type === 'identifier') {
-        params.push(child.text);
-      }
-    }
-
-    return params;
+    return paramsNode.children
+      .filter((child) => child.type === 'identifier')
+      .map((child) => child.text);
   }
 }

@@ -22,7 +22,7 @@ describe('RubyRelationshipExtractor', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const relationships = extractor.extract(result.result.tree.rootNode, code);
+      const relationships = extractor.extract(result.result.tree.rootNode);
       const imports = relationships.filter(r => r.type === 'imports');
 
       expect(imports).toHaveLength(2);
@@ -41,7 +41,7 @@ describe('RubyRelationshipExtractor', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const relationships = extractor.extract(result.result.tree.rootNode, code);
+      const relationships = extractor.extract(result.result.tree.rootNode);
       const imports = relationships.filter(r => r.type === 'imports');
 
       expect(imports).toHaveLength(2);
@@ -61,7 +61,7 @@ describe('RubyRelationshipExtractor', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const relationships = extractor.extract(result.result.tree.rootNode, code);
+      const relationships = extractor.extract(result.result.tree.rootNode);
       const imports = relationships.filter(r => r.type === 'imports');
 
       expect(imports).toHaveLength(1);
@@ -82,7 +82,7 @@ describe('RubyRelationshipExtractor', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const relationships = extractor.extract(result.result.tree.rootNode, code);
+      const relationships = extractor.extract(result.result.tree.rootNode);
       const calls = relationships.filter(r => r.type === 'calls');
 
       expect(calls).toHaveLength(2);
@@ -110,7 +110,7 @@ describe('RubyRelationshipExtractor', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const relationships = extractor.extract(result.result.tree.rootNode, code);
+      const relationships = extractor.extract(result.result.tree.rootNode);
       const calls = relationships.filter(r => r.type === 'calls');
 
       expect(calls).toHaveLength(2);
@@ -129,7 +129,7 @@ describe('RubyRelationshipExtractor', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const relationships = extractor.extract(result.result.tree.rootNode, code);
+      const relationships = extractor.extract(result.result.tree.rootNode);
       const calls = relationships.filter(r => r.type === 'calls');
 
       // Top-level calls should be filtered out
@@ -151,7 +151,7 @@ describe('RubyRelationshipExtractor', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const relationships = extractor.extract(result.result.tree.rootNode, code);
+      const relationships = extractor.extract(result.result.tree.rootNode);
       const extends_ = relationships.filter(r => r.type === 'extends');
 
       expect(extends_).toHaveLength(1);
@@ -171,7 +171,7 @@ describe('RubyRelationshipExtractor', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const relationships = extractor.extract(result.result.tree.rootNode, code);
+      const relationships = extractor.extract(result.result.tree.rootNode);
       const extends_ = relationships.filter(r => r.type === 'extends');
 
       expect(extends_).toHaveLength(0);
@@ -189,7 +189,7 @@ describe('RubyRelationshipExtractor', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const relationships = extractor.extract(result.result.tree.rootNode, code);
+      const relationships = extractor.extract(result.result.tree.rootNode);
       const extends_ = relationships.filter(r => r.type === 'extends');
 
       expect(extends_).toHaveLength(1);
@@ -210,7 +210,7 @@ describe('RubyRelationshipExtractor', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const relationships = extractor.extract(result.result.tree.rootNode, code);
+      const relationships = extractor.extract(result.result.tree.rootNode);
       const implements_ = relationships.filter(r => r.type === 'implements');
 
       expect(implements_).toHaveLength(2);
@@ -235,7 +235,7 @@ describe('RubyRelationshipExtractor', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const relationships = extractor.extract(result.result.tree.rootNode, code);
+      const relationships = extractor.extract(result.result.tree.rootNode);
       const implements_ = relationships.filter(r => r.type === 'implements');
 
       expect(implements_).toHaveLength(1);
@@ -254,7 +254,7 @@ describe('RubyRelationshipExtractor', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const relationships = extractor.extract(result.result.tree.rootNode, code);
+      const relationships = extractor.extract(result.result.tree.rootNode);
       const implements_ = relationships.filter(r => r.type === 'implements');
 
       expect(implements_).toHaveLength(1);
@@ -273,7 +273,7 @@ describe('RubyRelationshipExtractor', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const relationships = extractor.extract(result.result.tree.rootNode, code);
+      const relationships = extractor.extract(result.result.tree.rootNode);
       const implements_ = relationships.filter(r => r.type === 'implements');
 
       expect(implements_).toHaveLength(3);
@@ -308,7 +308,7 @@ describe('RubyRelationshipExtractor', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const relationships = extractor.extract(result.result.tree.rootNode, code);
+      const relationships = extractor.extract(result.result.tree.rootNode);
 
       const imports = relationships.filter(r => r.type === 'imports');
       const extends_ = relationships.filter(r => r.type === 'extends');
@@ -337,7 +337,7 @@ describe('RubyRelationshipExtractor', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const relationships = extractor.extract(result.result.tree.rootNode, code);
+      const relationships = extractor.extract(result.result.tree.rootNode);
 
       expect(relationships).toHaveLength(1);
       expect(relationships[0]?.sourceLocation).toBeDefined();
