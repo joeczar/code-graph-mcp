@@ -468,4 +468,101 @@ function second() {
       });
     });
   });
+
+  describe('named exports', () => {
+    it('detects named exports for functions', async () => {
+      const code = `
+        function foo() {}
+        function bar() {}
+        export { foo };
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+        sourceCode: code,
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      const foo = entities.find((e) => e.name === 'foo');
+      const bar = entities.find((e) => e.name === 'bar');
+
+      expect(foo?.metadata?.['exported']).toBe(true);
+      expect(bar?.metadata?.['exported']).toBe(false);
+    });
+
+    it('detects named exports for classes', async () => {
+      const code = `
+        class MyClass {}
+        export { MyClass };
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+        sourceCode: code,
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      const myClass = entities.find((e) => e.name === 'MyClass');
+      expect(myClass?.metadata?.['exported']).toBe(true);
+    });
+
+    it('detects named exports for types and interfaces', async () => {
+      const code = `
+        type MyType = string;
+        interface MyInterface {}
+        export { MyType, MyInterface };
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+        sourceCode: code,
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      const myType = entities.find((e) => e.name === 'MyType');
+      const myInterface = entities.find((e) => e.name === 'MyInterface');
+
+      expect(myType?.metadata?.['exported']).toBe(true);
+      expect(myInterface?.metadata?.['exported']).toBe(true);
+    });
+
+    it('detects default exports', async () => {
+      const code = `
+        export default function main() {}
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+        sourceCode: code,
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      expect(entities).toHaveLength(1);
+      expect(entities[0]?.metadata?.['exported']).toBe(true);
+    });
+  });
 });

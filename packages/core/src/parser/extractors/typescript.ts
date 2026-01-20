@@ -12,6 +12,7 @@ export interface TypeScriptExtractorOptions {
 export class TypeScriptExtractor {
   private filePath: string;
   private sourceCode: string;
+  private namedExports = new Set<string>();
 
   constructor(options: TypeScriptExtractorOptions) {
     this.filePath = options.filePath;
@@ -24,14 +25,49 @@ export class TypeScriptExtractor {
   extract(rootNode: Node): NewEntity[] {
     const entities: NewEntity[] = [];
 
-    // We'll walk the AST and extract entities
+    // First pass: collect all named exports (e.g., export { Foo, Bar })
+    this.collectNamedExports(rootNode);
+
+    // Second pass: extract entities
     this.walkNode(rootNode, entities);
 
     return entities;
   }
 
+  /**
+   * Collect identifiers from named export statements.
+   * Handles: export { Foo, Bar }, export { Foo as Bar }
+   */
+  private collectNamedExports(rootNode: Node): void {
+    this.namedExports.clear();
+    const exportStatements = rootNode.descendantsOfType('export_statement');
+
+    for (const exportStmt of exportStatements) {
+      const exportClause = exportStmt.children.find(
+        (c) => c.type === 'export_clause'
+      );
+      if (exportClause) {
+        // Find all export_specifier nodes (handles: export { Foo, Bar })
+        const specifiers = exportClause.descendantsOfType('export_specifier');
+        for (const spec of specifiers) {
+          // The first identifier child is the local name
+          const nameNode = spec.childForFieldName('name');
+          if (nameNode) {
+            this.namedExports.add(nameNode.text);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Recursively walks the AST and extracts entities.
+   * Note: This extracts entities at all levels, including nested ones.
+   * Nested entities (e.g., a class inside a function) are extracted as separate
+   * top-level entities. If scoped extraction is needed in the future,
+   * consider adding a parentId field to track nesting.
+   */
   private walkNode(node: Node, entities: NewEntity[]): void {
-    // Process current node
     switch (node.type) {
       case 'function_declaration':
         this.extractFunction(node, entities);
@@ -65,7 +101,7 @@ export class TypeScriptExtractor {
     }
 
     const name = nameNode.text;
-    const isExported = this.isExported(node);
+    const isExported = this.isExported(node, name);
     const isAsync = this.hasModifier(node, 'async');
     const isGenerator = this.hasModifier(node, 'generator');
 
@@ -100,44 +136,64 @@ export class TypeScriptExtractor {
         continue;
       }
 
-      // Check if value is an arrow function
-      if (
-        valueNode.type === 'arrow_function' ||
-        valueNode.descendantsOfType('arrow_function').length > 0
-      ) {
-        const arrowFunc =
-          valueNode.type === 'arrow_function'
-            ? valueNode
-            : valueNode.descendantsOfType('arrow_function')[0];
+      // Find the arrow function - check direct value or immediate wrapper (parenthesized_expression)
+      const arrowFunc = this.findDirectArrowFunction(valueNode);
+      if (!arrowFunc) {
+        continue;
+      }
 
-        if (!arrowFunc) {
-          continue;
-        }
+      const name = nameNode.text;
+      const isExported = this.isExported(node.parent ?? node, name);
+      const isAsync = this.hasModifier(arrowFunc, 'async');
 
-        const name = nameNode.text;
-        const isExported = this.isExported(node.parent ?? node);
-        const isAsync = this.hasModifier(arrowFunc, 'async');
+      const parameters = this.extractParameters(arrowFunc);
+      const returnType = this.extractReturnType(arrowFunc);
 
-        const parameters = this.extractParameters(arrowFunc);
-        const returnType = this.extractReturnType(arrowFunc);
+      entities.push({
+        type: 'function',
+        name,
+        filePath: this.filePath,
+        startLine: declarator.startPosition.row + 1,
+        endLine: declarator.endPosition.row + 1,
+        language: 'typescript',
+        metadata: {
+          exported: isExported,
+          async: isAsync,
+          arrowFunction: true,
+          parameters,
+          returnType,
+        },
+      });
+    }
+  }
 
-        entities.push({
-          type: 'function',
-          name,
-          filePath: this.filePath,
-          startLine: declarator.startPosition.row + 1,
-          endLine: declarator.endPosition.row + 1,
-          language: 'typescript',
-          metadata: {
-            exported: isExported,
-            async: isAsync,
-            arrowFunction: true,
-            parameters,
-            returnType,
-          },
-        });
+  /**
+   * Find an arrow function that is the direct value or wrapped in parentheses/type assertion.
+   * Does NOT use descendantsOfType to avoid finding nested arrow functions.
+   */
+  private findDirectArrowFunction(valueNode: Node): Node | null {
+    // Direct arrow function
+    if (valueNode.type === 'arrow_function') {
+      return valueNode;
+    }
+
+    // Unwrap parenthesized expression: (x) => x becomes (() => x)
+    if (valueNode.type === 'parenthesized_expression') {
+      const inner = valueNode.children.find((c) => c.isNamed);
+      if (inner?.type === 'arrow_function') {
+        return inner;
       }
     }
+
+    // Unwrap type assertion: x as T or <T>x
+    if (valueNode.type === 'as_expression' || valueNode.type === 'type_assertion') {
+      const inner = valueNode.children.find((c) => c.isNamed);
+      if (inner?.type === 'arrow_function') {
+        return inner;
+      }
+    }
+
+    return null;
   }
 
   private extractParameters(node: Node): string[] {
@@ -169,8 +225,13 @@ export class TypeScriptExtractor {
     return undefined;
   }
 
-  private isExported(node: Node): boolean {
-    // Check if node or parent has export keyword
+  private isExported(node: Node, entityName?: string): boolean {
+    // Check if entity is in named exports (e.g., export { Foo })
+    if (entityName && this.namedExports.has(entityName)) {
+      return true;
+    }
+
+    // Check if node or parent is wrapped in an export statement
     let current: Node | null = node;
     while (current) {
       if (
@@ -180,13 +241,6 @@ export class TypeScriptExtractor {
         return true;
       }
       current = current.parent;
-    }
-
-    // Check children for export keyword (e.g., export function)
-    for (const child of node.children) {
-      if (child.type === 'export' || child.text === 'export') {
-        return true;
-      }
     }
 
     return false;
@@ -208,7 +262,7 @@ export class TypeScriptExtractor {
     }
 
     const name = nameNode.text;
-    const isExported = this.isExported(node);
+    const isExported = this.isExported(node, name);
     const typeParameters = this.extractTypeParameters(node);
 
     // Extract the class entity
@@ -301,7 +355,7 @@ export class TypeScriptExtractor {
     }
 
     const name = nameNode.text;
-    const isExported = this.isExported(node);
+    const isExported = this.isExported(node, name);
     const typeParameters = this.extractTypeParameters(node);
 
     entities.push({
@@ -325,7 +379,7 @@ export class TypeScriptExtractor {
     }
 
     const name = nameNode.text;
-    const isExported = this.isExported(node);
+    const isExported = this.isExported(node, name);
     const typeParameters = this.extractTypeParameters(node);
 
     entities.push({
