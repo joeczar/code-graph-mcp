@@ -22,44 +22,28 @@ export function findRelatedEntities(
   relationshipStore: RelationshipStore,
   direction: RelationDirection
 ): Entity[] {
-  // Find all entities with the given name
   const targetEntities = entityStore.findByName(name);
 
   if (targetEntities.length === 0) {
     return [];
   }
 
-  // Collect all related entities across all matches
-  const related: Entity[] = [];
-  const seenIds = new Set<string>();
-
-  for (const entity of targetEntities) {
-    // Get relationships based on direction
+  // Collect all related IDs using functional approach
+  const allRelatedIds = targetEntities.flatMap((entity) => {
     const relationships =
       direction === 'callers'
         ? relationshipStore.findByTarget(entity.id)
         : relationshipStore.findBySource(entity.id);
 
-    // Filter to only 'calls' relationships
-    const callRelationships = relationships.filter(
-      (rel) => rel.type === 'calls'
-    );
+    return relationships
+      .filter((rel) => rel.type === 'calls')
+      .map((rel) => (direction === 'callers' ? rel.sourceId : rel.targetId));
+  });
 
-    // Get the related entity for each call relationship
-    for (const rel of callRelationships) {
-      const relatedId =
-        direction === 'callers' ? rel.sourceId : rel.targetId;
+  // Deduplicate and fetch entities
+  const uniqueRelatedIds = [...new Set(allRelatedIds)];
 
-      // Avoid duplicates
-      if (!seenIds.has(relatedId)) {
-        const relatedEntity = entityStore.findById(relatedId);
-        if (relatedEntity) {
-          related.push(relatedEntity);
-          seenIds.add(relatedId);
-        }
-      }
-    }
-  }
-
-  return related;
+  return uniqueRelatedIds
+    .map((id) => entityStore.findById(id))
+    .filter((entity): entity is Entity => entity !== null);
 }

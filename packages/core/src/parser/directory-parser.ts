@@ -77,8 +77,7 @@ export class DirectoryParser {
         ignore: ignorePatterns,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to scan directory ${directory}: ${message}`);
+      throw new Error(`Failed to scan directory ${directory}`, { cause: error });
     }
 
     const results: FileParseResult[] = [];

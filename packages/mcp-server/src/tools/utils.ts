@@ -66,20 +66,17 @@ export function formatEntityList(
   if (entities.length === 0) {
     lines.push(options.emptyMessage);
   } else {
-    lines.push(`${options.title}\n`);
+    lines.push(options.title);
+    lines.push('');
 
     entities.forEach((entity, index) => {
       lines.push(`${(index + 1).toString()}. ${entity.name} (${entity.type})`);
-      lines.push(
-        `   File: ${entity.filePath}:${entity.startLine.toString()}-${entity.endLine.toString()}`
-      );
+      lines.push(`   File: ${entity.filePath}:${entity.startLine.toString()}-${entity.endLine.toString()}`);
       lines.push('');
     });
 
     const plural = entities.length === 1 ? '' : 's';
-    lines.push(
-      `Total: ${entities.length.toString()} ${options.itemLabel}${plural} found`
-    );
+    lines.push(`Total: ${entities.length.toString()} ${options.itemLabel}${plural} found`);
   }
 
   return lines.join('\n');
