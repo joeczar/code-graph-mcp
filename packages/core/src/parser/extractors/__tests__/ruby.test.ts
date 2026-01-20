@@ -97,6 +97,114 @@ describe('RubyExtractor', () => {
         methodType: 'instance',
       });
     });
+
+    it('extracts methods with optional parameters (default values)', async () => {
+      const code = `
+        def foo(bar = 1)
+          bar * 2
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(1);
+      expect(methods[0]?.name).toBe('foo');
+      expect(methods[0]?.metadata).toEqual({
+        parameters: ['bar = 1'],
+        methodType: 'instance',
+      });
+    });
+
+    it('extracts methods with keyword parameters', async () => {
+      const code = `
+        def foo(bar:, baz: 1)
+          bar + baz
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(1);
+      expect(methods[0]?.name).toBe('foo');
+      expect(methods[0]?.metadata).toEqual({
+        parameters: ['bar:', 'baz: 1'],
+        methodType: 'instance',
+      });
+    });
+
+    it('extracts methods with splat parameters', async () => {
+      const code = `
+        def foo(*args)
+          args.sum
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(1);
+      expect(methods[0]?.name).toBe('foo');
+      expect(methods[0]?.metadata).toEqual({
+        parameters: ['*args'],
+        methodType: 'instance',
+      });
+    });
+
+    it('extracts methods with hash splat parameters', async () => {
+      const code = `
+        def foo(**kwargs)
+          kwargs.keys
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(1);
+      expect(methods[0]?.name).toBe('foo');
+      expect(methods[0]?.metadata).toEqual({
+        parameters: ['**kwargs'],
+        methodType: 'instance',
+      });
+    });
+
+    it('extracts methods with block parameters', async () => {
+      const code = `
+        def foo(&block)
+          block.call
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(1);
+      expect(methods[0]?.name).toBe('foo');
+      expect(methods[0]?.metadata).toEqual({
+        parameters: ['&block'],
+        methodType: 'instance',
+      });
+    });
+
+    it('extracts methods with mixed advanced parameter types', async () => {
+      const code = `
+        def foo(a, b = 2, *args, c:, d: 3, **kwargs, &block)
+          block.call(a, b, args, c, d, kwargs)
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(1);
+      expect(methods[0]?.name).toBe('foo');
+      expect(methods[0]?.metadata).toEqual({
+        parameters: ['a', 'b = 2', '*args', 'c:', 'd: 3', '**kwargs', '&block'],
+        methodType: 'instance',
+      });
+    });
   });
 
   describe('class extraction', () => {
