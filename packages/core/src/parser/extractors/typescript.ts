@@ -3,7 +3,6 @@ import type { NewEntity } from '../../db/entities.js';
 
 export interface TypeScriptExtractorOptions {
   filePath: string;
-  sourceCode: string;
 }
 
 /**
@@ -11,12 +10,10 @@ export interface TypeScriptExtractorOptions {
  */
 export class TypeScriptExtractor {
   private filePath: string;
-  private sourceCode: string;
   private namedExports = new Set<string>();
 
   constructor(options: TypeScriptExtractorOptions) {
     this.filePath = options.filePath;
-    this.sourceCode = options.sourceCode;
   }
 
   /**
@@ -218,11 +215,7 @@ export class TypeScriptExtractor {
   }
 
   private extractReturnType(node: Node): string | undefined {
-    const returnTypeNode = node.childForFieldName('return_type');
-    if (returnTypeNode) {
-      return returnTypeNode.text;
-    }
-    return undefined;
+    return node.childForFieldName('return_type')?.text;
   }
 
   private isExported(node: Node, entityName?: string): boolean {

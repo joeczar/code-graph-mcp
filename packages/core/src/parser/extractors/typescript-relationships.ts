@@ -199,35 +199,33 @@ export class TypeScriptRelationshipExtractor {
   // Helper methods
 
   private findContainingFunction(node: Node): Node | null {
-    let current: Node | null = node.parent;
+    const functionTypes = new Set([
+      'function_declaration',
+      'method_definition',
+      'arrow_function',
+      'function_expression',
+    ]);
 
+    let current: Node | null = node.parent;
     while (current) {
-      if (
-        current.type === 'function_declaration' ||
-        current.type === 'method_definition' ||
-        current.type === 'arrow_function' ||
-        current.type === 'function_expression'
-      ) {
+      if (functionTypes.has(current.type)) {
         return current;
       }
       current = current.parent;
     }
-
     return null;
   }
 
   private getFunctionName(functionNode: Node): string | null {
+    // Direct name field for function declarations and methods
     if (functionNode.type === 'function_declaration' || functionNode.type === 'method_definition') {
-      const name = functionNode.childForFieldName('name');
-      return name?.text ?? null;
+      return functionNode.childForFieldName('name')?.text ?? null;
     }
 
-    // For arrow functions and function expressions, try to find the variable name
+    // For arrow functions and function expressions, check parent variable declarator
     if (functionNode.type === 'arrow_function' || functionNode.type === 'function_expression') {
-      const parent = functionNode.parent;
-      if (parent?.type === 'variable_declarator') {
-        const name = parent.childForFieldName('name');
-        return name?.text ?? null;
+      if (functionNode.parent?.type === 'variable_declarator') {
+        return functionNode.parent.childForFieldName('name')?.text ?? null;
       }
     }
 
@@ -238,12 +236,9 @@ export class TypeScriptRelationshipExtractor {
     if (functionNode.type === 'identifier') {
       return functionNode.text;
     }
-
     if (functionNode.type === 'member_expression') {
-      const property = functionNode.childForFieldName('property');
-      return property?.text ?? null;
+      return functionNode.childForFieldName('property')?.text ?? null;
     }
-
     return null;
   }
 
@@ -251,9 +246,7 @@ export class TypeScriptRelationshipExtractor {
     if (typeNode.type === 'type_identifier' || typeNode.type === 'identifier') {
       return typeNode.text;
     }
-
     // Handle nested types (e.g., generic types)
-    const identifier = typeNode.descendantsOfType('type_identifier')[0];
-    return identifier?.text ?? null;
+    return typeNode.descendantsOfType('type_identifier')[0]?.text ?? null;
   }
 }
