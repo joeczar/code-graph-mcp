@@ -73,12 +73,20 @@ export interface RecentFile {
   lastUpdated: string;
 }
 
+export interface EntityQuery {
+  namePattern?: string;
+  matchMode?: 'exact' | 'prefix' | 'contains';
+  type?: EntityType;
+  filePath?: string;
+}
+
 export interface EntityStore {
   create(entity: NewEntity): Entity;
   findById(id: string): Entity | null;
   findByName(name: string): Entity[];
   findByFile(filePath: string): Entity[];
   findByType(type: EntityType): Entity[];
+  findEntity(query: EntityQuery): Entity[];
   update(id: string, updates: Partial<NewEntity>): Entity | null;
   delete(id: string): boolean;
   deleteByFile(filePath: string): number;
@@ -246,6 +254,50 @@ export function createEntityStore(db: Database.Database): EntityStore {
     getRecentFiles(limit: number): RecentFile[] {
       const rows = recentFilesStmt.all(limit) as RecentFile[];
       return rows;
+    },
+
+    findEntity(query: EntityQuery): Entity[] {
+      const whereClauses: string[] = [];
+      const params: unknown[] = [];
+
+      // Handle name pattern matching
+      if (query.namePattern !== undefined) {
+        const matchMode = query.matchMode ?? 'contains';
+
+        if (matchMode === 'exact') {
+          whereClauses.push('name = ?');
+          params.push(query.namePattern);
+        } else if (matchMode === 'prefix') {
+          whereClauses.push('name LIKE ? || \'%\'');
+          params.push(query.namePattern);
+        } else {
+          // contains
+          whereClauses.push('name LIKE \'%\' || ? || \'%\'');
+          params.push(query.namePattern);
+        }
+      }
+
+      // Handle type filter
+      if (query.type !== undefined) {
+        whereClauses.push('type = ?');
+        params.push(query.type);
+      }
+
+      // Handle file path filter
+      if (query.filePath !== undefined) {
+        whereClauses.push('file_path = ?');
+        params.push(query.filePath);
+      }
+
+      // Build final query
+      let sql = 'SELECT * FROM entities';
+      if (whereClauses.length > 0) {
+        sql += ' WHERE ' + whereClauses.join(' AND ');
+      }
+
+      const stmt = db.prepare(sql);
+      const rows = stmt.all(...params) as EntityRow[];
+      return rows.map(rowToEntity);
     },
   };
 }

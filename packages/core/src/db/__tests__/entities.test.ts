@@ -279,4 +279,97 @@ describe('EntityStore', () => {
       expect(recent).toHaveLength(0);
     });
   });
+
+  describe('findEntity', () => {
+    beforeEach(() => {
+      // Create test data
+      store.create({ ...sampleEntity, name: 'greet', type: 'function', filePath: '/src/utils.ts' });
+      store.create({ ...sampleEntity, name: 'greetUser', type: 'function', filePath: '/src/utils.ts' });
+      store.create({ ...sampleEntity, name: 'Calculator', type: 'class', filePath: '/src/calc.ts' });
+      store.create({ ...sampleEntity, name: 'calculateSum', type: 'function', filePath: '/src/calc.ts' });
+      store.create({ ...sampleEntity, name: 'User', type: 'class', filePath: '/src/models/user.ts' });
+    });
+
+    it('searches by name prefix', () => {
+      const results = store.findEntity({ namePattern: 'greet', matchMode: 'prefix' });
+
+      expect(results).toHaveLength(2);
+      expect(results.map(e => e.name).sort()).toEqual(['greet', 'greetUser']);
+    });
+
+    it('searches by name contains', () => {
+      const results = store.findEntity({ namePattern: 'calc', matchMode: 'contains' });
+
+      expect(results).toHaveLength(2);
+      expect(results.map(e => e.name).sort()).toEqual(['Calculator', 'calculateSum']);
+    });
+
+    it('searches by exact name match', () => {
+      const results = store.findEntity({ namePattern: 'greet', matchMode: 'exact' });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]?.name).toBe('greet');
+    });
+
+    it('defaults to contains mode when matchMode not specified', () => {
+      const results = store.findEntity({ namePattern: 'calc' });
+
+      expect(results).toHaveLength(2);
+    });
+
+    it('filters by entity type', () => {
+      const results = store.findEntity({ type: 'class' });
+
+      expect(results).toHaveLength(2);
+      expect(results.map(e => e.name).sort()).toEqual(['Calculator', 'User']);
+    });
+
+    it('filters by file path', () => {
+      const results = store.findEntity({ filePath: '/src/utils.ts' });
+
+      expect(results).toHaveLength(2);
+      expect(results.map(e => e.name).sort()).toEqual(['greet', 'greetUser']);
+    });
+
+    it('combines multiple filters with AND', () => {
+      const results = store.findEntity({
+        namePattern: 'greet',
+        matchMode: 'prefix',
+        type: 'function',
+        filePath: '/src/utils.ts',
+      });
+
+      expect(results).toHaveLength(2);
+      expect(results.map(e => e.name).sort()).toEqual(['greet', 'greetUser']);
+    });
+
+    it('combines name and type filters', () => {
+      const results = store.findEntity({
+        namePattern: 'calc',
+        type: 'function',
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]?.name).toBe('calculateSum');
+    });
+
+    it('returns empty array when no matches', () => {
+      const results = store.findEntity({ namePattern: 'nonexistent' });
+
+      expect(results).toHaveLength(0);
+    });
+
+    it('returns all entities when no filters provided', () => {
+      const results = store.findEntity({});
+
+      expect(results).toHaveLength(5);
+    });
+
+    it('handles case-sensitive searches', () => {
+      const results = store.findEntity({ namePattern: 'GREET', matchMode: 'contains' });
+
+      // SQLite LIKE is case-insensitive by default for ASCII characters
+      expect(results).toHaveLength(2);
+    });
+  });
 });
