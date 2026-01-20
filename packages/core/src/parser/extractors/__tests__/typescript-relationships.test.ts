@@ -311,14 +311,19 @@ describe('TypeScriptRelationshipExtractor', () => {
       }
     });
 
-    it('handles syntax errors gracefully', async () => {
+    it('handles partial/malformed syntax gracefully', async () => {
+      // Tree-sitter is error-tolerant and produces partial ASTs for invalid syntax.
+      // The parser returns success=true as long as a tree is produced.
       const code = 'class Broken extends {';
       const parseResult = await parser.parse(code, 'typescript');
+
+      // Tree-sitter returns a tree even for invalid syntax (for editor support)
       expect(parseResult.success).toBe(true);
 
       if (parseResult.success) {
-        // Should not throw, but may extract partial relationships
-        expect(() => extractor.extract(parseResult.result)).not.toThrow();
+        // Extractor should handle partial trees without throwing
+        const relationships = extractor.extract(parseResult.result);
+        expect(Array.isArray(relationships)).toBe(true);
       }
     });
   });

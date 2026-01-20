@@ -12,9 +12,12 @@ export interface ExtractedRelationship {
 }
 
 export class TypeScriptRelationshipExtractor {
+  private filePath: string | null = null;
+
   extract(parseResult: ParseResult): ExtractedRelationship[] {
     const relationships: ExtractedRelationship[] = [];
     const tree = parseResult.tree;
+    this.filePath = parseResult.filePath;
 
     relationships.push(...this.extractImports(tree));
     relationships.push(...this.extractCalls(tree));
@@ -36,9 +39,10 @@ export class TypeScriptRelationshipExtractor {
       const targetName = sourceNode.text.slice(1, -1);
 
       const metadata: Record<string, unknown> = {};
-      const importClause = importNode.child(1);
+      // Find import_clause by type instead of magic index
+      const importClause = importNode.children.find(c => c.type === 'import_clause');
 
-      if (importClause?.type === 'import_clause') {
+      if (importClause) {
         // Handle named imports: import { foo, bar } from 'module'
         const namedImports = importClause.descendantsOfType('import_specifier');
         if (namedImports.length > 0) {
@@ -49,29 +53,28 @@ export class TypeScriptRelationshipExtractor {
         }
 
         // Handle default import: import React from 'module'
-        // First child of import_clause is the identifier for default imports
-        const firstChild = importClause.child(0);
-        if (firstChild?.type === 'identifier') {
-          metadata['default'] = firstChild.text;
+        // The default import identifier is a direct child of import_clause
+        const defaultImport = importClause.children.find(c => c.type === 'identifier');
+        if (defaultImport) {
+          metadata['default'] = defaultImport.text;
         }
 
         // Handle namespace import: import * as fs from 'module'
         const namespaceImport = importClause.descendantsOfType('namespace_import');
         if (namespaceImport.length > 0) {
-          // Find the identifier child of namespace_import
-          const identifiers = namespaceImport[0]?.descendantsOfType('identifier');
-          if (identifiers && identifiers.length > 0) {
-            metadata['namespace'] = identifiers[0]?.text;
+          const identifier = namespaceImport[0]?.children.find(c => c.type === 'identifier');
+          if (identifier) {
+            metadata['namespace'] = identifier.text;
           }
         }
       }
 
       relationships.push({
         type: 'imports',
-        sourceName: '<file>',
+        sourceName: this.filePath ?? '<file>',
         sourceLocation: {
           line: importNode.startPosition.row + 1,
-          column: importNode.startPosition.column,
+          column: importNode.startPosition.column + 1,
         },
         targetName,
         metadata,
@@ -105,7 +108,7 @@ export class TypeScriptRelationshipExtractor {
         sourceName,
         sourceLocation: {
           line: callNode.startPosition.row + 1,
-          column: callNode.startPosition.column,
+          column: callNode.startPosition.column + 1,
         },
         targetName,
       });
@@ -142,7 +145,7 @@ export class TypeScriptRelationshipExtractor {
           sourceName: className,
           sourceLocation: {
             line: extendsNode.startPosition.row + 1,
-            column: extendsNode.startPosition.column,
+            column: extendsNode.startPosition.column + 1,
           },
           targetName: parentClassName,
         });
@@ -181,7 +184,7 @@ export class TypeScriptRelationshipExtractor {
               sourceName: className,
               sourceLocation: {
                 line: child.startPosition.row + 1,
-                column: child.startPosition.column,
+                column: child.startPosition.column + 1,
               },
               targetName: interfaceName,
             });
