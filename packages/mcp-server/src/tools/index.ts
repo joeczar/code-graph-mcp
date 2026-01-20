@@ -44,3 +44,4 @@ export { whatCallsTool } from './what-calls.js';
 export { whatDoesCallTool } from './what-does-call.js';
 export { blastRadiusTool } from './blast-radius.js';
 export { findEntityTool } from './find-entity.js';
+export { getExportsTool } from './get-exports.js';

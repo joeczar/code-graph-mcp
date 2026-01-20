@@ -179,7 +179,7 @@ describe('getExportsTool', () => {
       });
 
       entityStore.create({
-        type: 'constant',
+        type: 'type',
         name: 'VERSION',
         filePath: '/src/app.ts',
         startLine: 112,
@@ -201,7 +201,7 @@ describe('getExportsTool', () => {
       expect(text).toContain('Total Exports: 3');
       expect(text).toContain('[default] class MainApp');
       expect(text).toContain('[named] function initConfig');
-      expect(text).toContain('[named] constant VERSION');
+      expect(text).toContain('[named] type VERSION');
     });
 
     it('should handle exports without signatures', async () => {
@@ -209,7 +209,7 @@ describe('getExportsTool', () => {
       const entityStore = createEntityStore(db);
 
       entityStore.create({
-        type: 'interface',
+        type: 'type',
         name: 'User',
         filePath: '/src/types.ts',
         startLine: 1,
@@ -227,7 +227,7 @@ describe('getExportsTool', () => {
       expect(response.isError).toBeUndefined();
       const text = response.content[0]?.text ?? '';
 
-      expect(text).toContain('[named] interface User');
+      expect(text).toContain('[named] type User');
       expect(text).toContain('Lines: 1-5');
       expect(text).not.toContain('Signature:');
     });
