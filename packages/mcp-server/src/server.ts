@@ -7,6 +7,7 @@ import { whatCallsTool } from './tools/what-calls.js';
 import { whatDoesCallTool } from './tools/what-does-call.js';
 import { blastRadiusTool } from './tools/blast-radius.js';
 import { findEntityTool } from './tools/find-entity.js';
+import { getExportsTool } from './tools/get-exports.js';
 import { createErrorResponse, type ToolDefinition } from './tools/types.js';
 import { logger } from './tools/logger.js';
 
@@ -99,6 +100,7 @@ export function createServer(): McpServer {
   registerTool(server, whatDoesCallTool);
   registerTool(server, blastRadiusTool);
   registerTool(server, findEntityTool);
+  registerTool(server, getExportsTool);
 
   return server;
 }
