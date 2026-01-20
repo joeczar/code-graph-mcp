@@ -58,6 +58,25 @@ export const migrations: Migration[] = [
       DROP TABLE IF EXISTS entities;
     `,
   },
+  {
+    version: 2,
+    name: 'add_files_table',
+    up: `
+      CREATE TABLE IF NOT EXISTS files (
+        id TEXT PRIMARY KEY,
+        file_path TEXT NOT NULL UNIQUE,
+        content_hash TEXT NOT NULL,
+        language TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_files_path ON files(file_path);
+      CREATE INDEX IF NOT EXISTS idx_files_hash ON files(content_hash);
+    `,
+    down: `
+      DROP TABLE IF EXISTS files;
+    `,
+  },
 ];
 
 export interface MigrationRunner {
