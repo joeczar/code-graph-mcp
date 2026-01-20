@@ -19,3 +19,13 @@ export type { Migration, MigrationRunner } from './migrations.js';
 
 export { createFileStore } from './files.js';
 export type { FileRecord, FileStore } from './files.js';
+
+export {
+  createIncrementalUpdater,
+  computeFileHash,
+  computeFileHashFromPath,
+} from './incremental-updater.js';
+export type {
+  IncrementalUpdater,
+  IncrementalUpdateResult,
+} from './incremental-updater.js';

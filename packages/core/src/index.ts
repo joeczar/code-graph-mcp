@@ -35,6 +35,10 @@ export {
   createRelationshipStore,
   createMigrationRunner,
   migrations,
+  createFileStore,
+  createIncrementalUpdater,
+  computeFileHash,
+  computeFileHashFromPath,
 } from './db/index.js';
 export type {
   DatabaseOptions,
@@ -49,6 +53,10 @@ export type {
   RelationshipStore,
   Migration,
   MigrationRunner,
+  FileRecord,
+  FileStore,
+  IncrementalUpdater,
+  IncrementalUpdateResult,
 } from './db/index.js';
 
 // Graph exports
