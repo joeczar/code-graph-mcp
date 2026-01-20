@@ -10,6 +10,7 @@ export const VERSION = '0.0.1';
 // Parser exports
 export {
   CodeParser,
+  DirectoryParser,
   getSupportedLanguages,
   detectLanguage,
   getLanguageConfig,
@@ -19,6 +20,9 @@ export type {
   ParseError,
   ParseOutcome,
   SupportedLanguage,
+  DirectoryParseOptions,
+  DirectoryParseResult,
+  FileParseResult,
 } from './parser/index.js';
 
 // Database exports

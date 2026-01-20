@@ -26,8 +26,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "better-sqlite3": "^12.6.2",
     "@repomix/tree-sitter-wasms": "^0.1.16",
+    "better-sqlite3": "^12.6.2",
+    "globby": "^16.1.0",
     "web-tree-sitter": "^0.26.3"
   },
   "devDependencies": {
