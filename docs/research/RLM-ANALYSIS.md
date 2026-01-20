@@ -167,6 +167,69 @@ RLMs are powerful for exploration, but when the session ends, everything discove
 
 ---
 
+## Cursor's Dynamic Context Discovery
+
+Cursor released "Dynamic Context Discovery" in January 2026, applying similar principles to RLMs but with a different mechanism.
+
+### The Connection
+
+This approach has been [noted as "rhyming with RLM thinking"](https://whynowtech.substack.com/p/recursive-language-models-rlms). Same goal (avoid context bloat), different implementation.
+
+### Mechanism Comparison
+
+| Aspect | RLM Approach | Cursor Approach |
+|--------|--------------|-----------------|
+| Storage | REPL variable | **Files** |
+| Exploration | Python code | `grep`, `tail`, semantic search |
+| Sub-queries | Sub-LLM calls | Agent reads files as needed |
+| Primitive | Code execution | Filesystem operations |
+
+### Five Techniques
+
+From [Cursor's blog](https://cursor.com/blog/dynamic-context-discovery):
+
+1. **Tool outputs → files** - Long results written to files; agent uses `tail`/`grep` instead of truncating
+2. **Chat history → files** - Full history preserved for recovery after summarization
+3. **Agent skills** - Only names loaded statically; details fetched on-demand via grep/semantic search
+4. **MCP tools → folders** - Synced to filesystem, not loaded upfront (**46.9% token reduction** in A/B tests)
+5. **Terminal sessions → files** - Grep-able instead of copy-pasted into context
+
+### Conversation History Management
+
+This is notable: Cursor **does** manage conversation history dynamically.
+
+> "When context windows fill, Cursor triggers summarization. To prevent knowledge degradation from this 'lossy compression,' the system provides agents with **history files they can search to recover missing task details**."
+
+So when your conversation gets summarized (lossy), the full history remains in a file. The agent can grep it to recover what was lost during summarization.
+
+### The Pattern
+
+**Files as the universal primitive.** Everything goes to files. Agent searches files. Simple, powerful, no fancy abstractions.
+
+### Results
+
+- 46.9% token reduction for MCP tool calls (statistically significant)
+- Avoids "unnecessary summarizations when reaching context limits"
+- Enables recovery of information lost during context compression
+
+### Implications for Code Graph
+
+1. **Files are the integration point** - If Cursor writes context to files, our graph could be another "searchable resource" they access
+
+2. **Complementary approaches** - Cursor manages dynamic retrieval; we provide pre-computed structure and cross-session persistence
+
+3. **They still have the persistence problem** - Chat history files help *within* a session, but what about *across* sessions? Starting a new chat loses that history. That's still our territory.
+
+4. **Potential integration path** - Could expose graph queries as files that Cursor's agent can grep/search
+
+### Sources
+
+- [Cursor Blog: Dynamic Context Discovery](https://cursor.com/blog/dynamic-context-discovery)
+- [InfoQ: Cursor Introduces Dynamic Context Discovery](https://www.infoq.com/news/2026/01/cursor-dynamic-context-discovery/)
+- [WhyNow Tech: RLMs and Cursor Comparison](https://whynowtech.substack.com/p/recursive-language-models-rlms)
+
+---
+
 ## Design Implications for Code Graph
 
 ### What We Should Do
