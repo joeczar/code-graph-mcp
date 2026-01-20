@@ -37,10 +37,12 @@ Complete the work: final validation, create PR, update board, and clean up.
 ### Side Effects
 
 1. Updates checkpoint phase to "finalize"
-2. Pushes branch to origin
-3. Creates pull request on GitHub
-4. Logs PR creation to checkpoint
-5. Marks workflow as completed
+2. Runs automated review pass (code-simplifier, code-reviewer, silent-failure-hunter)
+3. Commits review findings if any
+4. Pushes branch to origin
+5. Creates pull request on GitHub
+6. Logs PR creation to checkpoint
+7. Marks workflow as completed
 
 ### Checkpoint Actions Logged
 
@@ -51,6 +53,10 @@ Complete the work: final validation, create PR, update board, and clean up.
 
 Load these skills for reference:
 - `checkpoint-workflow` - CLI commands for workflow state
+
+### Shared Patterns Used
+
+- `.claude/shared/review-pass.md` - Automated review logic
 
 ## Workflow
 
@@ -100,13 +106,39 @@ Verify:
 - No unintended changes included
 - Commit messages are clear
 
-### Step 4: Push Branch
+### Step 4: Run Review Pass
+
+Use shared review logic from `.claude/shared/review-pass.md`:
+
+1. **Identify changed files:**
+   ```bash
+   git diff origin/main --name-only | grep -E '\.(ts|tsx|js|jsx)$'
+   ```
+
+2. **Run review agents** (in sequence):
+   - `code-simplifier:code-simplifier` - Simplify changed code
+   - `pr-review-toolkit:code-reviewer` - Check for bugs and quality issues
+   - `pr-review-toolkit:silent-failure-hunter` - Find silent failures
+
+3. **Address findings** with confidence >= 60%
+
+4. **Commit changes** (if any):
+   ```bash
+   git add -A
+   git commit -m "refactor: address review findings"
+   ```
+
+**Skip conditions:**
+- No TypeScript/JavaScript files changed
+- Only documentation or config changes
+
+### Step 5: Push Branch
 
 ```bash
 git push -u origin {branch_name}
 ```
 
-### Step 5: Create PR
+### Step 6: Create PR
 
 ```bash
 gh pr create \
@@ -134,13 +166,13 @@ Closes #{issue_number}" \
   --base main
 ```
 
-### Step 6: Verify PR Created
+### Step 7: Verify PR Created
 
 ```bash
 gh pr view --json number,url,title
 ```
 
-### Step 7: Log PR and Complete Workflow
+### Step 8: Log PR and Complete Workflow
 
 Log PR creation to checkpoint:
 ```bash
@@ -152,13 +184,13 @@ Mark workflow complete:
 pnpm checkpoint workflow set-status "{workflow_id}" completed
 ```
 
-### Step 8: Update Board Status (Optional)
+### Step 9: Update Board Status (Optional)
 
 Move issue to "Review" or "Done" column.
 
 See `.claude/skills/board-manager/` for board operations.
 
-### Step 9: Comment on Issue (Optional)
+### Step 10: Comment on Issue (Optional)
 
 If useful context for reviewers:
 
@@ -280,6 +312,7 @@ Title: {pr_title}
 
 Finalization is complete when:
 - [ ] All validation passes
+- [ ] Review pass completed (agents run, findings addressed)
 - [ ] Branch pushed to origin
 - [ ] PR created and linked to issue
 - [ ] PR creation logged to checkpoint
