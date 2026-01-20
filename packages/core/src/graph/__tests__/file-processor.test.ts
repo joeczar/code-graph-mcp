@@ -150,13 +150,13 @@ describe('FileProcessor', () => {
 
       expect(result.success).toBe(true);
 
-      const functions = result.entities.filter(e => e.type === 'function');
-      expect(functions.length).toBeGreaterThan(0);
+      const methods = result.entities.filter(e => e.type === 'method');
+      expect(methods.length).toBeGreaterThan(0);
 
-      const addFunc = functions.find(f => f.name === 'add');
-      expect(addFunc).toBeDefined();
-      expect(addFunc?.filePath).toBe(filePath);
-      expect(addFunc?.language).toBe('ruby');
+      const addMethod = methods.find(f => f.name === 'add');
+      expect(addMethod).toBeDefined();
+      expect(addMethod?.filePath).toBe(filePath);
+      expect(addMethod?.language).toBe('ruby');
     });
 
     it('extracts class entities from Ruby', async () => {
@@ -218,7 +218,7 @@ describe('FileProcessor', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
-      expect(result.error).toContain('Failed to read file');
+      expect(result.error).toContain('not found');
     });
 
     it('handles unsupported file type gracefully', async () => {

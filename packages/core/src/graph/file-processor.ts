@@ -1,6 +1,5 @@
 import type Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 import type { Tree } from 'web-tree-sitter';
 import { CodeParser } from '../parser/parser.js';
 import { type Entity, type NewEntity, createEntityStore } from '../db/entities.js';
@@ -47,31 +46,12 @@ export class FileProcessor {
   async processFile(options: ProcessFileOptions): Promise<ProcessFileResult> {
     const { filePath, db } = options;
 
-    // Step 1: Read file and calculate hash
-    let sourceCode: string;
-    let fileHash: string;
-    try {
-      sourceCode = await readFile(filePath, 'utf-8');
-      fileHash = createHash('sha256').update(sourceCode).digest('hex');
-    } catch (err) {
-      const nodeErr = err as NodeJS.ErrnoException;
-      return {
-        filePath,
-        fileHash: '',
-        language: '',
-        entities: [],
-        relationships: [],
-        success: false,
-        error: `Failed to read file: ${nodeErr.message}`,
-      };
-    }
-
-    // Step 2: Parse file
+    // Step 1: Parse file (this also reads the file content)
     const parseResult = await this.parser.parseFile(filePath);
     if (!parseResult.success) {
       return {
         filePath,
-        fileHash,
+        fileHash: '',
         language: '',
         entities: [],
         relationships: [],
@@ -80,7 +60,10 @@ export class FileProcessor {
       };
     }
 
-    const { tree, language } = parseResult.result;
+    const { tree, language, sourceCode } = parseResult.result;
+
+    // Step 2: Calculate hash from parsed source code
+    const fileHash = createHash('sha256').update(sourceCode).digest('hex');
 
     // Step 3: Extract entities and relationships
     const entities = this.extractEntities(tree.rootNode, filePath, language);
@@ -95,13 +78,29 @@ export class FileProcessor {
     const relationshipStore = createRelationshipStore(db);
 
     const storedEntities: Entity[] = [];
+    // Use name as key for relationship resolution.
+    // Note: Names are not guaranteed unique within a file (e.g., same method name in different classes).
+    // For now, we warn about collisions and use the last entity with that name.
+    // A more robust solution would use qualified names or location-based keys.
     const entityNameToId = new Map<string, string>();
+    const nameCollisions: string[] = [];
 
     // Store entities
     for (const entity of entities) {
       const stored = entityStore.create(entity);
       storedEntities.push(stored);
+      if (entityNameToId.has(entity.name)) {
+        nameCollisions.push(entity.name);
+      }
       entityNameToId.set(entity.name, stored.id);
+    }
+
+    // Log warning for name collisions (indicates potential data quality issues)
+    if (nameCollisions.length > 0) {
+      console.warn(
+        `[FileProcessor] Name collisions detected in ${filePath}: ${nameCollisions.join(', ')}. ` +
+        'Relationships may be incorrectly resolved.'
+      );
     }
 
     // Store relationships (resolve names to IDs)
@@ -235,7 +234,7 @@ export class FileProcessor {
       const nameNode = node.childForFieldName('name');
       if (nameNode) {
         entities.push({
-          type: 'function',
+          type: 'method',
           name: nameNode.text,
           filePath,
           startLine: node.startPosition.row + 1,
@@ -321,29 +320,22 @@ export class FileProcessor {
     // Extract class inheritance
     if (node.type === 'class_declaration') {
       const nameNode = node.childForFieldName('name');
+      const heritageNode = node.children.find(c => c.type === 'class_heritage');
 
-      // Look for class_heritage child
-      for (let i = 0; i < node.childCount; i++) {
-        const child = node.child(i);
-        if (child?.type === 'class_heritage') {
-          // class_heritage contains extends_clause
-          for (let j = 0; j < child.childCount; j++) {
-            const heritageChild = child.child(j);
-            if (heritageChild?.type === 'extends_clause') {
-              // extends_clause has: [extends keyword, identifier]
-              // We want the identifier (usually second child)
-              for (let k = 0; k < heritageChild.childCount; k++) {
-                const extendsChild = heritageChild.child(k);
-                if (extendsChild?.type === 'identifier' && nameNode) {
-                  relationships.push({
-                    sourceId: nameNode.text,
-                    targetId: extendsChild.text,
-                    type: 'extends',
-                  });
-                  break;
-                }
-              }
-            }
+      if (nameNode && heritageNode) {
+        const extendsClause = heritageNode.children.find(
+          c => c.type === 'extends_clause'
+        );
+        if (extendsClause) {
+          const identifier = extendsClause.children.find(
+            c => c.type === 'identifier'
+          );
+          if (identifier) {
+            relationships.push({
+              sourceId: nameNode.text,
+              targetId: identifier.text,
+              type: 'extends',
+            });
           }
         }
       }
