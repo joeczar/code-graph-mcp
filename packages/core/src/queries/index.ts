@@ -5,3 +5,4 @@
  */
 
 export { whatCalls } from './whatCalls.js';
+export { whatDoesCall } from './whatDoesCall.js';

@@ -91,4 +91,4 @@ export type {
 } from './checkpoint/index.js';
 
 // Query exports
-export { whatCalls } from './queries/index.js';
+export { whatCalls, whatDoesCall } from './queries/index.js';
