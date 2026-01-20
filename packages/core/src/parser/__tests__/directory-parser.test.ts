@@ -76,11 +76,11 @@ describe('DirectoryParser', () => {
     });
 
     it('tracks progress with callback', async () => {
-      const progressUpdates: Array<{
+      const progressUpdates: {
         current: number;
         total: number;
         filePath: string;
-      }> = [];
+      }[] = [];
 
       await parser.parseDirectory({
         directory: testProjectDir,
@@ -109,7 +109,7 @@ describe('DirectoryParser', () => {
       // Check structure of successful file results
       const successfulFile = result.files.find((f) => f.success);
       expect(successfulFile).toBeDefined();
-      if (successfulFile && successfulFile.success) {
+      if (successfulFile?.success) {
         expect(successfulFile.filePath).toBeTruthy();
         expect(successfulFile.result).toBeDefined();
         expect(successfulFile.result?.tree).toBeDefined();

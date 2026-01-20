@@ -1,5 +1,5 @@
 import { globby } from 'globby';
-import { CodeParser, type ParseOutcome, type ParseResult } from './parser.js';
+import { CodeParser, type ParseResult } from './parser.js';
 import { getSupportedLanguages, getLanguageConfig } from './languages.js';
 
 export interface DirectoryParseOptions {
