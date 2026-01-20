@@ -146,8 +146,24 @@ export class RubyExtractor {
     const paramsNode = node.childForFieldName('parameters');
     if (!paramsNode) return [];
 
+    // Handle all Ruby parameter types:
+    // - identifier: simple positional (foo)
+    // - optional_parameter: default values (bar = 1)
+    // - keyword_parameter: keyword args (bar:, baz: 1)
+    // - splat_parameter: *args
+    // - hash_splat_parameter: **kwargs
+    // - block_parameter: &block
+    const validParamTypes = [
+      'identifier',
+      'optional_parameter',
+      'keyword_parameter',
+      'splat_parameter',
+      'hash_splat_parameter',
+      'block_parameter',
+    ];
+
     return paramsNode.children
-      .filter((child) => child.type === 'identifier')
+      .filter((child) => validParamTypes.includes(child.type))
       .map((child) => child.text);
   }
 }
