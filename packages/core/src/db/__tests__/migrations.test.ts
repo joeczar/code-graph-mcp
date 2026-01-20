@@ -87,17 +87,29 @@ describe('MigrationRunner', () => {
 
       const db = getDatabase();
 
-      // Verify tables exist
+      // Verify all tables exist (migrations 1 and 2)
       let tables = db
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('entities', 'relationships')")
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('entities', 'relationships', 'files')")
         .all() as { name: string }[];
-      expect(tables).toHaveLength(2);
+      expect(tables).toHaveLength(3);
 
+      // Rollback latest migration (migration 2 - files table)
       runner.rollback();
 
-      // Verify tables dropped
+      // Verify files table dropped, but entities and relationships remain
       tables = db
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('entities', 'relationships')")
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('entities', 'relationships', 'files')")
+        .all() as { name: string }[];
+      expect(tables).toHaveLength(2);
+      expect(tables.map((t) => t.name)).toContain('entities');
+      expect(tables.map((t) => t.name)).toContain('relationships');
+
+      // Rollback migration 1
+      runner.rollback();
+
+      // Verify all tables dropped
+      tables = db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('entities', 'relationships', 'files')")
         .all() as { name: string }[];
       expect(tables).toHaveLength(0);
     });
