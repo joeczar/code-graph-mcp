@@ -11,6 +11,7 @@ export interface RubyExtractorOptions {
  */
 export class RubyExtractor {
   private filePath: string;
+  private contextStack: string[] = [];
 
   constructor(options: RubyExtractorOptions) {
     this.filePath = options.filePath;
@@ -42,12 +43,34 @@ export class RubyExtractor {
       }
       case 'class': {
         const entity = this.extractClass(node);
-        if (entity) entities.push(entity);
+        if (entity) {
+          entities.push(entity);
+          // Push class name onto context stack
+          this.contextStack.push(entity.name);
+          // Walk children with this context
+          for (const child of node.children) {
+            this.walkNode(child, entities);
+          }
+          // Pop context when exiting class
+          this.contextStack.pop();
+          return; // Skip normal child walking
+        }
         break;
       }
       case 'module': {
         const entity = this.extractModule(node);
-        if (entity) entities.push(entity);
+        if (entity) {
+          entities.push(entity);
+          // Push module name onto context stack
+          this.contextStack.push(entity.name);
+          // Walk children with this context
+          for (const child of node.children) {
+            this.walkNode(child, entities);
+          }
+          // Pop context when exiting module
+          this.contextStack.pop();
+          return; // Skip normal child walking
+        }
         break;
       }
     }
@@ -68,20 +91,40 @@ export class RubyExtractor {
     const nameNode = node.childForFieldName('name');
     if (!nameNode) return null;
 
-    const name = nameNode.text;
+    const methodName = nameNode.text;
     const params = this.extractParameters(node);
+
+    // Build fully qualified name using context stack
+    let qualifiedName: string;
+    if (this.contextStack.length === 0) {
+      // Top-level method, no prefix
+      qualifiedName = methodName;
+    } else {
+      // Method inside class/module
+      const contextPath = this.contextStack.join('::');
+      const separator = methodType === 'instance' ? '#' : '.';
+      qualifiedName = `${contextPath}${separator}${methodName}`;
+    }
+
+    const metadata: Record<string, unknown> = {
+      methodName,
+      parameters: params,
+      methodType,
+    };
+
+    // Add context if present
+    if (this.contextStack.length > 0) {
+      metadata['context'] = this.contextStack.join('::');
+    }
 
     return {
       type: 'method',
-      name,
+      name: qualifiedName,
       filePath: this.filePath,
       startLine: node.startPosition.row + 1,
       endLine: node.endPosition.row + 1,
       language: 'ruby',
-      metadata: {
-        parameters: params,
-        methodType,
-      },
+      metadata,
     };
   }
 

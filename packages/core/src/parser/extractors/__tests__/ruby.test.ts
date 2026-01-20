@@ -40,6 +40,7 @@ describe('RubyExtractor', () => {
       expect(methods[0]?.language).toBe('ruby');
       expect(methods[0]?.filePath).toBe('/test/file.rb');
       expect(methods[0]?.metadata).toEqual({
+        methodName: 'greet',
         parameters: ['name'],
         methodType: 'instance',
       });
@@ -58,6 +59,7 @@ describe('RubyExtractor', () => {
       expect(methods).toHaveLength(1);
       expect(methods[0]?.name).toBe('helper');
       expect(methods[0]?.metadata).toEqual({
+        methodName: 'helper',
         parameters: [],
         methodType: 'class',
       });
@@ -75,6 +77,7 @@ describe('RubyExtractor', () => {
 
       expect(methods).toHaveLength(1);
       expect(methods[0]?.metadata).toEqual({
+        methodName: 'calculate',
         parameters: ['x', 'y', 'z'],
         methodType: 'instance',
       });
@@ -93,6 +96,7 @@ describe('RubyExtractor', () => {
       expect(methods).toHaveLength(1);
       expect(methods[0]?.name).toBe('get_value');
       expect(methods[0]?.metadata).toEqual({
+        methodName: 'get_value',
         parameters: [],
         methodType: 'instance',
       });
@@ -267,8 +271,20 @@ describe('RubyExtractor', () => {
       expect(classes[0]?.name).toBe('Calculator');
 
       expect(methods).toHaveLength(2);
-      expect(methods[0]?.name).toBe('add');
-      expect(methods[1]?.name).toBe('multiply');
+      expect(methods[0]?.name).toBe('Calculator#add');
+      expect(methods[0]?.metadata).toEqual({
+        methodName: 'add',
+        context: 'Calculator',
+        parameters: ['a', 'b'],
+        methodType: 'instance',
+      });
+      expect(methods[1]?.name).toBe('Calculator#multiply');
+      expect(methods[1]?.metadata).toEqual({
+        methodName: 'multiply',
+        context: 'Calculator',
+        parameters: ['a', 'b'],
+        methodType: 'instance',
+      });
     });
   });
 
@@ -312,8 +328,8 @@ describe('RubyExtractor', () => {
       expect(modules[0]?.name).toBe('Helpers');
 
       expect(methods).toHaveLength(2);
-      expect(methods.some((m) => m.name === 'utility')).toBe(true);
-      expect(methods.some((m) => m.name === 'instance_method')).toBe(true);
+      expect(methods.some((m) => m.name === 'Helpers.utility')).toBe(true);
+      expect(methods.some((m) => m.name === 'Helpers#instance_method')).toBe(true);
     });
   });
 
@@ -341,7 +357,13 @@ describe('RubyExtractor', () => {
       expect(classes[0]?.name).toBe('Calculator');
 
       expect(methods).toHaveLength(1);
-      expect(methods[0]?.name).toBe('add');
+      expect(methods[0]?.name).toBe('Namespace::Calculator#add');
+      expect(methods[0]?.metadata).toEqual({
+        methodName: 'add',
+        context: 'Namespace::Calculator',
+        parameters: ['a', 'b'],
+        methodType: 'instance',
+      });
     });
 
     it('extracts multiple entities at same level', async () => {
@@ -377,6 +399,43 @@ describe('RubyExtractor', () => {
       expect(methods).toHaveLength(4); // standalone + method_one + method_two + helper
       expect(classes).toHaveLength(2); // FirstClass + SecondClass
       expect(modules).toHaveLength(1); // MyModule
+    });
+
+    it('extracts deeply nested structures', async () => {
+      const code = `
+        module Outer
+          module Middle
+            class Inner
+              def instance_method
+                "nested"
+              end
+
+              def self.class_method
+                "class"
+              end
+            end
+          end
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(2);
+      expect(methods[0]?.name).toBe('Outer::Middle::Inner#instance_method');
+      expect(methods[0]?.metadata).toEqual({
+        methodName: 'instance_method',
+        context: 'Outer::Middle::Inner',
+        parameters: [],
+        methodType: 'instance',
+      });
+      expect(methods[1]?.name).toBe('Outer::Middle::Inner.class_method');
+      expect(methods[1]?.metadata).toEqual({
+        methodName: 'class_method',
+        context: 'Outer::Middle::Inner',
+        parameters: [],
+        methodType: 'class',
+      });
     });
   });
 
