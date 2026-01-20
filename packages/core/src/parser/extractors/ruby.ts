@@ -3,7 +3,6 @@ import type { NewEntity } from '../../db/entities.js';
 
 export interface RubyExtractorOptions {
   filePath: string;
-  sourceCode: string;
 }
 
 /**
@@ -12,11 +11,9 @@ export interface RubyExtractorOptions {
  */
 export class RubyExtractor {
   private filePath: string;
-  private sourceCode: string;
 
   constructor(options: RubyExtractorOptions) {
     this.filePath = options.filePath;
-    this.sourceCode = options.sourceCode;
   }
 
   /**
@@ -32,31 +29,42 @@ export class RubyExtractor {
   }
 
   private walkNode(node: Node, entities: NewEntity[]): void {
-    // Extract based on node type
-    if (node.type === 'method') {
-      const entity = this.extractMethod(node);
-      if (entity) entities.push(entity);
-    } else if (node.type === 'singleton_method') {
-      const entity = this.extractSingletonMethod(node);
-      if (entity) entities.push(entity);
-    } else if (node.type === 'class') {
-      const entity = this.extractClass(node);
-      if (entity) entities.push(entity);
-    } else if (node.type === 'module') {
-      const entity = this.extractModule(node);
-      if (entity) entities.push(entity);
+    switch (node.type) {
+      case 'method': {
+        const entity = this.extractMethodEntity(node, 'instance');
+        if (entity) entities.push(entity);
+        break;
+      }
+      case 'singleton_method': {
+        const entity = this.extractMethodEntity(node, 'class');
+        if (entity) entities.push(entity);
+        break;
+      }
+      case 'class': {
+        const entity = this.extractClass(node);
+        if (entity) entities.push(entity);
+        break;
+      }
+      case 'module': {
+        const entity = this.extractModule(node);
+        if (entity) entities.push(entity);
+        break;
+      }
     }
 
     // Recursively walk children
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.child(i);
-      if (child) {
-        this.walkNode(child, entities);
-      }
+    for (const child of node.children) {
+      this.walkNode(child, entities);
     }
   }
 
-  private extractMethod(node: Node): NewEntity | null {
+  /**
+   * Extract a method entity (both instance and singleton/class methods).
+   */
+  private extractMethodEntity(
+    node: Node,
+    methodType: 'instance' | 'class'
+  ): NewEntity | null {
     const nameNode = node.childForFieldName('name');
     if (!nameNode) return null;
 
@@ -72,28 +80,7 @@ export class RubyExtractor {
       language: 'ruby',
       metadata: {
         parameters: params,
-        methodType: 'instance',
-      },
-    };
-  }
-
-  private extractSingletonMethod(node: Node): NewEntity | null {
-    const nameNode = node.childForFieldName('name');
-    if (!nameNode) return null;
-
-    const name = nameNode.text;
-    const params = this.extractParameters(node);
-
-    return {
-      type: 'method',
-      name,
-      filePath: this.filePath,
-      startLine: node.startPosition.row + 1,
-      endLine: node.endPosition.row + 1,
-      language: 'ruby',
-      metadata: {
-        parameters: params,
-        methodType: 'class',
+        methodType,
       },
     };
   }
@@ -115,18 +102,28 @@ export class RubyExtractor {
     };
 
     if (superclassNode) {
-      // The superclass field includes '< ClassName', extract just the class name
-      const superclassText = superclassNode.text.trim();
-      const superclassName = superclassText.startsWith('<')
-        ? superclassText.slice(1).trim()
-        : superclassText;
-
-      entity.metadata = {
-        superclass: superclassName,
-      };
+      // Extract superclass name using AST traversal instead of string manipulation.
+      // The superclass node contains a constant or scope_resolution child.
+      const superclassName = this.extractSuperclassName(superclassNode);
+      if (superclassName) {
+        entity.metadata = {
+          superclass: superclassName,
+        };
+      }
     }
 
     return entity;
+  }
+
+  /**
+   * Extract the superclass name from a superclass node using AST traversal.
+   */
+  private extractSuperclassName(superclassNode: Node): string | null {
+    // Find the constant or scope_resolution child that holds the class name
+    const nameNode = superclassNode.children.find(
+      (c) => c.type === 'constant' || c.type === 'scope_resolution'
+    );
+    return nameNode?.text ?? null;
   }
 
   private extractModule(node: Node): NewEntity | null {
