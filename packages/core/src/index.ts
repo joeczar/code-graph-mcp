@@ -47,6 +47,7 @@ export type {
   EntityType,
   EntityStore,
   RecentFile,
+  EntityQuery,
   Relationship,
   NewRelationship,
   RelationshipType,
@@ -89,3 +90,13 @@ export type {
   NewWorkflow,
   WorkflowSummary,
 } from './checkpoint/index.js';
+
+// Query exports
+export { whatCalls, whatDoesCall, blastRadius, getExports } from './queries/index.js';
+export type {
+  AffectedEntity,
+  BlastRadiusResult,
+  ExportType,
+  ExportedEntity,
+  GetExportsResult,
+} from './queries/index.js';
