@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { echoTool } from './tools/echo.js';
 import { graphStatusTool } from './tools/graph-status.js';
+import { whatCallsTool } from './tools/what-calls.js';
+import { whatDoesCallTool } from './tools/what-does-call.js';
 import { createErrorResponse, type ToolDefinition } from './tools/types.js';
 import { logger } from './tools/logger.js';
 
@@ -91,6 +93,8 @@ export function createServer(): McpServer {
   // Register tools using the standard pattern
   registerTool(server, echoTool);
   registerTool(server, graphStatusTool);
+  registerTool(server, whatCallsTool);
+  registerTool(server, whatDoesCallTool);
 
   return server;
 }
