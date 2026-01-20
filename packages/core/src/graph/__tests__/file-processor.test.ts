@@ -266,4 +266,91 @@ describe('FileProcessor', () => {
       }
     });
   });
+
+  describe('Transaction rollback', () => {
+    it('returns error and empty results if transaction fails', async () => {
+      const filePath = join(fixturesDir, 'sample.ts');
+
+      // Create a constraint that will be violated during entity insertion
+      // Add a UNIQUE constraint on (name, file_path) combination
+      db.exec('CREATE UNIQUE INDEX idx_unique_name_file ON entities(name, file_path)');
+
+      // First insert should succeed
+      const result1 = await processor.processFile({ filePath, db });
+      expect(result1.success).toBe(true);
+      expect(result1.entities.length).toBeGreaterThan(0);
+
+      const initialEntityCount = result1.entities.length;
+      const initialRelationshipCount = result1.relationships.length;
+
+      // Second insert of same file should fail due to UNIQUE constraint
+      const result2 = await processor.processFile({ filePath, db });
+
+      expect(result2.success).toBe(false);
+      expect(result2.error).toBeDefined();
+      expect(result2.error).toContain('Database transaction failed');
+      expect(result2.entities).toEqual([]);
+      expect(result2.relationships).toEqual([]);
+
+      // Verify database still contains only the first set of data (no partial writes)
+      const entityStore = createEntityStore(db);
+      const relationshipStore = createRelationshipStore(db);
+
+      const storedEntities = entityStore.findByFile(filePath);
+      const totalRelationships = relationshipStore.count();
+
+      // Should still have exactly the original count, not double
+      expect(storedEntities.length).toBe(initialEntityCount);
+      expect(totalRelationships).toBe(initialRelationshipCount);
+    });
+
+    it('does not write partial data if relationship creation fails', async () => {
+      const filePath = join(fixturesDir, 'sample.ts');
+
+      // Add a foreign key constraint that will fail
+      // (Note: SQLite foreign keys are already enabled in our schema)
+      // We can test by manually inserting an entity, then trying to process
+      // a file that references a non-existent entity in a relationship
+
+      // First, verify initial state is empty
+      const entityStore = createEntityStore(db);
+      const relationshipStore = createRelationshipStore(db);
+
+      const initialEntities = entityStore.findByFile(filePath);
+      const initialRelationships = relationshipStore.count();
+
+      expect(initialEntities.length).toBe(0);
+      expect(initialRelationships).toBe(0);
+
+      // Now simulate a transaction failure by dropping relationships table
+      // after entities are created but before relationships are stored
+      // This is tricky to test without modifying the code, so instead we'll
+      // verify that the transaction wrapper catches errors properly
+
+      // Use a database that will fail on the relationship insert
+      // by adding a CHECK constraint that always fails
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS fail_relationship_insert
+        BEFORE INSERT ON relationships
+        BEGIN
+          SELECT RAISE(ABORT, 'Simulated transaction failure');
+        END
+      `);
+
+      const result = await processor.processFile({ filePath, db });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain('Database transaction failed');
+      expect(result.entities).toEqual([]);
+      expect(result.relationships).toEqual([]);
+
+      // Verify NO entities were written (transaction rolled back completely)
+      const storedEntities = entityStore.findByFile(filePath);
+      const totalRelationships = relationshipStore.count();
+
+      expect(storedEntities.length).toBe(0);
+      expect(totalRelationships).toBe(0);
+    });
+  });
 });
