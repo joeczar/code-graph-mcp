@@ -61,8 +61,8 @@ export class VueExtractor {
     if (!this.isScriptSetup(rootNode)) {
       const scriptContent = this.getScriptContent(rootNode);
       if (scriptContent) {
-        metadata.props = this.extractPropsFromOptions(scriptContent);
-        metadata.emits = this.extractEmitsFromOptions(scriptContent);
+        metadata['props'] = this.extractPropsFromOptions(scriptContent);
+        metadata['emits'] = this.extractEmitsFromOptions(scriptContent);
       }
     }
 
@@ -120,13 +120,19 @@ export class VueExtractor {
   private isScriptSetup(rootNode: Node): boolean {
     const scriptElements = rootNode.descendantsOfType('script_element');
     for (const scriptEl of scriptElements) {
-      const startTag = scriptEl.descendantsOfType('start_tag')[0];
-      if (startTag) {
-        const attrs = startTag.descendantsOfType('attribute');
-        for (const attr of attrs) {
-          const name = attr.childForFieldName('name')?.text;
-          if (name === 'setup') {
-            return true;
+      // Check all children of script_element for start_tag
+      for (const child of scriptEl.children) {
+        if (child.type === 'start_tag') {
+          // Check direct children of start_tag for attribute nodes
+          for (const tagChild of child.children) {
+            if (tagChild.type === 'attribute') {
+              // The attribute text contains the whole attribute (e.g., "setup" or "lang='ts'")
+              const attrText = tagChild.text;
+              // Check if attribute is "setup" or starts with "setup " or "setup="
+              if (attrText === 'setup' || attrText.startsWith('setup ') || attrText.startsWith('setup=')) {
+                return true;
+              }
+            }
           }
         }
       }

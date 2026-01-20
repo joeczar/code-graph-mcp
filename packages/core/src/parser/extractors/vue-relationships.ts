@@ -62,15 +62,18 @@ export class VueRelationshipExtractor {
 
     // Adjust line numbers for script offset
     const scriptStartLine = scriptElement?.startPosition.row ?? 0;
-    return relationships.map((rel) => ({
-      ...rel,
-      sourceLocation: rel.sourceLocation
-        ? {
+    return relationships.map((rel) => {
+      if (rel.sourceLocation) {
+        return {
+          ...rel,
+          sourceLocation: {
             line: rel.sourceLocation.line + scriptStartLine,
             column: rel.sourceLocation.column,
-          }
-        : undefined,
-    }));
+          },
+        };
+      }
+      return rel;
+    });
   }
 
   /**
@@ -85,19 +88,22 @@ export class VueRelationshipExtractor {
       return relationships;
     }
 
-    // Find all element nodes in template
-    const elements = templateElement.descendantsOfType('element');
+    // Find both start_tag and self_closing_tag nodes
+    const startTags = templateElement.descendantsOfType('start_tag');
+    const selfClosingTags = templateElement.descendantsOfType('self_closing_tag');
+    const allTags = [...startTags, ...selfClosingTags];
 
-    for (const element of elements) {
-      const startTag = element.descendantsOfType('start_tag')[0];
-      if (!startTag) continue;
+    for (const tag of allTags) {
+      // Find tag_name as a direct child
+      let tagName: string | null = null;
+      for (const child of tag.children) {
+        if (child.type === 'tag_name') {
+          tagName = child.text;
+          break;
+        }
+      }
 
-      const tagNameNode = startTag.children.find(
-        (child) => child.type === 'tag_name'
-      );
-      if (!tagNameNode) continue;
-
-      const tagName = tagNameNode.text;
+      if (!tagName) continue;
 
       // Check if it's a custom component (PascalCase or kebab-case with dash)
       if (this.isCustomComponent(tagName)) {
@@ -105,8 +111,8 @@ export class VueRelationshipExtractor {
           type: 'imports',
           sourceName: '<template>',
           sourceLocation: {
-            line: startTag.startPosition.row + 1,
-            column: startTag.startPosition.column + 1,
+            line: tag.startPosition.row + 1,
+            column: tag.startPosition.column + 1,
           },
           targetName: tagName,
           metadata: {
