@@ -1,8 +1,5 @@
-import type { Tree } from 'web-tree-sitter';
+import type { Node, Tree } from 'web-tree-sitter';
 import type { ParseResult } from '../parser.js';
-
-// Using the actual node type from tree-sitter
-type SyntaxNode = ReturnType<Tree['rootNode']['child']> & { type: string; text: string };
 
 export type ExtractedRelationshipType = 'imports' | 'calls' | 'extends' | 'implements';
 
@@ -18,18 +15,16 @@ export class TypeScriptRelationshipExtractor {
   extract(parseResult: ParseResult): ExtractedRelationship[] {
     const relationships: ExtractedRelationship[] = [];
     const tree = parseResult.tree;
-    const sourceCode = parseResult.sourceCode;
 
-    // Extract all relationship types
-    relationships.push(...this.extractImports(tree, sourceCode));
-    relationships.push(...this.extractCalls(tree, sourceCode));
-    relationships.push(...this.extractClassInheritance(tree, sourceCode));
-    relationships.push(...this.extractInterfaceImplementations(tree, sourceCode));
+    relationships.push(...this.extractImports(tree));
+    relationships.push(...this.extractCalls(tree));
+    relationships.push(...this.extractClassInheritance(tree));
+    relationships.push(...this.extractInterfaceImplementations(tree));
 
     return relationships;
   }
 
-  private extractImports(tree: Tree, _sourceCode: string): ExtractedRelationship[] {
+  private extractImports(tree: Tree): ExtractedRelationship[] {
     const relationships: ExtractedRelationship[] = [];
     const importStatements = tree.rootNode.descendantsOfType('import_statement');
 
@@ -86,7 +81,7 @@ export class TypeScriptRelationshipExtractor {
     return relationships;
   }
 
-  private extractCalls(tree: Tree, _sourceCode: string): ExtractedRelationship[] {
+  private extractCalls(tree: Tree): ExtractedRelationship[] {
     const relationships: ExtractedRelationship[] = [];
     const callExpressions = tree.rootNode.descendantsOfType('call_expression');
 
@@ -119,7 +114,7 @@ export class TypeScriptRelationshipExtractor {
     return relationships;
   }
 
-  private extractClassInheritance(tree: Tree, _sourceCode: string): ExtractedRelationship[] {
+  private extractClassInheritance(tree: Tree): ExtractedRelationship[] {
     const relationships: ExtractedRelationship[] = [];
     const classDeclarations = tree.rootNode.descendantsOfType('class_declaration');
 
@@ -157,7 +152,7 @@ export class TypeScriptRelationshipExtractor {
     return relationships;
   }
 
-  private extractInterfaceImplementations(tree: Tree, _sourceCode: string): ExtractedRelationship[] {
+  private extractInterfaceImplementations(tree: Tree): ExtractedRelationship[] {
     const relationships: ExtractedRelationship[] = [];
     const classDeclarations = tree.rootNode.descendantsOfType('class_declaration');
 
@@ -200,8 +195,8 @@ export class TypeScriptRelationshipExtractor {
 
   // Helper methods
 
-  private findContainingFunction(node: SyntaxNode): SyntaxNode | null {
-    let current: SyntaxNode | null = node.parent;
+  private findContainingFunction(node: Node): Node | null {
+    let current: Node | null = node.parent;
 
     while (current) {
       if (
@@ -218,7 +213,7 @@ export class TypeScriptRelationshipExtractor {
     return null;
   }
 
-  private getFunctionName(functionNode: SyntaxNode): string | null {
+  private getFunctionName(functionNode: Node): string | null {
     if (functionNode.type === 'function_declaration' || functionNode.type === 'method_definition') {
       const name = functionNode.childForFieldName('name');
       return name?.text ?? null;
@@ -236,7 +231,7 @@ export class TypeScriptRelationshipExtractor {
     return null;
   }
 
-  private getCalledFunctionName(functionNode: SyntaxNode): string | null {
+  private getCalledFunctionName(functionNode: Node): string | null {
     if (functionNode.type === 'identifier') {
       return functionNode.text;
     }
@@ -249,7 +244,7 @@ export class TypeScriptRelationshipExtractor {
     return null;
   }
 
-  private getTypeName(typeNode: SyntaxNode): string | null {
+  private getTypeName(typeNode: Node): string | null {
     if (typeNode.type === 'type_identifier' || typeNode.type === 'identifier') {
       return typeNode.text;
     }
