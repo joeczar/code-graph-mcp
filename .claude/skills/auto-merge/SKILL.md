@@ -107,20 +107,31 @@ Verify before proceeding: `git status` shows clean working tree on PR branch.
 
 ---
 
-### Step 3: Run Review Pass
+### Step 3: Run Review Pass (MANDATORY)
 
 **Entry:** On PR branch, rebased, clean working tree
 **Exit:** Review agents completed, findings addressed, any fixes committed
 
-Use shared review logic from `.claude/shared/review-pass.md`:
+**CRITICAL:** Do NOT skip this step. Run all review agents.
 
-1. Run `code-simplifier:code-simplifier` on changed files
-2. Run `pr-review-toolkit:code-reviewer`
-3. Run `pr-review-toolkit:silent-failure-hunter`
-4. Fix issues with confidence >= 60%
-5. Commit: `refactor: address review findings`
+| Agent | Purpose | Status |
+|-------|---------|--------|
+| `code-simplifier:code-simplifier` | Simplify changed code | ☐ |
+| `pr-review-toolkit:code-reviewer` | Check bugs and quality | ☐ |
+| `pr-review-toolkit:silent-failure-hunter` | Find silent failures | ☐ |
 
-Verify before proceeding: All review agents have run, issues either fixed or documented as skipped.
+For each agent:
+1. Launch via Task tool
+2. Apply fixes with confidence >= 60%
+3. Mark as complete (☑)
+
+If changes made:
+```bash
+git add -A
+git commit -m "refactor: address review findings"
+```
+
+**Verify before proceeding:** All three agents must show ☑. If any skipped, do NOT proceed.
 
 ---
 

@@ -226,9 +226,43 @@ IMPLEMENTATION COMPLETE
 
 ---
 
-## Phase 4: Review
+## Phase 4: Review Agents (MANDATORY)
 
-Run validation and review tools:
+**CRITICAL:** This phase runs automated review agents. Do NOT skip this phase.
+
+### Step 1: Identify Changed Files
+
+```bash
+git diff origin/main --name-only | grep -E '\.(ts|tsx|js|jsx)$'
+```
+
+If no TypeScript/JavaScript files changed, skip to validation.
+
+### Step 2: Run Review Agents (in sequence)
+
+Run each agent and track completion:
+
+| Agent | Purpose | Status |
+|-------|---------|--------|
+| `code-simplifier:code-simplifier` | Simplify and clarify code | ☐ |
+| `pr-review-toolkit:code-reviewer` | Check bugs, style, quality | ☐ |
+| `pr-review-toolkit:silent-failure-hunter` | Find silent failures | ☐ |
+
+**For each agent:**
+1. Launch the agent via Task tool
+2. Review findings with confidence >= 60%
+3. Apply valid fixes
+4. Mark agent as complete (☑)
+
+### Step 3: Commit Review Fixes
+
+If any changes were made:
+```bash
+git add -A
+git commit -m "refactor: address review findings"
+```
+
+### Step 4: Final Validation
 
 ```bash
 pnpm typecheck
@@ -237,7 +271,8 @@ pnpm test
 pnpm build
 ```
 
-Review changes:
+### Step 5: Review Summary
+
 ```bash
 git log origin/main..HEAD --oneline
 git diff origin/main --stat
@@ -245,9 +280,9 @@ git diff origin/main --stat
 
 Verify:
 - All validation passes
+- Review agents completed (all ☑)
 - Changes match issue requirements
 - Commit messages are clear
-- No unintended changes
 
 ---
 
@@ -260,17 +295,25 @@ Verify:
 ```
 REVIEW COMPLETE
 
-All validation passed:
+## Review Agents
+- [x] code-simplifier ran
+- [x] code-reviewer ran
+- [x] silent-failure-hunter ran
+- Findings addressed: {count}
+
+## Validation
 - [x] Tests pass
 - [x] Types pass
 - [x] Lint passes
 - [x] Build passes
 
-Changes summary:
+## Changes
 {git diff origin/main --stat}
 
 Ready to create PR?
 ```
+
+**IMPORTANT:** If any review agent was skipped, do NOT proceed. Return to Phase 4 and run the missing agents.
 
 **Wait for:** "proceed", "create PR", "approved"
 
