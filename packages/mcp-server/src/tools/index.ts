@@ -40,3 +40,5 @@ export {
 // Tool definitions
 export { echoTool } from './echo.js';
 export { graphStatusTool } from './graph-status.js';
+export { whatCallsTool } from './what-calls.js';
+export { whatDoesCallTool } from './what-does-call.js';

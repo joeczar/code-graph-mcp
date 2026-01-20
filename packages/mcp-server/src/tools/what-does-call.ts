@@ -46,10 +46,10 @@ export const whatDoesCallTool: ToolDefinition<typeof whatDoesCallInputSchema> = 
     }
 
     // Find all callees for each matching entity
-    const callees: Array<{
+    const callees: {
       callee: { name: string; type: string; filePath: string; startLine: number; endLine: number };
       sourceEntity: { name: string; type: string };
-    }> = [];
+    }[] = [];
 
     for (const entity of entities) {
       // Find relationships where this entity is the source
@@ -88,12 +88,12 @@ export const whatDoesCallTool: ToolDefinition<typeof whatDoesCallInputSchema> = 
       lines.push(`Entities called by '${input.name}':\n`);
 
       callees.forEach((item, index) => {
-        lines.push(`${index + 1}. ${item.callee.name} (${item.callee.type})`);
-        lines.push(`   File: ${item.callee.filePath}:${item.callee.startLine}-${item.callee.endLine}`);
+        lines.push(`${(index + 1).toString()}. ${item.callee.name} (${item.callee.type})`);
+        lines.push(`   File: ${item.callee.filePath}:${item.callee.startLine.toString()}-${item.callee.endLine.toString()}`);
         lines.push('');
       });
 
-      lines.push(`Total: ${callees.length} callee${callees.length === 1 ? '' : 's'} found`);
+      lines.push(`Total: ${callees.length.toString()} callee${callees.length === 1 ? '' : 's'} found`);
     }
 
     return createSuccessResponse(lines.join('\n'));

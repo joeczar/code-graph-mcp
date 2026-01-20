@@ -46,10 +46,10 @@ export const whatCallsTool: ToolDefinition<typeof whatCallsInputSchema> = {
     }
 
     // Find all callers for each matching entity
-    const callers: Array<{
+    const callers: {
       caller: { name: string; type: string; filePath: string; startLine: number; endLine: number };
       targetEntity: { name: string; type: string };
-    }> = [];
+    }[] = [];
 
     for (const entity of entities) {
       // Find relationships where this entity is the target
@@ -88,12 +88,12 @@ export const whatCallsTool: ToolDefinition<typeof whatCallsInputSchema> = {
       lines.push(`Entities calling '${input.name}':\n`);
 
       callers.forEach((item, index) => {
-        lines.push(`${index + 1}. ${item.caller.name} (${item.caller.type})`);
-        lines.push(`   File: ${item.caller.filePath}:${item.caller.startLine}-${item.caller.endLine}`);
+        lines.push(`${(index + 1).toString()}. ${item.caller.name} (${item.caller.type})`);
+        lines.push(`   File: ${item.caller.filePath}:${item.caller.startLine.toString()}-${item.caller.endLine.toString()}`);
         lines.push('');
       });
 
-      lines.push(`Total: ${callers.length} caller${callers.length === 1 ? '' : 's'} found`);
+      lines.push(`Total: ${callers.length.toString()} caller${callers.length === 1 ? '' : 's'} found`);
     }
 
     return createSuccessResponse(lines.join('\n'));
