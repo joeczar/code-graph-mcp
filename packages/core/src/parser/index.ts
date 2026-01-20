@@ -6,3 +6,11 @@ export {
   detectLanguage,
   getLanguageConfig,
 } from './languages.js';
+export { Walker, WalkControl } from './walker.js';
+export type {
+  WalkerContext,
+  EnterCallback,
+  ExitCallback,
+  Visitor,
+  WalkOptions,
+} from './walker.js';
