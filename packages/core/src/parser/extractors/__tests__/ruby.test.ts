@@ -115,6 +115,7 @@ describe('RubyExtractor', () => {
       expect(methods).toHaveLength(1);
       expect(methods[0]?.name).toBe('foo');
       expect(methods[0]?.metadata).toEqual({
+        methodName: 'foo',
         parameters: ['bar = 1'],
         methodType: 'instance',
       });
@@ -133,6 +134,7 @@ describe('RubyExtractor', () => {
       expect(methods).toHaveLength(1);
       expect(methods[0]?.name).toBe('foo');
       expect(methods[0]?.metadata).toEqual({
+        methodName: 'foo',
         parameters: ['bar:', 'baz: 1'],
         methodType: 'instance',
       });
@@ -151,6 +153,7 @@ describe('RubyExtractor', () => {
       expect(methods).toHaveLength(1);
       expect(methods[0]?.name).toBe('foo');
       expect(methods[0]?.metadata).toEqual({
+        methodName: 'foo',
         parameters: ['*args'],
         methodType: 'instance',
       });
@@ -169,6 +172,7 @@ describe('RubyExtractor', () => {
       expect(methods).toHaveLength(1);
       expect(methods[0]?.name).toBe('foo');
       expect(methods[0]?.metadata).toEqual({
+        methodName: 'foo',
         parameters: ['**kwargs'],
         methodType: 'instance',
       });
@@ -187,6 +191,7 @@ describe('RubyExtractor', () => {
       expect(methods).toHaveLength(1);
       expect(methods[0]?.name).toBe('foo');
       expect(methods[0]?.metadata).toEqual({
+        methodName: 'foo',
         parameters: ['&block'],
         methodType: 'instance',
       });
@@ -205,6 +210,7 @@ describe('RubyExtractor', () => {
       expect(methods).toHaveLength(1);
       expect(methods[0]?.name).toBe('foo');
       expect(methods[0]?.metadata).toEqual({
+        methodName: 'foo',
         parameters: ['a', 'b = 2', '*args', 'c:', 'd: 3', '**kwargs', '&block'],
         methodType: 'instance',
       });
