@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { ServerRequest, ServerNotification, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { echoTool } from './tools/echo.js';
 import { graphStatusTool } from './tools/graph-status.js';
 import { whatCallsTool } from './tools/what-calls.js';
@@ -12,63 +13,81 @@ import { createErrorResponse, type ToolDefinition } from './tools/types.js';
 import { logger } from './tools/logger.js';
 
 /**
+ * Callback type for MCP tool handlers.
+ * The SDK validates input and passes typed args to this callback.
+ */
+type McpToolCallback<T> = (
+  args: z.infer<T>,
+  extra: RequestHandlerExtra<ServerRequest, ServerNotification>
+) => Promise<CallToolResult>;
+
+/**
  * Register a tool with the MCP server using the standard pattern
  *
+ * The MCP SDK validates input against the Zod schema and passes
+ * the validated args directly to the callback.
+ *
+ * Note: We use a type assertion for the callback because the SDK's generic
+ * types don't align perfectly with our ToolDefinition pattern. The SDK itself
+ * uses similar assertions internally (see executeToolHandler in mcp.js).
+ *
  * Handles:
- * - JSON Schema generation from Zod schema
- * - Input validation with Zod
- * - Error logging for non-validation errors
+ * - Error logging for execution errors
  * - Consistent response formatting
  */
-function registerTool<T extends z.ZodType>(
+function registerTool<T extends z.ZodObject<z.ZodRawShape>>(
   server: McpServer,
   tool: ToolDefinition<T>
 ): void {
-  server.registerTool(
-    tool.metadata.name,
-    {
-      title: tool.metadata.name,
-      description: tool.metadata.description,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-      inputSchema: zodToJsonSchema(tool.metadata.inputSchema) as any,
-    },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    async (params: any) => {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-        const validated = tool.metadata.inputSchema.parse(params.params);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        const result = await tool.handler(validated);
-        return {
-          ...result,
-          content: result.content.map(item => ({ ...item, type: 'text' as const })),
-        };
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          logger.warn('Tool validation failed', {
-            toolName: tool.metadata.name,
-            error: error.errors,
-          });
-        } else if (error instanceof Error) {
-          logger.error('Tool execution failed', {
-            toolName: tool.metadata.name,
-            error,
-            params,
-          });
-        } else {
-          logger.error('Unknown error in tool execution', {
-            toolName: tool.metadata.name,
-            error,
-            params,
-          });
-        }
-        const errorResult = createErrorResponse(error);
-        return {
-          ...errorResult,
-          content: errorResult.content.map(item => ({ ...item, type: 'text' as const })),
-        };
+  const toolName = tool.metadata.name;
+  const toolHandler = tool.handler;
+
+  const callback: McpToolCallback<T> = async (args, _extra) => {
+    try {
+      // SDK has already validated args against inputSchema
+      const result = await toolHandler(args);
+      return {
+        content: result.content.map(item => ({ type: 'text' as const, text: item.text })),
+        isError: result.isError,
+      };
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        // Shouldn't happen since SDK validates, but handle just in case
+        logger.warn('Tool validation failed', {
+          toolName,
+          error: error.issues,
+        });
+      } else if (error instanceof Error) {
+        logger.error('Tool execution failed', {
+          toolName,
+          error,
+          args,
+        });
+      } else {
+        logger.error('Unknown error in tool execution', {
+          toolName,
+          error,
+          args,
+        });
       }
+      const errorResult = createErrorResponse(error);
+      return {
+        content: errorResult.content.map(item => ({ type: 'text' as const, text: item.text })),
+        isError: true,
+      };
     }
+  };
+
+  server.registerTool(
+    toolName,
+    {
+      title: toolName,
+      description: tool.metadata.description,
+      inputSchema: tool.metadata.inputSchema,
+    },
+    // Type assertion needed: SDK's BaseToolCallback generic doesn't align with
+    // z.ZodObject. The SDK validates input and passes z.infer<T> to callback.
+    callback as Parameters<typeof server.registerTool>[2]
   );
 }
 
