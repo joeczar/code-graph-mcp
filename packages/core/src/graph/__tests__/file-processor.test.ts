@@ -278,13 +278,16 @@ describe('FileProcessor', () => {
       expect(fileEntities.length).toBe(1);
 
       const fileEntity = fileEntities[0];
+      expect(fileEntity).toBeDefined();
+      if (!fileEntity) return;
+
       expect(fileEntity.name).toBe(filePath);
       expect(fileEntity.filePath).toBe(filePath);
       expect(fileEntity.startLine).toBe(1);
       expect(fileEntity.endLine).toBeGreaterThan(0);
       expect(fileEntity.language).toBe('typescript');
       expect(fileEntity.metadata).toBeDefined();
-      expect(fileEntity.metadata?.contentHash).toBe(result.fileHash);
+      expect(fileEntity.metadata?.['contentHash']).toBe(result.fileHash);
     });
 
     it('creates contains relationships from File to all code entities', async () => {
@@ -321,7 +324,7 @@ describe('FileProcessor', () => {
       const fileEntities = entityStore.findByType('file');
 
       expect(fileEntities.length).toBe(1);
-      expect(fileEntities[0].filePath).toBe(filePath);
+      expect(fileEntities[0]?.filePath).toBe(filePath);
     });
 
     it('contains relationships are stored in database', async () => {
