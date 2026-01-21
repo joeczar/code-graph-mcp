@@ -151,6 +151,52 @@ describe('IncrementalUpdater', () => {
       expect(file).toBeNull();
     });
 
+    it('should delete File entity when file is deleted', () => {
+      const entityStore = createEntityStore(db);
+      const updater = createIncrementalUpdater(db);
+
+      // Create File entity
+      entityStore.create({
+        type: 'file',
+        name: '/test/file.ts',
+        filePath: '/test/file.ts',
+        startLine: 1,
+        endLine: 50,
+        language: 'typescript',
+        metadata: { contentHash: 'hash123' },
+      });
+
+      // Create code entities
+      entityStore.create({
+        type: 'function',
+        name: 'testFunc',
+        filePath: '/test/file.ts',
+        startLine: 1,
+        endLine: 5,
+        language: 'typescript',
+      });
+
+      // Mark file as tracked
+      updater.markFileUpdated('/test/file.ts', 'hash123', 'typescript');
+
+      const result = updater.deleteFile('/test/file.ts');
+
+      expect(result).toMatchObject({
+        filePath: '/test/file.ts',
+        action: 'deleted',
+        entitiesAffected: 2, // File entity + function entity
+      });
+
+      // Verify all entities are deleted (including File entity)
+      const remainingEntities = entityStore.findByFile('/test/file.ts');
+      expect(remainingEntities).toHaveLength(0);
+
+      // Verify File entity specifically is deleted
+      const fileEntities = entityStore.findByType('file');
+      const matchingFileEntity = fileEntities.find(e => e.filePath === '/test/file.ts');
+      expect(matchingFileEntity).toBeUndefined();
+    });
+
     it('should return skipped for non-existent file', () => {
       const updater = createIncrementalUpdater(db);
       const result = updater.deleteFile('/nonexistent.ts');

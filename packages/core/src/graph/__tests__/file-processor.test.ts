@@ -267,6 +267,77 @@ describe('FileProcessor', () => {
     });
   });
 
+  describe('File entity and contains relationships', () => {
+    it('creates File entity with correct properties', async () => {
+      const filePath = join(fixturesDir, 'sample.ts');
+      const result = await processor.processFile({ filePath, db });
+
+      expect(result.success).toBe(true);
+
+      const fileEntities = result.entities.filter(e => e.type === 'file');
+      expect(fileEntities.length).toBe(1);
+
+      const fileEntity = fileEntities[0];
+      expect(fileEntity.name).toBe(filePath);
+      expect(fileEntity.filePath).toBe(filePath);
+      expect(fileEntity.startLine).toBe(1);
+      expect(fileEntity.endLine).toBeGreaterThan(0);
+      expect(fileEntity.language).toBe('typescript');
+      expect(fileEntity.metadata).toBeDefined();
+      expect(fileEntity.metadata?.contentHash).toBe(result.fileHash);
+    });
+
+    it('creates contains relationships from File to all code entities', async () => {
+      const filePath = join(fixturesDir, 'sample.ts');
+      const result = await processor.processFile({ filePath, db });
+
+      expect(result.success).toBe(true);
+
+      const fileEntity = result.entities.find(e => e.type === 'file');
+      expect(fileEntity).toBeDefined();
+
+      const codeEntities = result.entities.filter(e => e.type !== 'file');
+      expect(codeEntities.length).toBeGreaterThan(0);
+
+      const containsRels = result.relationships.filter(r => r.type === 'contains');
+      expect(containsRels.length).toBe(codeEntities.length);
+
+      // Verify each contains relationship has File as source and a code entity as target
+      for (const rel of containsRels) {
+        expect(rel.sourceId).toBe(fileEntity?.id);
+        const targetEntity = result.entities.find(e => e.id === rel.targetId);
+        expect(targetEntity).toBeDefined();
+        expect(targetEntity?.type).not.toBe('file');
+      }
+    });
+
+    it('File entity is stored in database', async () => {
+      const filePath = join(fixturesDir, 'sample.ts');
+      const result = await processor.processFile({ filePath, db });
+
+      expect(result.success).toBe(true);
+
+      const entityStore = createEntityStore(db);
+      const fileEntities = entityStore.findByType('file');
+
+      expect(fileEntities.length).toBe(1);
+      expect(fileEntities[0].filePath).toBe(filePath);
+    });
+
+    it('contains relationships are stored in database', async () => {
+      const filePath = join(fixturesDir, 'sample.ts');
+      const result = await processor.processFile({ filePath, db });
+
+      expect(result.success).toBe(true);
+
+      const relationshipStore = createRelationshipStore(db);
+      const containsRels = relationshipStore.findByType('contains');
+
+      const codeEntitiesCount = result.entities.filter(e => e.type !== 'file').length;
+      expect(containsRels.length).toBe(codeEntitiesCount);
+    });
+  });
+
   describe('Transaction rollback', () => {
     it('returns error and empty results if transaction fails', async () => {
       const filePath = join(fixturesDir, 'sample.ts');
