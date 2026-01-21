@@ -65,9 +65,9 @@ Restart Claude Code after adding the configuration.
 |------|-------------|
 | `ping` | Test connectivity (returns "pong") |
 | `echo` | Echo back a message (for testing) |
-| `graph_status` | Show database stats and parsed file counts |
-| `what_calls` | Find all callers of a function/method |
-| `what_does_call` | Find all functions called by a given entity |
+| `graph_status` | Show graph stats (entities, relationships) and parsed files |
+| `what_calls` | Find all callers of a given entity |
+| `what_does_call` | Find all entities called by a given entity |
 | `blast_radius` | Analyze impact of changes to a file |
 | `find_entity` | Search entities by name, type, or file path |
 | `get_exports` | List all exported entities from a file |
