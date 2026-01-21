@@ -2,6 +2,12 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { ServerRequest, ServerNotification, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import {
+  getDatabase,
+  createMigrationRunner,
+  createMetricsStore,
+  type MetricsStore,
+} from '@code-graph/core';
 import { echoTool } from './tools/echo.js';
 import { graphStatusTool } from './tools/graph-status.js';
 import { whatCallsTool } from './tools/what-calls.js';
@@ -13,6 +19,8 @@ import { parseFileTool } from './tools/parse-file.js';
 import { parseDirectoryTool } from './tools/parse-directory.js';
 import { createErrorResponse, type ToolDefinition } from './tools/types.js';
 import { logger } from './tools/logger.js';
+import { instrumentHandler } from './tools/instrument.js';
+import { getProjectId } from './config.js';
 
 /**
  * Callback type for MCP tool handlers.
@@ -36,13 +44,17 @@ type McpToolCallback<T> = (
  * Handles:
  * - Error logging for execution errors
  * - Consistent response formatting
+ * - Metrics collection via instrumentation
  */
 function registerTool<T extends z.ZodObject<z.ZodRawShape>>(
   server: McpServer,
-  tool: ToolDefinition<T>
+  tool: ToolDefinition<T>,
+  metricsStore: MetricsStore,
+  projectId: string
 ): void {
   const toolName = tool.metadata.name;
-  const toolHandler = tool.handler;
+  // Wrap handler with metrics instrumentation
+  const toolHandler = instrumentHandler(toolName, tool.handler, metricsStore, projectId);
 
   const callback: McpToolCallback<T> = async (args, _extra) => {
     try {
@@ -99,7 +111,23 @@ export function createServer(): McpServer {
     version: '0.0.1',
   });
 
-  // Register ping tool for connectivity testing
+  // Initialize database and run migrations early
+  const db = getDatabase();
+  const migrationRunner = createMigrationRunner(db);
+  migrationRunner.run();
+
+  // Create metrics store and get project ID
+  const metricsStore = createMetricsStore(db);
+  const projectId = getProjectId();
+
+  // Register ping tool with instrumentation for connectivity testing
+  const pingHandler = instrumentHandler(
+    'ping',
+    () => ({ content: [{ type: 'text' as const, text: 'pong' }] }),
+    metricsStore,
+    projectId
+  );
+
   server.registerTool(
     'ping',
     {
@@ -107,23 +135,24 @@ export function createServer(): McpServer {
       description: 'Simple ping tool for testing connectivity',
       inputSchema: {},
     },
-    () => {
+    async () => {
+      const result = await pingHandler({});
       return {
-        content: [{ type: 'text', text: 'pong' }],
+        content: result.content.map(item => ({ type: 'text' as const, text: item.text })),
       };
     }
   );
 
-  // Register tools using the standard pattern
-  registerTool(server, echoTool);
-  registerTool(server, graphStatusTool);
-  registerTool(server, whatCallsTool);
-  registerTool(server, whatDoesCallTool);
-  registerTool(server, blastRadiusTool);
-  registerTool(server, findEntityTool);
-  registerTool(server, getExportsTool);
-  registerTool(server, parseFileTool);
-  registerTool(server, parseDirectoryTool);
+  // Register tools using the standard pattern (with metrics instrumentation)
+  registerTool(server, echoTool, metricsStore, projectId);
+  registerTool(server, graphStatusTool, metricsStore, projectId);
+  registerTool(server, whatCallsTool, metricsStore, projectId);
+  registerTool(server, whatDoesCallTool, metricsStore, projectId);
+  registerTool(server, blastRadiusTool, metricsStore, projectId);
+  registerTool(server, findEntityTool, metricsStore, projectId);
+  registerTool(server, getExportsTool, metricsStore, projectId);
+  registerTool(server, parseFileTool, metricsStore, projectId);
+  registerTool(server, parseDirectoryTool, metricsStore, projectId);
 
   return server;
 }
