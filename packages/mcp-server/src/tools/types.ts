@@ -76,7 +76,7 @@ export function createErrorResponse(error: unknown): ErrorResponse {
   if (error instanceof z.ZodError) {
     // Provide detailed validation error messages
     const issues = error.issues
-      .map((e: { path: PropertyKey[]; message: string }) => `${String(e.path.join('.'))}: ${e.message}`)
+      .map((e: { path: PropertyKey[]; message: string }) => `${e.path.join('.')}: ${e.message}`)
       .join('; ');
     message = `Validation error: ${issues}`;
   } else if (error instanceof ToolError) {
