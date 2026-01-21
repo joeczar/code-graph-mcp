@@ -45,10 +45,9 @@ export class VueRelationshipExtractor {
       return [];
     }
 
-    // Determine language
+    // tree-sitter-typescript can parse both JS and TS
     const scriptElement = rootNode.descendantsOfType('script_element')[0];
-    const langAttr = this.getScriptLang(scriptElement);
-    const language = langAttr === 'ts' || langAttr === 'tsx' ? 'typescript' : 'typescript';
+    const language = 'typescript';
 
     // Parse script content with TypeScript parser
     const parseResult = await this.parser.parse(scriptContent, language);
@@ -129,38 +128,33 @@ export class VueRelationshipExtractor {
    * Check if a tag name represents a custom component.
    */
   private isCustomComponent(tagName: string): boolean {
-    // Built-in HTML tags (lowercase, no dashes)
+    // Common HTML5 tags (not exhaustive, but covers most usage)
     const htmlTags = new Set([
-      'div',
-      'span',
-      'p',
-      'a',
-      'img',
-      'button',
-      'input',
-      'form',
-      'ul',
-      'ol',
-      'li',
-      'table',
-      'tr',
-      'td',
-      'th',
-      'section',
-      'article',
-      'header',
-      'footer',
-      'nav',
-      'main',
-      'aside',
-      'h1',
-      'h2',
-      'h3',
-      'h4',
-      'h5',
-      'h6',
-      'template',
-      'slot',
+      // Document structure
+      'html', 'head', 'body', 'title', 'meta', 'link', 'script', 'style', 'noscript',
+      // Content sectioning
+      'header', 'footer', 'nav', 'main', 'section', 'article', 'aside', 'address',
+      // Text content
+      'div', 'span', 'p', 'pre', 'blockquote', 'figure', 'figcaption', 'hr',
+      'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+      // Headings
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      // Inline text semantics
+      'a', 'em', 'strong', 'small', 'cite', 'q', 'abbr', 'code', 'var', 'kbd', 'samp',
+      'sub', 'sup', 's', 'u', 'mark', 'ruby', 'rt', 'rp', 'bdi', 'bdo', 'br', 'wbr',
+      'b', 'i', 'time', 'data', 'dfn',
+      // Media
+      'img', 'picture', 'source', 'video', 'audio', 'track', 'map', 'area',
+      'iframe', 'embed', 'object', 'param', 'canvas', 'svg', 'math',
+      // Tables
+      'table', 'caption', 'colgroup', 'col', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td',
+      // Forms
+      'form', 'fieldset', 'legend', 'label', 'input', 'button', 'select', 'datalist',
+      'optgroup', 'option', 'textarea', 'output', 'progress', 'meter',
+      // Interactive
+      'details', 'summary', 'dialog', 'menu',
+      // Web components / Vue special
+      'template', 'slot', 'component', 'transition', 'keep-alive', 'teleport', 'suspense',
     ]);
 
     if (htmlTags.has(tagName.toLowerCase())) {
@@ -178,28 +172,6 @@ export class VueRelationshipExtractor {
     }
 
     return false;
-  }
-
-  /**
-   * Get script language attribute value.
-   */
-  private getScriptLang(scriptElement: Node | undefined): string | null {
-    if (!scriptElement) return null;
-
-    const startTag = scriptElement.descendantsOfType('start_tag')[0];
-    if (!startTag) return null;
-
-    const attrs = startTag.descendantsOfType('attribute');
-    for (const attr of attrs) {
-      const name = attr.childForFieldName('name')?.text;
-      if (name === 'lang') {
-        const value = attr.childForFieldName('value');
-        if (value) {
-          return value.text.replace(/['"]/g, '');
-        }
-      }
-    }
-    return null;
   }
 
   /**

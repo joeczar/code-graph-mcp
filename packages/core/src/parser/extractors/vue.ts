@@ -86,10 +86,9 @@ export class VueExtractor {
       return [];
     }
 
-    // Determine language (typescript or javascript)
+    // tree-sitter-typescript can parse both JS and TS
     const scriptElement = rootNode.descendantsOfType('script_element')[0];
-    const langAttr = this.getScriptLang(scriptElement);
-    const language = langAttr === 'ts' || langAttr === 'tsx' ? 'typescript' : 'typescript';
+    const language = 'typescript';
 
     // Parse script content with TypeScript parser
     const parseResult = await this.parser.parse(scriptContent, language);
@@ -120,47 +119,18 @@ export class VueExtractor {
   private isScriptSetup(rootNode: Node): boolean {
     const scriptElements = rootNode.descendantsOfType('script_element');
     for (const scriptEl of scriptElements) {
-      // Check all children of script_element for start_tag
-      for (const child of scriptEl.children) {
-        if (child.type === 'start_tag') {
-          // Check direct children of start_tag for attribute nodes
-          for (const tagChild of child.children) {
-            if (tagChild.type === 'attribute') {
-              // The attribute text contains the whole attribute (e.g., "setup" or "lang='ts'")
-              const attrText = tagChild.text;
-              // Check if attribute is "setup" or starts with "setup " or "setup="
-              if (attrText === 'setup' || attrText.startsWith('setup ') || attrText.startsWith('setup=')) {
-                return true;
-              }
-            }
-          }
+      const startTag = scriptEl.descendantsOfType('start_tag')[0];
+      if (!startTag) continue;
+
+      for (const attr of startTag.descendantsOfType('attribute')) {
+        const name = attr.childForFieldName('name')?.text;
+        // Boolean attribute 'setup' may not have a name field
+        if (name === 'setup' || attr.text === 'setup') {
+          return true;
         }
       }
     }
     return false;
-  }
-
-  /**
-   * Get script language attribute value.
-   */
-  private getScriptLang(scriptElement: Node | undefined): string | null {
-    if (!scriptElement) return null;
-
-    const startTag = scriptElement.descendantsOfType('start_tag')[0];
-    if (!startTag) return null;
-
-    const attrs = startTag.descendantsOfType('attribute');
-    for (const attr of attrs) {
-      const name = attr.childForFieldName('name')?.text;
-      if (name === 'lang') {
-        const value = attr.childForFieldName('value');
-        if (value) {
-          // Remove quotes from attribute value
-          return value.text.replace(/['"]/g, '');
-        }
-      }
-    }
-    return null;
   }
 
   /**
