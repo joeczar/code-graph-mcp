@@ -2,6 +2,7 @@ import type { Node } from 'web-tree-sitter';
 import type { NewEntity } from '../../db/entities.js';
 import { CodeParser } from '../parser.js';
 import { TypeScriptExtractor } from './typescript.js';
+import { getScriptContent, getScriptElement } from './vue-utils.js';
 
 export interface VueExtractorOptions {
   filePath: string;
@@ -52,14 +53,15 @@ export class VueExtractor {
     const startLine = scriptElement?.startPosition.row ?? 0;
     const endLine = rootNode.endPosition.row;
 
+    const isSetup = this.isScriptSetup(rootNode);
     const metadata: Record<string, unknown> = {
       exported: true,
-      componentType: this.isScriptSetup(rootNode) ? 'composition' : 'options',
+      componentType: isSetup ? 'composition' : 'options',
     };
 
     // Extract props, emits, computed, methods from Options API
-    if (!this.isScriptSetup(rootNode)) {
-      const scriptContent = this.getScriptContent(rootNode);
+    if (!isSetup) {
+      const scriptContent = getScriptContent(rootNode);
       if (scriptContent) {
         metadata['props'] = this.extractPropsFromOptions(scriptContent);
         metadata['emits'] = this.extractEmitsFromOptions(scriptContent);
@@ -81,17 +83,16 @@ export class VueExtractor {
    * Extract script content and parse with TypeScript extractor.
    */
   private async extractScriptEntities(rootNode: Node): Promise<NewEntity[]> {
-    const scriptContent = this.getScriptContent(rootNode);
+    const scriptContent = getScriptContent(rootNode);
     if (!scriptContent) {
       return [];
     }
 
     // tree-sitter-typescript can parse both JS and TS
-    const scriptElement = rootNode.descendantsOfType('script_element')[0];
-    const language = 'typescript';
+    const scriptElement = getScriptElement(rootNode);
 
     // Parse script content with TypeScript parser
-    const parseResult = await this.parser.parse(scriptContent, language);
+    const parseResult = await this.parser.parse(scriptContent, 'typescript');
     if (!parseResult.success) {
       return [];
     }
@@ -117,86 +118,58 @@ export class VueExtractor {
    * Check if component uses <script setup>.
    */
   private isScriptSetup(rootNode: Node): boolean {
-    const scriptElements = rootNode.descendantsOfType('script_element');
-    for (const scriptEl of scriptElements) {
+    return rootNode.descendantsOfType('script_element').some((scriptEl) => {
       const startTag = scriptEl.descendantsOfType('start_tag')[0];
-      if (!startTag) continue;
-
-      for (const attr of startTag.descendantsOfType('attribute')) {
+      if (!startTag) return false;
+      return startTag.descendantsOfType('attribute').some((attr) => {
         const name = attr.childForFieldName('name')?.text;
         // Boolean attribute 'setup' may not have a name field
-        if (name === 'setup' || attr.text === 'setup') {
-          return true;
-        }
-      }
-    }
-    return false;
+        return name === 'setup' || attr.text === 'setup';
+      });
+    });
   }
 
   /**
-   * Extract raw script content from Vue file.
+   * Shared helper for extracting props/emits from Options API.
    */
-  private getScriptContent(rootNode: Node): string | null {
-    const scriptElements = rootNode.descendantsOfType('script_element');
-    if (scriptElements.length === 0) return null;
+  private extractOptionsArray(
+    scriptContent: string,
+    pattern: RegExp,
+    itemPattern: RegExp,
+    captureGroup: number
+  ): string[] | undefined {
+    const match = pattern.exec(scriptContent);
+    if (!match?.[1]) return undefined;
 
-    const scriptElement = scriptElements[0];
-    if (!scriptElement) return null;
+    const items = match[1]
+      .split(',')
+      .map((item) => itemPattern.exec(item.trim())?.[captureGroup])
+      .filter((name): name is string => name !== undefined);
 
-    // Find raw_text node inside script_element
-    const rawText = scriptElement.descendantsOfType('raw_text')[0];
-    if (!rawText) return null;
-
-    return rawText.text;
+    return items.length > 0 ? items : undefined;
   }
 
   /**
    * Extract props from Options API (simple string extraction).
    */
   private extractPropsFromOptions(scriptContent: string): string[] | undefined {
-    // Simple regex to find props definition
-    const propsRegex = /props:\s*\{([^}]+)\}/s;
-    const propsMatch = propsRegex.exec(scriptContent);
-    if (!propsMatch) return undefined;
-
-    const propsContent = propsMatch[1];
-    if (!propsContent) return undefined;
-
-    // Extract prop names (handles both object and array syntax)
-    const propNameRegex = /^(['"])?(\w+)\1?\s*:/;
-    const propNames = propsContent
-      .split(',')
-      .map((line) => {
-        const match = propNameRegex.exec(line.trim());
-        return match?.[2];
-      })
-      .filter((name): name is string => name !== undefined);
-
-    return propNames.length > 0 ? propNames : undefined;
+    return this.extractOptionsArray(
+      scriptContent,
+      /props:\s*\{([^}]+)\}/s,
+      /^(['"])?(\w+)\1?\s*:/,
+      2
+    );
   }
 
   /**
    * Extract emits from Options API (simple string extraction).
    */
   private extractEmitsFromOptions(scriptContent: string): string[] | undefined {
-    // Simple regex to find emits definition
-    const emitsRegex = /emits:\s*\[([^\]]+)\]/;
-    const emitsMatch = emitsRegex.exec(scriptContent);
-    if (!emitsMatch) return undefined;
-
-    const emitsContent = emitsMatch[1];
-    if (!emitsContent) return undefined;
-
-    // Extract emit names
-    const emitNameRegex = /['"](\w+)['"]/;
-    const emitNames = emitsContent
-      .split(',')
-      .map((item) => {
-        const match = emitNameRegex.exec(item.trim());
-        return match?.[1];
-      })
-      .filter((name): name is string => name !== undefined);
-
-    return emitNames.length > 0 ? emitNames : undefined;
+    return this.extractOptionsArray(
+      scriptContent,
+      /emits:\s*\[([^\]]+)\]/,
+      /['"](\w+)['"]/,
+      1
+    );
   }
 }

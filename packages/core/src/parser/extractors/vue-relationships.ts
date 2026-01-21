@@ -5,6 +5,36 @@ import {
   TypeScriptRelationshipExtractor,
   type ExtractedRelationship,
 } from './typescript-relationships.js';
+import { getScriptContent, getScriptElement } from './vue-utils.js';
+
+// Fix #7: Common HTML5 tags at module scope to avoid recreating Set on each call
+const HTML_TAGS = new Set([
+  // Document structure
+  'html', 'head', 'body', 'title', 'meta', 'link', 'script', 'style', 'noscript',
+  // Content sectioning
+  'header', 'footer', 'nav', 'main', 'section', 'article', 'aside', 'address',
+  // Text content
+  'div', 'span', 'p', 'pre', 'blockquote', 'figure', 'figcaption', 'hr',
+  'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+  // Headings
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  // Inline text semantics
+  'a', 'em', 'strong', 'small', 'cite', 'q', 'abbr', 'code', 'var', 'kbd', 'samp',
+  'sub', 'sup', 's', 'u', 'mark', 'ruby', 'rt', 'rp', 'bdi', 'bdo', 'br', 'wbr',
+  'b', 'i', 'time', 'data', 'dfn',
+  // Media
+  'img', 'picture', 'source', 'video', 'audio', 'track', 'map', 'area',
+  'iframe', 'embed', 'object', 'param', 'canvas', 'svg', 'math',
+  // Tables
+  'table', 'caption', 'colgroup', 'col', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td',
+  // Forms
+  'form', 'fieldset', 'legend', 'label', 'input', 'button', 'select', 'datalist',
+  'optgroup', 'option', 'textarea', 'output', 'progress', 'meter',
+  // Interactive
+  'details', 'summary', 'dialog', 'menu',
+  // Web components / Vue special
+  'template', 'slot', 'component', 'transition', 'keep-alive', 'teleport', 'suspense',
+]);
 
 /**
  * Extracts relationships from Vue Single File Components.
@@ -40,17 +70,16 @@ export class VueRelationshipExtractor {
   private async extractScriptRelationships(
     rootNode: Node
   ): Promise<ExtractedRelationship[]> {
-    const scriptContent = this.getScriptContent(rootNode);
+    const scriptContent = getScriptContent(rootNode);
     if (!scriptContent) {
       return [];
     }
 
     // tree-sitter-typescript can parse both JS and TS
-    const scriptElement = rootNode.descendantsOfType('script_element')[0];
-    const language = 'typescript';
+    const scriptElement = getScriptElement(rootNode);
 
     // Parse script content with TypeScript parser
-    const parseResult = await this.parser.parse(scriptContent, language);
+    const parseResult = await this.parser.parse(scriptContent, 'typescript');
     if (!parseResult.success) {
       return [];
     }
@@ -94,13 +123,8 @@ export class VueRelationshipExtractor {
 
     for (const tag of allTags) {
       // Find tag_name as a direct child
-      let tagName: string | null = null;
-      for (const child of tag.children) {
-        if (child.type === 'tag_name') {
-          tagName = child.text;
-          break;
-        }
-      }
+      const tagNameNode = tag.children.find((child) => child.type === 'tag_name');
+      const tagName = tagNameNode?.text ?? null;
 
       if (!tagName) continue;
 
@@ -128,36 +152,7 @@ export class VueRelationshipExtractor {
    * Check if a tag name represents a custom component.
    */
   private isCustomComponent(tagName: string): boolean {
-    // Common HTML5 tags (not exhaustive, but covers most usage)
-    const htmlTags = new Set([
-      // Document structure
-      'html', 'head', 'body', 'title', 'meta', 'link', 'script', 'style', 'noscript',
-      // Content sectioning
-      'header', 'footer', 'nav', 'main', 'section', 'article', 'aside', 'address',
-      // Text content
-      'div', 'span', 'p', 'pre', 'blockquote', 'figure', 'figcaption', 'hr',
-      'ul', 'ol', 'li', 'dl', 'dt', 'dd',
-      // Headings
-      'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-      // Inline text semantics
-      'a', 'em', 'strong', 'small', 'cite', 'q', 'abbr', 'code', 'var', 'kbd', 'samp',
-      'sub', 'sup', 's', 'u', 'mark', 'ruby', 'rt', 'rp', 'bdi', 'bdo', 'br', 'wbr',
-      'b', 'i', 'time', 'data', 'dfn',
-      // Media
-      'img', 'picture', 'source', 'video', 'audio', 'track', 'map', 'area',
-      'iframe', 'embed', 'object', 'param', 'canvas', 'svg', 'math',
-      // Tables
-      'table', 'caption', 'colgroup', 'col', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td',
-      // Forms
-      'form', 'fieldset', 'legend', 'label', 'input', 'button', 'select', 'datalist',
-      'optgroup', 'option', 'textarea', 'output', 'progress', 'meter',
-      // Interactive
-      'details', 'summary', 'dialog', 'menu',
-      // Web components / Vue special
-      'template', 'slot', 'component', 'transition', 'keep-alive', 'teleport', 'suspense',
-    ]);
-
-    if (htmlTags.has(tagName.toLowerCase())) {
+    if (HTML_TAGS.has(tagName.toLowerCase())) {
       return false;
     }
 
@@ -172,21 +167,5 @@ export class VueRelationshipExtractor {
     }
 
     return false;
-  }
-
-  /**
-   * Extract raw script content from Vue file.
-   */
-  private getScriptContent(rootNode: Node): string | null {
-    const scriptElements = rootNode.descendantsOfType('script_element');
-    if (scriptElements.length === 0) return null;
-
-    const scriptElement = scriptElements[0];
-    if (!scriptElement) return null;
-
-    const rawText = scriptElement.descendantsOfType('raw_text')[0];
-    if (!rawText) return null;
-
-    return rawText.text;
   }
 }
