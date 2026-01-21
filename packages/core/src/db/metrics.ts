@@ -368,7 +368,7 @@ export function createMetricsStore(db: Database.Database): MetricsStore {
         FROM tool_calls
         WHERE 1=1
       `;
-      const params: string[] = [];
+      const params: (string | number)[] = [];
 
       if (projectId) {
         query += ' AND project_id = ?';
@@ -379,11 +379,11 @@ export function createMetricsStore(db: Database.Database): MetricsStore {
 
       if (limit !== undefined) {
         query += ' LIMIT ?';
+        params.push(limit);
       }
 
       const stmt = db.prepare(query);
-      const allParams = limit !== undefined ? [...params, limit.toString()] : params;
-      const rows = stmt.all(...allParams) as {
+      const rows = stmt.all(...params) as {
         tool_name: string;
         call_count: number;
         avg_latency_ms: number;

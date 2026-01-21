@@ -4,7 +4,13 @@
  * Display aggregated metrics from tool calls and parse operations.
  */
 
-import { getDatabase, createMetricsStore } from '@code-graph/core';
+import {
+  getDatabase,
+  createMetricsStore,
+  type ToolCallSummary,
+  type ParseStatsSummary,
+  type ToolUsageRanking,
+} from '@code-graph/core';
 import { formatTable } from '../utils/table.js';
 
 export function runMetricsCommand(args: string[]): void {
@@ -44,69 +50,61 @@ function handleSummary(args: string[]): void {
     }
   }
 
-  const db = getDatabase();
+  let db;
+  try {
+    db = getDatabase();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to open metrics database: ${message}`);
+  }
+
   const metricsStore = createMetricsStore(db);
 
-  try {
-    // Get tool call summary
-    const toolCallSummary = metricsStore.getToolCallSummary(projectId, toolName);
+  // Query metrics with explicit error handling for missing tables
+  let toolCallSummary: ToolCallSummary[];
+  let parseStatsSummary: ParseStatsSummary | null;
+  let toolUsageRanking: ToolUsageRanking[] | null;
 
-    // Get parse stats summary (only if no tool filter)
-    const parseStatsSummary = toolName
+  try {
+    toolCallSummary = metricsStore.getToolCallSummary(projectId, toolName);
+    parseStatsSummary = toolName
       ? null
       : metricsStore.getParseStatsSummary(projectId);
-
-    // Get tool usage ranking (only if no tool filter)
-    const toolUsageRanking = toolName
+    toolUsageRanking = toolName
       ? null
       : metricsStore.getToolUsageRanking(projectId, 10);
-
-    if (jsonOutput) {
-      console.log(
-        JSON.stringify(
-          {
-            toolCallSummary,
-            parseStatsSummary,
-            toolUsageRanking,
-          },
-          null,
-          2
-        )
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('no such table')) {
+      throw new Error(
+        `Metrics tables not found. The database may need to be initialized.\n` +
+          `Ensure the MCP server has been started at least once to run migrations.`
       );
-    } else {
-      printSummaryTable(toolCallSummary, parseStatsSummary, toolUsageRanking);
     }
-  } finally {
-    // Database is singleton, don't close it
+    throw new Error(`Failed to query metrics: ${message}`);
+  }
+
+  if (jsonOutput) {
+    console.log(
+      JSON.stringify(
+        {
+          toolCallSummary,
+          parseStatsSummary,
+          toolUsageRanking,
+        },
+        null,
+        2
+      )
+    );
+  } else {
+    printSummaryTable(toolCallSummary, parseStatsSummary, toolUsageRanking);
   }
 }
 
 function printSummaryTable(
-  toolCallSummary: {
-    toolName: string;
-    callCount: number;
-    successCount: number;
-    errorCount: number;
-    successRate: number;
-    p50LatencyMs: number;
-    p95LatencyMs: number;
-    p99LatencyMs: number;
-    avgLatencyMs: number;
-  }[],
-  parseStatsSummary: {
-    totalParseRuns: number;
-    totalFilesProcessed: number;
-    totalFilesSuccess: number;
-    totalFilesError: number;
-    totalEntitiesExtracted: number;
-    totalRelationshipsExtracted: number;
-    avgDurationMs: number;
-  } | null,
-  toolUsageRanking: {
-    toolName: string;
-    callCount: number;
-    avgLatencyMs: number;
-  }[] | null
+  toolCallSummary: ToolCallSummary[],
+  parseStatsSummary: ParseStatsSummary | null,
+  toolUsageRanking: ToolUsageRanking[] | null
 ): void {
   console.log('\n=== Tool Call Summary ===\n');
 
