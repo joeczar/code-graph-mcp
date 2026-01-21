@@ -542,11 +542,11 @@ end`;
 
       expect(methods).toHaveLength(3);
       expect(methods[0]?.name).toBe('Product#id');
-      expect(methods[0]?.metadata?.methodType).toBe('getter');
+      expect(methods[0]?.metadata?.['methodType']).toBe('getter');
       expect(methods[1]?.name).toBe('Product#name');
-      expect(methods[1]?.metadata?.methodType).toBe('getter');
+      expect(methods[1]?.metadata?.['methodType']).toBe('getter');
       expect(methods[2]?.name).toBe('Product#price');
-      expect(methods[2]?.metadata?.methodType).toBe('getter');
+      expect(methods[2]?.metadata?.['methodType']).toBe('getter');
     });
 
     it('extracts multiple symbols from single attr_writer', async () => {
@@ -561,11 +561,11 @@ end`;
 
       expect(methods).toHaveLength(3);
       expect(methods[0]?.name).toBe('Product#a=');
-      expect(methods[0]?.metadata?.methodType).toBe('setter');
+      expect(methods[0]?.metadata?.['methodType']).toBe('setter');
       expect(methods[1]?.name).toBe('Product#b=');
-      expect(methods[1]?.metadata?.methodType).toBe('setter');
+      expect(methods[1]?.metadata?.['methodType']).toBe('setter');
       expect(methods[2]?.name).toBe('Product#c=');
-      expect(methods[2]?.metadata?.methodType).toBe('setter');
+      expect(methods[2]?.metadata?.['methodType']).toBe('setter');
     });
 
     it('extracts multiple symbols from single attr_accessor', async () => {
@@ -580,13 +580,13 @@ end`;
 
       expect(methods).toHaveLength(4); // 2 getters + 2 setters
       expect(methods[0]?.name).toBe('Product#x');
-      expect(methods[0]?.metadata?.methodType).toBe('getter');
+      expect(methods[0]?.metadata?.['methodType']).toBe('getter');
       expect(methods[1]?.name).toBe('Product#x=');
-      expect(methods[1]?.metadata?.methodType).toBe('setter');
+      expect(methods[1]?.metadata?.['methodType']).toBe('setter');
       expect(methods[2]?.name).toBe('Product#y');
-      expect(methods[2]?.metadata?.methodType).toBe('getter');
+      expect(methods[2]?.metadata?.['methodType']).toBe('getter');
       expect(methods[3]?.name).toBe('Product#y=');
-      expect(methods[3]?.metadata?.methodType).toBe('setter');
+      expect(methods[3]?.metadata?.['methodType']).toBe('setter');
     });
 
     it('builds correct qualified names inside class context', async () => {

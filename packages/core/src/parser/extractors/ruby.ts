@@ -18,6 +18,21 @@ export class RubyExtractor {
   }
 
   /**
+   * Returns the current context path (e.g., "Module::Class").
+   * Empty string if at top level.
+   */
+  private get contextPath(): string {
+    return this.contextStack.join('::');
+  }
+
+  /**
+   * Returns true if currently inside a class or module.
+   */
+  private get hasContext(): boolean {
+    return this.contextStack.length > 0;
+  }
+
+  /**
    * Extract all entities from the provided Ruby AST root node.
    */
   extract(rootNode: Node): NewEntity[] {
@@ -117,14 +132,11 @@ export class RubyExtractor {
 
     // Build fully qualified name using context stack
     let qualifiedName: string;
-    if (this.contextStack.length === 0) {
-      // Top-level method, no prefix
-      qualifiedName = methodName;
-    } else {
-      // Method inside class/module
-      const contextPath = this.contextStack.join('::');
+    if (this.hasContext) {
       const separator = methodType === 'instance' ? '#' : '.';
-      qualifiedName = `${contextPath}${separator}${methodName}`;
+      qualifiedName = `${this.contextPath}${separator}${methodName}`;
+    } else {
+      qualifiedName = methodName;
     }
 
     const metadata: Record<string, unknown> = {
@@ -133,9 +145,8 @@ export class RubyExtractor {
       methodType,
     };
 
-    // Add context if present
-    if (this.contextStack.length > 0) {
-      metadata['context'] = this.contextStack.join('::');
+    if (this.hasContext) {
+      metadata['context'] = this.contextPath;
     }
 
     return {
@@ -217,24 +228,17 @@ export class RubyExtractor {
     const constantName = leftNode.text;
 
     // Build qualified name using context stack
-    let qualifiedName: string;
-    if (this.contextStack.length === 0) {
-      // Top-level constant
-      qualifiedName = constantName;
-    } else {
-      // Constant inside class/module
-      const contextPath = this.contextStack.join('::');
-      qualifiedName = `${contextPath}::${constantName}`;
-    }
+    const qualifiedName = this.hasContext
+      ? `${this.contextPath}::${constantName}`
+      : constantName;
 
     const metadata: Record<string, unknown> = {
       kind: 'constant',
       constantName,
     };
 
-    // Add context if present
-    if (this.contextStack.length > 0) {
-      metadata['context'] = this.contextStack.join('::');
+    if (this.hasContext) {
+      metadata['context'] = this.contextPath;
     }
 
     return {
@@ -332,15 +336,9 @@ export class RubyExtractor {
     generatedBy: string
   ): NewEntity {
     // Build fully qualified name using context stack
-    let qualifiedName: string;
-    if (this.contextStack.length === 0) {
-      // Top-level (unlikely but possible)
-      qualifiedName = methodName;
-    } else {
-      // Method inside class/module
-      const contextPath = this.contextStack.join('::');
-      qualifiedName = `${contextPath}#${methodName}`;
-    }
+    const qualifiedName = this.hasContext
+      ? `${this.contextPath}#${methodName}`
+      : methodName;
 
     const metadata: Record<string, unknown> = {
       generatedBy,
@@ -348,9 +346,8 @@ export class RubyExtractor {
       methodType,
     };
 
-    // Add context if present
-    if (this.contextStack.length > 0) {
-      metadata['context'] = this.contextStack.join('::');
+    if (this.hasContext) {
+      metadata['context'] = this.contextPath;
     }
 
     return {
