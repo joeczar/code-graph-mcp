@@ -121,11 +121,14 @@ export class FileProcessor {
     // Step 2: Calculate hash from parsed source code
     const fileHash = createHash('sha256').update(sourceCode).digest('hex');
 
-    // Step 3: Extract entities and relationships
+    // Step 3: Calculate total lines in file
+    const totalLines = sourceCode.split('\n').length;
+
+    // Step 4: Extract entities and relationships
     const entities = this.extractEntities(tree.rootNode, filePath, language);
     const relationships = this.extractRelationships(tree.rootNode, language);
 
-    // Step 4: Store in database
+    // Step 5: Store in database
     const entityStore = createEntityStore(db);
     const relationshipStore = createRelationshipStore(db);
 
@@ -142,7 +145,20 @@ export class FileProcessor {
     try {
       // Wrap database operations in a transaction for atomicity
       const transaction = db.transaction(() => {
-        // Store entities
+        // Create File entity first
+        const fileEntity: NewEntity = {
+          type: 'file',
+          name: filePath,
+          filePath,
+          startLine: 1,
+          endLine: totalLines,
+          language,
+          metadata: { contentHash: fileHash },
+        };
+        const storedFileEntity = entityStore.create(fileEntity);
+        storedEntities.push(storedFileEntity);
+
+        // Store code entities
         for (const entity of entities) {
           const stored = entityStore.create(entity);
           storedEntities.push(stored);
@@ -160,7 +176,7 @@ export class FileProcessor {
           );
         }
 
-        // Store relationships (resolve names to IDs)
+        // Store code relationships (resolve names to IDs)
         for (const rel of relationships) {
           const sourceId = entityNameToId.get(rel.sourceName);
           const targetId = entityNameToId.get(rel.targetName);
@@ -177,6 +193,17 @@ export class FileProcessor {
             ...(rel.metadata && { metadata: rel.metadata }),
           });
           storedRelationships.push(stored);
+        }
+
+        // Create contains relationships from File to all code entities
+        // storedEntities[0] is the file entity, the rest are code entities
+        for (const codeEntity of storedEntities.slice(1)) {
+          const containsRel = relationshipStore.create({
+            sourceId: storedFileEntity.id,
+            targetId: codeEntity.id,
+            type: 'contains',
+          });
+          storedRelationships.push(containsRel);
         }
       });
 
