@@ -41,6 +41,11 @@ export class RubyExtractor {
         if (entity) entities.push(entity);
         break;
       }
+      case 'assignment': {
+        const entity = this.extractConstant(node);
+        if (entity) entities.push(entity);
+        break;
+      }
       case 'class': {
         const entity = this.extractClass(node);
         if (entity) {
@@ -182,6 +187,48 @@ export class RubyExtractor {
       startLine: node.startPosition.row + 1,
       endLine: node.endPosition.row + 1,
       language: 'ruby',
+    };
+  }
+
+  /**
+   * Extract a constant entity from an assignment node.
+   * Only processes assignments where the left side is a constant (UPPERCASE).
+   */
+  private extractConstant(node: Node): NewEntity | null {
+    const leftNode = node.childForFieldName('left');
+    if (leftNode?.type !== 'constant') return null;
+
+    const constantName = leftNode.text;
+
+    // Build qualified name using context stack
+    let qualifiedName: string;
+    if (this.contextStack.length === 0) {
+      // Top-level constant
+      qualifiedName = constantName;
+    } else {
+      // Constant inside class/module
+      const contextPath = this.contextStack.join('::');
+      qualifiedName = `${contextPath}::${constantName}`;
+    }
+
+    const metadata: Record<string, unknown> = {
+      kind: 'constant',
+      constantName,
+    };
+
+    // Add context if present
+    if (this.contextStack.length > 0) {
+      metadata['context'] = this.contextStack.join('::');
+    }
+
+    return {
+      type: 'variable',
+      name: qualifiedName,
+      filePath: this.filePath,
+      startLine: node.startPosition.row + 1,
+      endLine: node.endPosition.row + 1,
+      language: 'ruby',
+      metadata,
     };
   }
 
