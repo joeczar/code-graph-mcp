@@ -19,6 +19,7 @@ const RAILS_ASSOCIATION_METHODS = new Set([
   'belongs_to',
   'has_and_belongs_to_many',
 ]);
+const PLURAL_ASSOCIATIONS = new Set(['has_many', 'has_and_belongs_to_many']);
 
 export class RubyRelationshipExtractor {
   /**
@@ -309,24 +310,10 @@ export class RubyRelationshipExtractor {
     associationName: string,
     associationType: string
   ): string {
-    if (associationType === 'has_many' || associationType === 'has_and_belongs_to_many') {
-      // Basic singularization: remove trailing 's'
-      const singular = associationName.endsWith('s')
-        ? associationName.slice(0, -1)
-        : associationName;
-      return this.capitalize(singular);
-    }
-
-    // belongs_to and has_one: just capitalize
-    return this.capitalize(associationName);
-  }
-
-  /**
-   * Capitalize first letter of a string.
-   */
-  private capitalize(str: string): string {
-    if (str.length === 0) return str;
-    return str.charAt(0).toUpperCase() + str.slice(1);
+    const name = PLURAL_ASSOCIATIONS.has(associationType) && associationName.endsWith('s')
+      ? associationName.slice(0, -1)
+      : associationName;
+    return name.charAt(0).toUpperCase() + name.slice(1);
   }
 
   /**
@@ -334,23 +321,17 @@ export class RubyRelationshipExtractor {
    * Looks for pattern: class_name: "ModelName"
    */
   private extractClassNameOption(argumentsNode: SyntaxNode): string | null {
-    // Look for pair nodes (key-value pairs in hash arguments)
-    for (const child of argumentsNode.children) {
-      if (child.type === 'pair') {
-        const keyNode = child.childForFieldName('key');
-        const valueNode = child.childForFieldName('value');
+    const classNamePair = argumentsNode.children.find((child) => {
+      if (child.type !== 'pair') return false;
+      const keyText = child.childForFieldName('key')?.text;
+      return keyText === 'class_name' || keyText === ':class_name';
+    });
 
-        if (!keyNode || !valueNode) continue;
+    if (!classNamePair) return null;
 
-        // Check if key is 'class_name' (as symbol or identifier)
-        const keyText = keyNode.text;
-        if (keyText === 'class_name' || keyText === ':class_name') {
-          // Extract string value
-          if (valueNode.type === 'string') {
-            return valueNode.text.slice(1, -1); // Remove quotes
-          }
-        }
-      }
+    const valueNode = classNamePair.childForFieldName('value');
+    if (valueNode?.type === 'string') {
+      return valueNode.text.slice(1, -1); // Remove quotes
     }
 
     return null;
