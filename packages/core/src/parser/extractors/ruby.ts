@@ -196,7 +196,7 @@ export class RubyExtractor {
    */
   private extractConstant(node: Node): NewEntity | null {
     const leftNode = node.childForFieldName('left');
-    if (!leftNode?.type || leftNode.type !== 'constant') return null;
+    if (leftNode?.type !== 'constant') return null;
 
     const constantName = leftNode.text;
 
