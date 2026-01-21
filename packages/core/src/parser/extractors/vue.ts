@@ -88,12 +88,12 @@ export class VueExtractor {
       return [];
     }
 
-    // tree-sitter-typescript can parse both JS and TS
-    const scriptElement = getScriptElement(rootNode);
-
-    // Parse script content with TypeScript parser
+    // Parse script content with TypeScript parser (handles both JS and TS)
     const parseResult = await this.parser.parse(scriptContent, 'typescript');
     if (!parseResult.success) {
+      console.warn(
+        `[VueExtractor] Failed to parse script in ${this.filePath}: ${parseResult.error.message}`
+      );
       return [];
     }
 
@@ -102,16 +102,24 @@ export class VueExtractor {
       filePath: this.filePath,
     });
 
-    const entities = tsExtractor.extract(parseResult.result.tree.rootNode);
+    try {
+      const entities = tsExtractor.extract(parseResult.result.tree.rootNode);
 
-    // Adjust line numbers to account for script tag offset
-    const scriptStartLine = scriptElement?.startPosition.row ?? 0;
-    return entities.map((entity) => ({
-      ...entity,
-      language: 'vue', // Mark as Vue language
-      startLine: entity.startLine + scriptStartLine,
-      endLine: entity.endLine + scriptStartLine,
-    }));
+      // Adjust line numbers to account for script tag offset
+      const scriptStartLine = getScriptElement(rootNode)?.startPosition.row ?? 0;
+      return entities.map((entity) => ({
+        ...entity,
+        language: 'vue', // Mark as Vue language
+        startLine: entity.startLine + scriptStartLine,
+        endLine: entity.endLine + scriptStartLine,
+      }));
+    } catch (error) {
+      console.warn(
+        `[VueExtractor] TypeScript extraction failed in ${this.filePath}:`,
+        error
+      );
+      return [];
+    }
   }
 
   /**
@@ -151,6 +159,8 @@ export class VueExtractor {
 
   /**
    * Extract props from Options API (simple string extraction).
+   * Note: Only handles flat props objects. Nested prop definitions (e.g., with
+   * type/default objects) may not be fully captured.
    */
   private extractPropsFromOptions(scriptContent: string): string[] | undefined {
     return this.extractOptionsArray(

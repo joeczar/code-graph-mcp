@@ -75,33 +75,38 @@ export class VueRelationshipExtractor {
       return [];
     }
 
-    // tree-sitter-typescript can parse both JS and TS
-    const scriptElement = getScriptElement(rootNode);
-
-    // Parse script content with TypeScript parser
+    // Parse script content with TypeScript parser (handles both JS and TS)
     const parseResult = await this.parser.parse(scriptContent, 'typescript');
     if (!parseResult.success) {
+      console.warn(
+        `[VueRelationshipExtractor] Failed to parse script: ${parseResult.error.message}`
+      );
       return [];
     }
 
-    // Extract relationships using TypeScriptRelationshipExtractor
-    const tsExtractor = new TypeScriptRelationshipExtractor();
-    const relationships = tsExtractor.extract(parseResult.result);
+    try {
+      // Extract relationships using TypeScriptRelationshipExtractor
+      const tsExtractor = new TypeScriptRelationshipExtractor();
+      const relationships = tsExtractor.extract(parseResult.result);
 
-    // Adjust line numbers for script offset
-    const scriptStartLine = scriptElement?.startPosition.row ?? 0;
-    return relationships.map((rel) => {
-      if (rel.sourceLocation) {
-        return {
-          ...rel,
-          sourceLocation: {
-            line: rel.sourceLocation.line + scriptStartLine,
-            column: rel.sourceLocation.column,
-          },
-        };
-      }
-      return rel;
-    });
+      // Adjust line numbers for script offset
+      const scriptStartLine = getScriptElement(rootNode)?.startPosition.row ?? 0;
+      return relationships.map((rel) => {
+        if (rel.sourceLocation) {
+          return {
+            ...rel,
+            sourceLocation: {
+              line: rel.sourceLocation.line + scriptStartLine,
+              column: rel.sourceLocation.column,
+            },
+          };
+        }
+        return rel;
+      });
+    } catch (error) {
+      console.warn('[VueRelationshipExtractor] Extraction failed:', error);
+      return [];
+    }
   }
 
   /**
