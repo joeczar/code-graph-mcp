@@ -14,6 +14,17 @@ import { FileProcessor, getDatabase, initializeSchema } from '@code-graph/core';
 import { type ToolDefinition, createSuccessResponse, createErrorResponse } from './types.js';
 import { ResourceNotFoundError, ToolExecutionError } from './errors.js';
 
+/**
+ * Count occurrences of each type in an array of objects with a `type` property
+ */
+function countByType(items: { type: string }[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    counts.set(item.type, (counts.get(item.type) ?? 0) + 1);
+  }
+  return counts;
+}
+
 const parseFileInputSchema = z.object({
   path: z.string().describe('Path to file to parse (absolute or relative to working directory)'),
 });
@@ -39,31 +50,84 @@ export const parseFileTool: ToolDefinition<typeof parseFileInputSchema> = {
       ? inputPath
       : path.resolve(process.cwd(), inputPath);
 
-    // Check if file exists
-    if (!fs.existsSync(resolvedPath)) {
+    // Check file exists and is a regular file (not a directory)
+    // Use a single stat call to avoid race conditions between exists check and stat
+    let stats: fs.Stats;
+    try {
+      stats = fs.statSync(resolvedPath);
+    } catch (err) {
+      // Handle specific filesystem errors with appropriate messages
+      if (err instanceof Error && 'code' in err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === 'ENOENT') {
+          return createErrorResponse(
+            new ResourceNotFoundError(`File not found: ${resolvedPath}`, { path: resolvedPath })
+          );
+        }
+        if (code === 'EACCES') {
+          return createErrorResponse(
+            new ToolExecutionError(`Permission denied: ${resolvedPath}`, {
+              path: resolvedPath,
+              code,
+            })
+          );
+        }
+        // Other filesystem errors (ELOOP, ENAMETOOLONG, etc.)
+        return createErrorResponse(
+          new ToolExecutionError(`Cannot access file: ${resolvedPath}`, {
+            path: resolvedPath,
+            code,
+            error: err.message,
+          })
+        );
+      }
+      // Unexpected error type
       return createErrorResponse(
-        new ResourceNotFoundError(`File not found: ${resolvedPath}`, { path: resolvedPath })
+        new ToolExecutionError(`Failed to check file: ${resolvedPath}`, {
+          path: resolvedPath,
+          error: err instanceof Error ? err.message : String(err),
+        })
       );
     }
 
-    // Check if it's a file (not a directory)
-    const stats = fs.statSync(resolvedPath);
     if (!stats.isFile()) {
       return createErrorResponse(
         new ToolExecutionError(`Path is not a file: ${resolvedPath}`, { path: resolvedPath })
       );
     }
 
-    // Ensure database is initialized
-    const db = getDatabase();
-    initializeSchema(db);
+    // Initialize database and process file
+    // Wrapped in try-catch to handle database and parser initialization errors
+    let db;
+    try {
+      db = getDatabase();
+      initializeSchema(db);
+    } catch (err) {
+      return createErrorResponse(
+        new ToolExecutionError(`Database initialization failed`, {
+          path: resolvedPath,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      );
+    }
 
     // Process the file
-    const processor = new FileProcessor();
-    const result = await processor.processFile({
-      filePath: resolvedPath,
-      db,
-    });
+    let result;
+    try {
+      const processor = new FileProcessor();
+      result = await processor.processFile({
+        filePath: resolvedPath,
+        db,
+      });
+    } catch (err) {
+      // Catch unexpected errors from parser initialization or processing
+      return createErrorResponse(
+        new ToolExecutionError(`Unexpected error during file processing`, {
+          path: resolvedPath,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      );
+    }
 
     if (!result.success) {
       return createErrorResponse(
@@ -87,13 +151,7 @@ export const parseFileTool: ToolDefinition<typeof parseFileInputSchema> = {
     if (result.entities.length === 0) {
       lines.push('  (no entities extracted)');
     } else {
-      // Group entities by type
-      const byType = new Map<string, number>();
-      for (const entity of result.entities) {
-        const count = byType.get(entity.type) ?? 0;
-        byType.set(entity.type, count + 1);
-      }
-      for (const [type, count] of byType) {
+      for (const [type, count] of countByType(result.entities)) {
         lines.push(`  ${type}: ${String(count)}`);
       }
     }
@@ -104,13 +162,7 @@ export const parseFileTool: ToolDefinition<typeof parseFileInputSchema> = {
     if (result.relationships.length === 0) {
       lines.push('  (no relationships extracted)');
     } else {
-      // Group relationships by type
-      const byType = new Map<string, number>();
-      for (const rel of result.relationships) {
-        const count = byType.get(rel.type) ?? 0;
-        byType.set(rel.type, count + 1);
-      }
-      for (const [type, count] of byType) {
+      for (const [type, count] of countByType(result.relationships)) {
         lines.push(`  ${type}: ${String(count)}`);
       }
     }
