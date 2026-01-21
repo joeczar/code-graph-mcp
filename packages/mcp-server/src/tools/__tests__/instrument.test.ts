@@ -7,6 +7,37 @@ import type { MetricsStore } from '../../../../core/src/db/metrics.js';
 import { ToolExecutionError } from '../errors.js';
 import { z } from 'zod';
 
+function createMockMetricsStore(overrides: Partial<MetricsStore> = {}): MetricsStore {
+  return {
+    insertToolCall: vi.fn(() => ({
+      id: '123',
+      projectId: 'test-project',
+      toolName: 'test-tool',
+      timestamp: new Date().toISOString(),
+      latencyMs: 100,
+      success: true,
+      errorType: null,
+      inputSummary: null,
+      outputSize: null,
+    })),
+    queryToolCalls: vi.fn(),
+    insertParseStats: vi.fn(),
+    queryParseStats: vi.fn(),
+    getToolCallSummary: vi.fn(() => []),
+    getParseStatsSummary: vi.fn(() => ({
+      totalParseRuns: 0,
+      totalFilesProcessed: 0,
+      totalFilesSuccess: 0,
+      totalFilesError: 0,
+      totalEntitiesExtracted: 0,
+      totalRelationshipsExtracted: 0,
+      avgDurationMs: 0,
+    })),
+    getToolUsageRanking: vi.fn(() => []),
+    ...overrides,
+  };
+}
+
 describe('instrumentHandler', () => {
   describe('successful execution', () => {
     it('should call handler and record success metrics', async () => {
@@ -14,22 +45,7 @@ describe('instrumentHandler', () => {
         content: [{ type: 'text' as const, text: 'success' }],
       }));
 
-      const metricsStore: MetricsStore = {
-        insertToolCall: vi.fn(() => ({
-          id: '123',
-          projectId: 'test-project',
-          toolName: 'test-tool',
-          timestamp: new Date().toISOString(),
-          latencyMs: 100,
-          success: true,
-          errorType: null,
-          inputSummary: null,
-          outputSize: null,
-        })),
-        queryToolCalls: vi.fn(),
-        insertParseStats: vi.fn(),
-        queryParseStats: vi.fn(),
-      };
+      const metricsStore = createMockMetricsStore();
 
       const instrumented = instrumentHandler('test-tool', handler, metricsStore, 'test-project');
       const result = await instrumented({ message: 'hello' });
@@ -53,22 +69,7 @@ describe('instrumentHandler', () => {
         return { content: [{ type: 'text' as const, text: 'done' }] };
       });
 
-      const metricsStore: MetricsStore = {
-        insertToolCall: vi.fn(() => ({
-          id: '123',
-          projectId: 'test-project',
-          toolName: 'slow-tool',
-          timestamp: new Date().toISOString(),
-          latencyMs: 50,
-          success: true,
-          errorType: null,
-          inputSummary: null,
-          outputSize: null,
-        })),
-        queryToolCalls: vi.fn(),
-        insertParseStats: vi.fn(),
-        queryParseStats: vi.fn(),
-      };
+      const metricsStore = createMockMetricsStore();
 
       const instrumented = instrumentHandler('slow-tool', handler, metricsStore, 'test-project');
       await instrumented({});
@@ -95,22 +96,7 @@ describe('instrumentHandler', () => {
         })
       );
 
-      const metricsStore: MetricsStore = {
-        insertToolCall: vi.fn(() => ({
-          id: '123',
-          projectId: 'test-project',
-          toolName: 'test-tool',
-          timestamp: new Date().toISOString(),
-          latencyMs: 1,
-          success: true,
-          errorType: null,
-          inputSummary: null,
-          outputSize: null,
-        })),
-        queryToolCalls: vi.fn(),
-        insertParseStats: vi.fn(),
-        queryParseStats: vi.fn(),
-      };
+      const metricsStore = createMockMetricsStore();
 
       const instrumented = instrumentHandler('test-tool', handler, metricsStore, 'test-project');
       await instrumented({ apiKey: 'secret123', data: 'public' });
@@ -130,22 +116,7 @@ describe('instrumentHandler', () => {
         ],
       }));
 
-      const metricsStore: MetricsStore = {
-        insertToolCall: vi.fn(() => ({
-          id: '123',
-          projectId: 'test-project',
-          toolName: 'test-tool',
-          timestamp: new Date().toISOString(),
-          latencyMs: 1,
-          success: true,
-          errorType: null,
-          inputSummary: null,
-          outputSize: null,
-        })),
-        queryToolCalls: vi.fn(),
-        insertParseStats: vi.fn(),
-        queryParseStats: vi.fn(),
-      };
+      const metricsStore = createMockMetricsStore();
 
       const instrumented = instrumentHandler('test-tool', handler, metricsStore, 'test-project');
       await instrumented({});
@@ -163,22 +134,7 @@ describe('instrumentHandler', () => {
         throw error;
       });
 
-      const metricsStore: MetricsStore = {
-        insertToolCall: vi.fn(() => ({
-          id: '123',
-          projectId: 'test-project',
-          toolName: 'failing-tool',
-          timestamp: new Date().toISOString(),
-          latencyMs: 1,
-          success: false,
-          errorType: 'ExecutionError',
-          inputSummary: null,
-          outputSize: null,
-        })),
-        queryToolCalls: vi.fn(),
-        insertParseStats: vi.fn(),
-        queryParseStats: vi.fn(),
-      };
+      const metricsStore = createMockMetricsStore();
 
       const instrumented = instrumentHandler('failing-tool', handler, metricsStore, 'test-project');
 
@@ -201,22 +157,7 @@ describe('instrumentHandler', () => {
         throw error;
       });
 
-      const metricsStore: MetricsStore = {
-        insertToolCall: vi.fn(() => ({
-          id: '123',
-          projectId: 'test-project',
-          toolName: 'test-tool',
-          timestamp: new Date().toISOString(),
-          latencyMs: 1,
-          success: false,
-          errorType: 'ValidationError',
-          inputSummary: null,
-          outputSize: null,
-        })),
-        queryToolCalls: vi.fn(),
-        insertParseStats: vi.fn(),
-        queryParseStats: vi.fn(),
-      };
+      const metricsStore = createMockMetricsStore();
 
       const instrumented = instrumentHandler('test-tool', handler, metricsStore, 'test-project');
 
@@ -232,14 +173,11 @@ describe('instrumentHandler', () => {
         content: [{ type: 'text' as const, text: 'ok' }],
       }));
 
-      const metricsStore: MetricsStore = {
+      const metricsStore = createMockMetricsStore({
         insertToolCall: vi.fn(() => {
           throw new Error('Database connection failed');
         }),
-        queryToolCalls: vi.fn(),
-        insertParseStats: vi.fn(),
-        queryParseStats: vi.fn(),
-      };
+      });
 
       const instrumented = instrumentHandler('test-tool', handler, metricsStore, 'test-project');
 
@@ -255,22 +193,7 @@ describe('instrumentHandler', () => {
         content: [],
       }));
 
-      const metricsStore: MetricsStore = {
-        insertToolCall: vi.fn(() => ({
-          id: '123',
-          projectId: 'test-project',
-          toolName: 'test-tool',
-          timestamp: new Date().toISOString(),
-          latencyMs: 1,
-          success: true,
-          errorType: null,
-          inputSummary: null,
-          outputSize: null,
-        })),
-        queryToolCalls: vi.fn(),
-        insertParseStats: vi.fn(),
-        queryParseStats: vi.fn(),
-      };
+      const metricsStore = createMockMetricsStore();
 
       const instrumented = instrumentHandler('test-tool', handler, metricsStore, 'test-project');
       const result = await instrumented({});
@@ -292,22 +215,7 @@ describe('instrumentHandler', () => {
         content: [{ type: 'text' as const, text: 'processed' }],
       }));
 
-      const metricsStore: MetricsStore = {
-        insertToolCall: vi.fn(() => ({
-          id: '123',
-          projectId: 'test-project',
-          toolName: 'test-tool',
-          timestamp: new Date().toISOString(),
-          latencyMs: 1,
-          success: true,
-          errorType: null,
-          inputSummary: null,
-          outputSize: null,
-        })),
-        queryToolCalls: vi.fn(),
-        insertParseStats: vi.fn(),
-        queryParseStats: vi.fn(),
-      };
+      const metricsStore = createMockMetricsStore();
 
       const instrumented = instrumentHandler('test-tool', handler, metricsStore, 'test-project');
       await instrumented({ data: 'x'.repeat(10000) });

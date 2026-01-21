@@ -62,6 +62,9 @@ export type {
   ToolCall,
   ParseStats,
   MetricsStore,
+  ToolCallSummary,
+  ParseStatsSummary,
+  ToolUsageRanking,
 } from './db/index.js';
 
 // Graph exports
