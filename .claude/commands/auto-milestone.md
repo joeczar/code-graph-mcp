@@ -18,6 +18,55 @@ Analyze and optionally execute a milestone's issues in dependency order.
 | Issue numbers | Analyze specific issues (space-separated) |
 | `--execute` | Actually run /auto-issue for each (default: analyze only) |
 | `--parallel N` | Max concurrent issues (default: 1) |
+| `--continue` | Resume from interruption (reads state from checkpoint DB) |
+
+---
+
+## State Tracking
+
+The orchestrator uses the checkpoint system (`.claude/execution-state.db`) to track milestone progress. Each issue gets its own workflow entry.
+
+### Checkpoint Commands
+
+```bash
+# Check existing workflow for an issue
+pnpm checkpoint workflow find {issue_number}
+
+# Get full workflow state
+pnpm checkpoint workflow get "{workflow_id}"
+
+# Update phase after completing a step
+pnpm checkpoint workflow set-phase "{workflow_id}" {phase}
+
+# Track PR creation
+pnpm checkpoint workflow set-pr "{workflow_id}" {pr_number}
+
+# Track merge completion
+pnpm checkpoint workflow set-merged "{workflow_id}" {merge_sha}
+```
+
+### Workflow Phases
+
+| Phase | Meaning |
+|-------|---------|
+| `setup` | Branch created, issue assigned |
+| `research` | Plan created |
+| `implement` | Code written, commits made |
+| `review` | Review agents run |
+| `finalize` | PR created |
+| `merge` | Merge in progress (/auto-merge running) |
+
+### PR States
+
+| State | Meaning |
+|-------|---------|
+| `open` | PR created, awaiting merge |
+| `merged` | PR successfully merged |
+| `closed` | PR closed without merging |
+
+Each workflow tracks: issue number, branch, current phase, PR number, PR state, and all commits made.
+
+See `.claude/shared/checkpoint-patterns.md` for detailed patterns.
 
 ## Workflow
 
@@ -88,9 +137,7 @@ Proceed? [y/N]
 
 ### Wave Execution Pattern
 
-**CRITICAL: Each wave must be fully merged before starting the next wave.**
-
-This prevents rebase conflicts when dependent issues build on earlier work.
+Each wave must be fully merged before starting the next wave. This prevents rebase conflicts when dependent issues build on earlier work.
 
 ```
 WRONG (causes conflicts):
@@ -102,6 +149,34 @@ CORRECT:
   Wave 1: /auto-issue #12 → PR #30 created → /auto-merge #30 → MERGED
   Wave 2: /auto-issue #13 → PR #31 created (base: main WITH #12) → /auto-merge #31 → MERGED
 ```
+
+---
+
+### Sequential Execution (parallel=1)
+
+When `--parallel 1` is set, process ONE issue at a time through the COMPLETE cycle before starting the next:
+
+```
+For each issue in wave order:
+  1. Check: pnpm checkpoint workflow find {issue}
+     - If pr_state=merged → skip issue (already done)
+     - If pr_state=open → skip to step 4 (/auto-merge)
+     - Otherwise continue to step 2
+  2. /auto-issue {issue} → creates PR, sets phase=finalize, pr_state=open
+  3. Get PR number from workflow: pnpm checkpoint workflow find {issue}
+  4. /auto-merge {pr_number} → merges PR, sets pr_state=merged
+  5. Verify: pnpm checkpoint workflow find {issue} shows pr_state=merged
+  6. git checkout main && git pull
+  7. Move to next issue
+```
+
+Do not create multiple PRs before merging. Each PR must be merged before starting the next issue. This ensures:
+- Each new branch starts from up-to-date main
+- No parallel rebase conflicts
+- Clean linear history
+- Full checkpoint trail for resume
+
+---
 
 ### For Each Wave:
 
@@ -200,6 +275,60 @@ Final summary:
 | Circular dependency | Report cycle, ask for resolution |
 | /auto-issue failure | Log error, mark as failed, continue |
 | All issues blocked | Report deadlock, exit |
+
+---
+
+## Resume Handling (--continue)
+
+When `--continue` is passed:
+
+### Step 1: Query Checkpoint State
+
+For each issue in the milestone, check its workflow state:
+
+```bash
+pnpm checkpoint workflow find {issue_number}
+```
+
+### Step 2: Determine Resume Point
+
+| Workflow State | Resume Action |
+|----------------|---------------|
+| No workflow found | Run /auto-issue (fresh start) |
+| phase in (setup, research, implement, review) | Run /auto-issue (will detect existing branch) |
+| phase = finalize, pr_state = open | Run /auto-merge {pr_number} |
+| phase = merge, pr_state = open | Run /auto-merge {pr_number} (retry) |
+| pr_state = merged | Skip issue (already complete) |
+| status = failed | Report failure, ask whether to retry or skip |
+
+### Step 3: Resume Execution
+
+```bash
+# 1. Ensure clean state
+git checkout main && git pull
+
+# 2. For each issue, check checkpoint
+pnpm checkpoint workflow find {issue}
+
+# 3. Based on state, either:
+#    - Skip (already merged)
+#    - Run /auto-merge (PR exists)
+#    - Run /auto-issue (no PR yet)
+```
+
+### Example Resume Flow
+
+```bash
+# Query each issue's workflow
+pnpm checkpoint workflow find 90  → pr_state: merged    → SKIP
+pnpm checkpoint workflow find 92  → pr_state: open, PR #105 → /auto-merge 105
+pnpm checkpoint workflow find 93  → no workflow         → /auto-issue 93
+
+# Resume executes:
+/auto-merge 105        → merges, sets pr_state=merged
+/auto-issue 93         → creates PR #106, sets phase=finalize
+/auto-merge 106        → merges, sets pr_state=merged
+```
 
 ---
 

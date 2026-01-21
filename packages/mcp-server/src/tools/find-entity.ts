@@ -8,10 +8,9 @@
  */
 
 import { z } from 'zod';
-import { getDatabase } from '@code-graph/core';
-import { createEntityStore } from '@code-graph/core';
 import type { Entity, EntityType } from '@code-graph/core';
 import { type ToolDefinition, createSuccessResponse } from './types.js';
+import { getStores, formatEntityList } from './utils.js';
 
 const findEntityInputSchema = z.object({
   namePattern: z.string().optional().describe('Name pattern to search for'),
@@ -29,11 +28,6 @@ const findEntityInputSchema = z.object({
 
 /**
  * Matches entity name against pattern using specified mode
- *
- * @param entityName - Name of the entity
- * @param pattern - Pattern to match against
- * @param mode - Match mode (exact, prefix, contains)
- * @returns True if the entity name matches the pattern
  */
 function matchesPattern(
   entityName: string,
@@ -57,7 +51,6 @@ function matchesPattern(
  * Find entity tool definition
  *
  * Searches for entities based on name pattern, type, and file path.
- * Results are formatted with entity details including location.
  */
 export const findEntityTool: ToolDefinition<typeof findEntityInputSchema> = {
   metadata: {
@@ -68,8 +61,7 @@ export const findEntityTool: ToolDefinition<typeof findEntityInputSchema> = {
   },
 
   handler: (input) => {
-    const db = getDatabase();
-    const entityStore = createEntityStore(db);
+    const { entityStore } = getStores();
 
     // Start with all entities or filter by file/type
     let entities: Entity[] = [];
@@ -79,7 +71,7 @@ export const findEntityTool: ToolDefinition<typeof findEntityInputSchema> = {
     } else if (input.type) {
       entities = entityStore.findByType(input.type);
     } else {
-      // Need to get all entities - do this by getting each type
+      // Get all entities by querying each type
       const types: EntityType[] = [
         'function',
         'class',
@@ -105,12 +97,7 @@ export const findEntityTool: ToolDefinition<typeof findEntityInputSchema> = {
       );
     }
 
-    // Format output
-    const lines: string[] = [];
-
-    lines.push('=== Entity Search Results ===');
-
-    // Build query description
+    // Build query description for header
     const queryParts: string[] = [];
     if (input.namePattern) {
       queryParts.push(`name ${input.matchMode} "${input.namePattern}"`);
@@ -122,32 +109,15 @@ export const findEntityTool: ToolDefinition<typeof findEntityInputSchema> = {
       queryParts.push(`file: ${input.filePath}`);
     }
 
-    if (queryParts.length > 0) {
-      lines.push(`Query: ${queryParts.join(', ')}`);
-    }
-    lines.push('');
+    const queryStr = queryParts.length > 0 ? `Query: ${queryParts.join(', ')}\n\n` : '';
 
-    if (entities.length === 0) {
-      lines.push('No entities found.');
-    } else {
-      lines.push(`Found ${entities.length.toString()} ${entities.length === 1 ? 'entity' : 'entities'}:`);
-      lines.push('');
+    // Format output using shared helper
+    const listOutput = formatEntityList(entities, {
+      title: `Found ${entities.length.toString()} ${entities.length === 1 ? 'entity' : 'entities'}:`,
+      emptyMessage: 'No entities found.',
+      itemLabel: 'entity',
+    });
 
-      for (let i = 0; i < entities.length; i++) {
-        const entity = entities[i];
-        if (!entity) {
-          continue;
-        }
-        lines.push(
-          `${(i + 1).toString()}. ${entity.name} (${entity.type})`
-        );
-        lines.push(
-          `   File: ${entity.filePath}:${entity.startLine.toString()}-${entity.endLine.toString()}`
-        );
-        lines.push('');
-      }
-    }
-
-    return createSuccessResponse(lines.join('\n'));
+    return createSuccessResponse(`=== Entity Search Results ===\n${queryStr}${listOutput}`);
   },
 };

@@ -199,20 +199,54 @@ export class RubyRelationshipExtractor {
 
   /**
    * Get the current context (class, module, or method name).
+   * Returns fully qualified name using Ruby conventions:
+   * - Module::Class for nested structures
+   * - Class#method for instance methods
+   * - Class.method for class methods
    */
   private getCurrentContext(node: SyntaxNode): string | null {
+    const contextParts: string[] = [];
     let current = node.parent;
+    let immediateParent: SyntaxNode | null = null;
+
+    // Walk up the tree collecting all class/module/method names
     while (current) {
       if (
         current.type === 'class' ||
         current.type === 'module' ||
-        current.type === 'method'
+        current.type === 'method' ||
+        current.type === 'singleton_method'
       ) {
         const nameNode = current.childForFieldName('name');
-        return nameNode?.text ?? null;
+        if (nameNode) {
+          contextParts.unshift(nameNode.text);
+          immediateParent ??= current;
+        }
       }
       current = current.parent;
     }
-    return null;
+
+    if (contextParts.length === 0) return null;
+
+    // Build qualified name with appropriate separators
+    if (contextParts.length === 1) {
+      return contextParts[0] ?? null;
+    }
+
+    // Check if the immediate parent is a method
+    if (
+      immediateParent &&
+      (immediateParent.type === 'method' || immediateParent.type === 'singleton_method')
+    ) {
+      // For calls within methods, return the method's fully qualified name
+      const methodName = contextParts.pop();
+      if (!methodName) return null;
+      const contextPath = contextParts.join('::');
+      const separator = immediateParent.type === 'singleton_method' ? '.' : '#';
+      return contextPath ? `${contextPath}${separator}${methodName}` : methodName;
+    }
+
+    // For calls within classes/modules (but not in a method), join with ::
+    return contextParts.join('::');
   }
 }
