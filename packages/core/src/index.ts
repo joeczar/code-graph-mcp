@@ -39,6 +39,7 @@ export {
   createIncrementalUpdater,
   computeFileHash,
   computeFileHashFromPath,
+  createMetricsStore,
 } from './db/index.js';
 export type {
   DatabaseOptions,
@@ -58,6 +59,9 @@ export type {
   FileStore,
   IncrementalUpdater,
   IncrementalUpdateResult,
+  ToolCall,
+  ParseStats,
+  MetricsStore,
 } from './db/index.js';
 
 // Graph exports
