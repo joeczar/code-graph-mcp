@@ -460,6 +460,214 @@ end`;
     });
   });
 
+  describe('attribute accessors', () => {
+    it('extracts attr_reader as getter method', async () => {
+      const code = `
+        class User
+          attr_reader :name
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(1);
+      expect(methods[0]?.name).toBe('User#name');
+      expect(methods[0]?.type).toBe('method');
+      expect(methods[0]?.metadata).toEqual({
+        generatedBy: 'attr_reader',
+        methodName: 'name',
+        methodType: 'getter',
+        context: 'User',
+      });
+    });
+
+    it('extracts attr_writer as setter method', async () => {
+      const code = `
+        class User
+          attr_writer :email
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(1);
+      expect(methods[0]?.name).toBe('User#email=');
+      expect(methods[0]?.type).toBe('method');
+      expect(methods[0]?.metadata).toEqual({
+        generatedBy: 'attr_writer',
+        methodName: 'email=',
+        methodType: 'setter',
+        context: 'User',
+      });
+    });
+
+    it('extracts attr_accessor as both getter and setter', async () => {
+      const code = `
+        class User
+          attr_accessor :age
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(2);
+      expect(methods[0]?.name).toBe('User#age');
+      expect(methods[0]?.metadata).toEqual({
+        generatedBy: 'attr_accessor',
+        methodName: 'age',
+        methodType: 'getter',
+        context: 'User',
+      });
+      expect(methods[1]?.name).toBe('User#age=');
+      expect(methods[1]?.metadata).toEqual({
+        generatedBy: 'attr_accessor',
+        methodName: 'age=',
+        methodType: 'setter',
+        context: 'User',
+      });
+    });
+
+    it('extracts multiple symbols from single attr_reader', async () => {
+      const code = `
+        class Product
+          attr_reader :id, :name, :price
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(3);
+      expect(methods[0]?.name).toBe('Product#id');
+      expect(methods[0]?.metadata?.methodType).toBe('getter');
+      expect(methods[1]?.name).toBe('Product#name');
+      expect(methods[1]?.metadata?.methodType).toBe('getter');
+      expect(methods[2]?.name).toBe('Product#price');
+      expect(methods[2]?.metadata?.methodType).toBe('getter');
+    });
+
+    it('extracts multiple symbols from single attr_writer', async () => {
+      const code = `
+        class Product
+          attr_writer :a, :b, :c
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(3);
+      expect(methods[0]?.name).toBe('Product#a=');
+      expect(methods[0]?.metadata?.methodType).toBe('setter');
+      expect(methods[1]?.name).toBe('Product#b=');
+      expect(methods[1]?.metadata?.methodType).toBe('setter');
+      expect(methods[2]?.name).toBe('Product#c=');
+      expect(methods[2]?.metadata?.methodType).toBe('setter');
+    });
+
+    it('extracts multiple symbols from single attr_accessor', async () => {
+      const code = `
+        class Product
+          attr_accessor :x, :y
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(4); // 2 getters + 2 setters
+      expect(methods[0]?.name).toBe('Product#x');
+      expect(methods[0]?.metadata?.methodType).toBe('getter');
+      expect(methods[1]?.name).toBe('Product#x=');
+      expect(methods[1]?.metadata?.methodType).toBe('setter');
+      expect(methods[2]?.name).toBe('Product#y');
+      expect(methods[2]?.metadata?.methodType).toBe('getter');
+      expect(methods[3]?.name).toBe('Product#y=');
+      expect(methods[3]?.metadata?.methodType).toBe('setter');
+    });
+
+    it('builds correct qualified names inside class context', async () => {
+      const code = `
+        class User
+          attr_reader :username
+          attr_writer :password
+          attr_accessor :email
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(4);
+      const methodNames = methods.map((m) => m.name);
+      expect(methodNames).toContain('User#username');
+      expect(methodNames).toContain('User#password=');
+      expect(methodNames).toContain('User#email');
+      expect(methodNames).toContain('User#email=');
+    });
+
+    it('extracts attribute accessors in nested module/class context', async () => {
+      const code = `
+        module API
+          class Response
+            attr_accessor :status
+          end
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(2);
+      expect(methods[0]?.name).toBe('API::Response#status');
+      expect(methods[0]?.metadata).toEqual({
+        generatedBy: 'attr_accessor',
+        methodName: 'status',
+        methodType: 'getter',
+        context: 'API::Response',
+      });
+      expect(methods[1]?.name).toBe('API::Response#status=');
+      expect(methods[1]?.metadata).toEqual({
+        generatedBy: 'attr_accessor',
+        methodName: 'status=',
+        methodType: 'setter',
+        context: 'API::Response',
+      });
+    });
+
+    it('extracts mixed regular methods and attribute accessors', async () => {
+      const code = `
+        class Book
+          attr_reader :title
+          attr_accessor :author
+
+          def initialize(title, author)
+            @title = title
+            @author = author
+          end
+
+          def description
+            "#{@title} by #{@author}"
+          end
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const methods = entities.filter((e) => e.type === 'method');
+
+      expect(methods).toHaveLength(5);
+      const methodNames = methods.map((m) => m.name);
+      expect(methodNames).toContain('Book#title'); // attr_reader
+      expect(methodNames).toContain('Book#author'); // attr_accessor getter
+      expect(methodNames).toContain('Book#author='); // attr_accessor setter
+      expect(methodNames).toContain('Book#initialize'); // regular method
+      expect(methodNames).toContain('Book#description'); // regular method
+    });
+  });
+
   describe('constants', () => {
     it('extracts top-level constants with string values', async () => {
       const code = `

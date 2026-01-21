@@ -46,6 +46,22 @@ export class RubyExtractor {
         if (entity) entities.push(entity);
         break;
       }
+      case 'call': {
+        // Check if this is an attr_accessor/attr_reader/attr_writer call
+        const methodNode = node.childForFieldName('method');
+        if (methodNode?.type === 'identifier') {
+          const methodName = methodNode.text;
+          if (
+            methodName === 'attr_reader' ||
+            methodName === 'attr_writer' ||
+            methodName === 'attr_accessor'
+          ) {
+            const attrMethods = this.extractAttrAccessorMethods(node, methodName);
+            entities.push(...attrMethods);
+          }
+        }
+        break;
+      }
       case 'class': {
         const entity = this.extractClass(node);
         if (entity) {
@@ -255,5 +271,96 @@ export class RubyExtractor {
     return paramsNode.children
       .filter((child) => validParamTypes.includes(child.type))
       .map((child) => child.text);
+  }
+
+  /**
+   * Extract method entities from attr_reader, attr_writer, or attr_accessor calls.
+   */
+  private extractAttrAccessorMethods(
+    node: Node,
+    attrType: string
+  ): NewEntity[] {
+    const entities: NewEntity[] = [];
+
+    // Get the argument_list node
+    const argsNode = node.childForFieldName('arguments');
+    if (!argsNode) return entities;
+
+    // Extract all simple_symbol nodes from argument_list
+    const symbols = argsNode.children.filter(
+      (child) => child.type === 'simple_symbol'
+    );
+
+    for (const symbolNode of symbols) {
+      // Symbol text is ":name", strip the colon
+      const symbolText = symbolNode.text;
+      const attributeName = symbolText.startsWith(':')
+        ? symbolText.slice(1)
+        : symbolText;
+
+      // Generate method entities based on attr type
+      if (attrType === 'attr_reader' || attrType === 'attr_accessor') {
+        // Create getter method
+        entities.push(
+          this.createAttrMethod(node, attributeName, 'getter', attrType)
+        );
+      }
+
+      if (attrType === 'attr_writer' || attrType === 'attr_accessor') {
+        // Create setter method (name=)
+        entities.push(
+          this.createAttrMethod(
+            node,
+            `${attributeName}=`,
+            'setter',
+            attrType
+          )
+        );
+      }
+    }
+
+    return entities;
+  }
+
+  /**
+   * Create a method entity for an attribute accessor.
+   */
+  private createAttrMethod(
+    node: Node,
+    methodName: string,
+    methodType: 'getter' | 'setter',
+    generatedBy: string
+  ): NewEntity {
+    // Build fully qualified name using context stack
+    let qualifiedName: string;
+    if (this.contextStack.length === 0) {
+      // Top-level (unlikely but possible)
+      qualifiedName = methodName;
+    } else {
+      // Method inside class/module
+      const contextPath = this.contextStack.join('::');
+      qualifiedName = `${contextPath}#${methodName}`;
+    }
+
+    const metadata: Record<string, unknown> = {
+      generatedBy,
+      methodName,
+      methodType,
+    };
+
+    // Add context if present
+    if (this.contextStack.length > 0) {
+      metadata['context'] = this.contextStack.join('::');
+    }
+
+    return {
+      type: 'method',
+      name: qualifiedName,
+      filePath: this.filePath,
+      startLine: node.startPosition.row + 1,
+      endLine: node.endPosition.row + 1,
+      language: 'ruby',
+      metadata,
+    };
   }
 }
