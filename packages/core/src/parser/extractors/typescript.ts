@@ -469,13 +469,10 @@ export class TypeScriptExtractor {
           const memberName = child.childForFieldName('name');
           const memberValue = child.childForFieldName('value');
           if (memberName) {
-            const member: { name: string; value?: string } = {
+            members.push({
               name: memberName.text,
-            };
-            if (memberValue) {
-              member.value = memberValue.text;
-            }
-            members.push(member);
+              ...(memberValue && { value: memberValue.text }),
+            });
           }
         }
       }
