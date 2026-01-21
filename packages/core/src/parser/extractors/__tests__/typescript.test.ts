@@ -451,6 +451,174 @@ function second() {
     });
   });
 
+  describe('variable extraction', () => {
+    it('extracts exported const variables', async () => {
+      const code = `
+        export const API_URL = 'https://api.example.com';
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      expect(entities).toHaveLength(1);
+      expect(entities[0]).toMatchObject({
+        type: 'variable',
+        name: 'API_URL',
+        filePath: '/test/file.ts',
+        language: 'typescript',
+      });
+      expect(entities[0]?.metadata).toMatchObject({
+        exported: true,
+        kind: 'const',
+      });
+    });
+
+    it('extracts exported let variables', async () => {
+      const code = `
+        export let counter = 0;
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      expect(entities).toHaveLength(1);
+      expect(entities[0]).toMatchObject({
+        type: 'variable',
+        name: 'counter',
+      });
+      expect(entities[0]?.metadata).toMatchObject({
+        exported: true,
+        kind: 'let',
+      });
+    });
+
+    it('extracts non-exported variables', async () => {
+      const code = `
+        const localConfig = { debug: true };
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      expect(entities).toHaveLength(1);
+      expect(entities[0]).toMatchObject({
+        type: 'variable',
+        name: 'localConfig',
+      });
+      expect(entities[0]?.metadata).toMatchObject({
+        exported: false,
+        kind: 'const',
+      });
+    });
+
+    it('extracts multiple variables in one declaration', async () => {
+      const code = `
+        export const a = 1, b = 2, c = 3;
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      expect(entities).toHaveLength(3);
+      expect(entities.map((e) => e.name)).toEqual(['a', 'b', 'c']);
+    });
+
+    it('extracts variables with type annotations', async () => {
+      const code = `
+        export const port: number = 3000;
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      expect(entities).toHaveLength(1);
+      expect(entities[0]?.metadata?.['typeAnnotation']).toBe(': number');
+    });
+
+    it('does not extract arrow functions as variables', async () => {
+      const code = `
+        export const handler = () => {};
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      // Should be extracted as function, not variable
+      expect(entities).toHaveLength(1);
+      expect(entities[0]?.type).toBe('function');
+      expect(entities[0]?.metadata?.['arrowFunction']).toBe(true);
+    });
+
+    it('extracts named exported variables', async () => {
+      const code = `
+        const MAX_SIZE = 100;
+        export { MAX_SIZE };
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      expect(entities).toHaveLength(1);
+      expect(entities[0]?.metadata?.['exported']).toBe(true);
+    });
+  });
+
   describe('named exports', () => {
     it('detects named exports for functions', async () => {
       const code = `
