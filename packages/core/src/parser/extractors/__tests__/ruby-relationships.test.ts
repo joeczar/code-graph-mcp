@@ -283,6 +283,142 @@ describe('RubyRelationshipExtractor', () => {
     });
   });
 
+  describe('Rails associations', () => {
+    it('extracts has_many as calls relationship', async () => {
+      const code = `
+        class User
+          has_many :posts
+        end
+      `;
+      const result = await parser.parse(code, 'ruby');
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      const relationships = extractor.extract(result.result.tree.rootNode);
+      const calls = relationships.filter(r => r.type === 'calls');
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.sourceName).toBe('User');
+      expect(calls[0]?.targetName).toBe('Post');
+      expect(calls[0]?.metadata?.['association_type']).toBe('has_many');
+      expect(calls[0]?.metadata?.['association_name']).toBe('posts');
+    });
+
+    it('extracts belongs_to as calls relationship', async () => {
+      const code = `
+        class User
+          belongs_to :organization
+        end
+      `;
+      const result = await parser.parse(code, 'ruby');
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      const relationships = extractor.extract(result.result.tree.rootNode);
+      const calls = relationships.filter(r => r.type === 'calls');
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.sourceName).toBe('User');
+      expect(calls[0]?.targetName).toBe('Organization');
+      expect(calls[0]?.metadata?.['association_type']).toBe('belongs_to');
+      expect(calls[0]?.metadata?.['association_name']).toBe('organization');
+    });
+
+    it('extracts has_one as calls relationship', async () => {
+      const code = `
+        class User
+          has_one :profile
+        end
+      `;
+      const result = await parser.parse(code, 'ruby');
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      const relationships = extractor.extract(result.result.tree.rootNode);
+      const calls = relationships.filter(r => r.type === 'calls');
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.sourceName).toBe('User');
+      expect(calls[0]?.targetName).toBe('Profile');
+      expect(calls[0]?.metadata?.['association_type']).toBe('has_one');
+      expect(calls[0]?.metadata?.['association_name']).toBe('profile');
+    });
+
+    it('extracts association with explicit class_name option', async () => {
+      const code = `
+        class Post
+          has_many :comments, class_name: "Review"
+        end
+      `;
+      const result = await parser.parse(code, 'ruby');
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      const relationships = extractor.extract(result.result.tree.rootNode);
+      const calls = relationships.filter(r => r.type === 'calls');
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.sourceName).toBe('Post');
+      expect(calls[0]?.targetName).toBe('Review');
+      expect(calls[0]?.metadata?.['association_type']).toBe('has_many');
+      expect(calls[0]?.metadata?.['association_name']).toBe('comments');
+    });
+
+    it('extracts associations in nested class', async () => {
+      const code = `
+        module Admin
+          class User
+            has_many :posts
+            belongs_to :organization
+          end
+        end
+      `;
+      const result = await parser.parse(code, 'ruby');
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      const relationships = extractor.extract(result.result.tree.rootNode);
+      const calls = relationships.filter(r => r.type === 'calls');
+
+      expect(calls).toHaveLength(2);
+
+      const hasManyCall = calls.find(c => c.metadata?.['association_type'] === 'has_many');
+      expect(hasManyCall).toBeDefined();
+      expect(hasManyCall?.sourceName).toBe('Admin::User');
+      expect(hasManyCall?.targetName).toBe('Post');
+
+      const belongsToCall = calls.find(c => c.metadata?.['association_type'] === 'belongs_to');
+      expect(belongsToCall).toBeDefined();
+      expect(belongsToCall?.sourceName).toBe('Admin::User');
+      expect(belongsToCall?.targetName).toBe('Organization');
+    });
+
+    it('extracts has_and_belongs_to_many as calls relationship', async () => {
+      const code = `
+        class User
+          has_and_belongs_to_many :roles
+        end
+      `;
+      const result = await parser.parse(code, 'ruby');
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      const relationships = extractor.extract(result.result.tree.rootNode);
+      const calls = relationships.filter(r => r.type === 'calls');
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.sourceName).toBe('User');
+      expect(calls[0]?.targetName).toBe('Role');
+      expect(calls[0]?.metadata?.['association_type']).toBe('has_and_belongs_to_many');
+    });
+  });
+
   describe('comprehensive integration', () => {
     it('extracts all relationship types from complex Ruby code', async () => {
       const code = `

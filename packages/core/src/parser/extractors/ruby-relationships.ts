@@ -13,6 +13,13 @@ type SyntaxNode = Tree['rootNode'];
 
 const REQUIRE_METHODS = new Set(['require', 'require_relative']);
 const MODULE_OPERATIONS = new Set(['include', 'extend', 'prepend']);
+const RAILS_ASSOCIATION_METHODS = new Set([
+  'has_many',
+  'has_one',
+  'belongs_to',
+  'has_and_belongs_to_many',
+]);
+const PLURAL_ASSOCIATIONS = new Set(['has_many', 'has_and_belongs_to_many']);
 
 export class RubyRelationshipExtractor {
   /**
@@ -52,6 +59,8 @@ export class RubyRelationshipExtractor {
       this.extractRequireRelationship(callNode, methodName, relationships);
     } else if (MODULE_OPERATIONS.has(methodName)) {
       this.extractModuleOperationRelationship(callNode, methodName, relationships);
+    } else if (RAILS_ASSOCIATION_METHODS.has(methodName)) {
+      this.extractAssociationRelationship(callNode, methodName, relationships);
     } else {
       this.extractMethodCallRelationship(callNode, methodName, relationships);
     }
@@ -135,6 +144,48 @@ export class RubyRelationshipExtractor {
         },
       });
     }
+  }
+
+  /**
+   * Extract Rails association relationships (has_many, belongs_to, etc).
+   */
+  private extractAssociationRelationship(
+    callNode: SyntaxNode,
+    methodName: string,
+    relationships: ExtractedRelationship[]
+  ): void {
+    const sourceName = this.getCurrentContext(callNode);
+    if (!sourceName) return; // Associations must be within a class context
+
+    const argumentsNode = callNode.childForFieldName('arguments');
+    if (!argumentsNode) return;
+
+    // Extract association name from first symbol argument
+    const symbolArg = argumentsNode.children.find((arg) => arg.type === 'simple_symbol');
+    if (!symbolArg) return;
+
+    // Strip leading colon from symbol
+    const associationName = symbolArg.text.slice(1);
+
+    // Check for explicit class_name option
+    const explicitClassName = this.extractClassNameOption(argumentsNode);
+
+    // Determine target model name
+    const targetModelName = explicitClassName ?? this.inferModelName(associationName, methodName);
+
+    relationships.push({
+      type: 'calls',
+      sourceName,
+      sourceLocation: {
+        line: callNode.startPosition.row + 1,
+        column: callNode.startPosition.column,
+      },
+      targetName: targetModelName,
+      metadata: {
+        association_type: methodName,
+        association_name: associationName,
+      },
+    });
   }
 
   /**
@@ -248,5 +299,41 @@ export class RubyRelationshipExtractor {
 
     // For calls within classes/modules (but not in a method), join with ::
     return contextParts.join('::');
+  }
+
+  /**
+   * Infer model name from association name based on Rails conventions.
+   * has_many/has_and_belongs_to_many: singularize (posts -> Post)
+   * belongs_to/has_one: capitalize (organization -> Organization)
+   */
+  private inferModelName(
+    associationName: string,
+    associationType: string
+  ): string {
+    const name = PLURAL_ASSOCIATIONS.has(associationType) && associationName.endsWith('s')
+      ? associationName.slice(0, -1)
+      : associationName;
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
+  /**
+   * Extract class_name option from association arguments.
+   * Looks for pattern: class_name: "ModelName"
+   */
+  private extractClassNameOption(argumentsNode: SyntaxNode): string | null {
+    const classNamePair = argumentsNode.children.find((child) => {
+      if (child.type !== 'pair') return false;
+      const keyText = child.childForFieldName('key')?.text;
+      return keyText === 'class_name' || keyText === ':class_name';
+    });
+
+    if (!classNamePair) return null;
+
+    const valueNode = classNamePair.childForFieldName('value');
+    if (valueNode?.type === 'string') {
+      return valueNode.text.slice(1, -1); // Remove quotes
+    }
+
+    return null;
   }
 }
