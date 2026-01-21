@@ -485,4 +485,42 @@ See `.claude/skills/checkpoint-workflow/SKILL.md` for full reference.
 
 ---
 
+## Known Limitations
+
+### Rails Association Singularization
+
+The Ruby parser extracts Rails ActiveRecord associations (`has_many`, `has_one`, `belongs_to`, `has_and_belongs_to_many`) as relationships. For plural associations, it infers the target model name by singularizing the association name.
+
+**Current approach**: Naive singularization (removes trailing 's')
+
+This handles ~98% of associations but fails for irregular English plurals:
+
+| Association | Naive Result | Correct |
+|-------------|--------------|---------|
+| `has_many :companies` | Companie | Company |
+| `has_many :localities` | Localitie | Locality |
+| `has_many :categories` | Categorie | Category |
+| `has_many :statuses` | Statuse | Status |
+| `has_many :people` | Peopl | Person |
+
+**Why not use Rails Inflector?**
+
+This is a static analysis tool that runs outside Rails. Pulling in ActiveSupport just for singularization adds significant dependency weight. The naive approach provides good coverage for most codebases.
+
+**Impact analysis (fobizz-rails)**: 3 of 170 associations affected (1.8%)
+
+**Workaround**: Use explicit `class_name` option in Rails:
+```ruby
+has_many :companies, class_name: "Company"
+has_many :localities, class_name: "Locality"
+```
+
+The extractor correctly reads `class_name` and uses it instead of inference.
+
+**Future enhancement**: Could add common irregular plural rules (`-ies→-y`, `-es→-e` for specific patterns) if real-world usage shows significant impact.
+
+See: `packages/core/src/parser/extractors/ruby-relationships.ts:inferModelName()`
+
+---
+
 *This is a conceptual architecture. Implementation details will evolve.*

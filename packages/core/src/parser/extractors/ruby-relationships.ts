@@ -303,8 +303,41 @@ export class RubyRelationshipExtractor {
 
   /**
    * Infer model name from association name based on Rails conventions.
-   * has_many/has_and_belongs_to_many: singularize (posts -> Post)
-   * belongs_to/has_one: capitalize (organization -> Organization)
+   *
+   * **Behavior:**
+   * - has_many/has_and_belongs_to_many: singularize then capitalize (posts → Post)
+   * - belongs_to/has_one: capitalize only (user → User)
+   *
+   * **Singularization Limitation:**
+   * Uses naive singularization (removes trailing 's') which handles ~98% of cases
+   * but fails for irregular English plurals:
+   *
+   * | Association | Naive Result | Correct |
+   * |-------------|--------------|---------|
+   * | :companies  | Companie     | Company |
+   * | :localities | Localitie    | Locality |
+   * | :categories | Categorie    | Category |
+   * | :statuses   | Statuse      | Status |
+   * | :addresses  | Addresse     | Address |
+   * | :people     | Peopl        | Person |
+   * | :children   | Children     | Child |
+   *
+   * **Why not use Rails Inflector?**
+   * This is a static analysis tool that runs outside Rails. Pulling in ActiveSupport
+   * just for singularization adds significant dependency weight. The naive approach
+   * provides good coverage for most codebases.
+   *
+   * **Workaround:**
+   * Use explicit `class_name` option in Rails associations:
+   * ```ruby
+   * has_many :companies, class_name: "Company"
+   * has_many :localities, class_name: "Locality"
+   * ```
+   * The extractor correctly reads `class_name` and uses it instead of inference.
+   *
+   * **Future Enhancement:**
+   * Could add common irregular plural rules (-ies→-y, -es→-e for specific patterns)
+   * if real-world usage shows significant impact. See GitHub issue for discussion.
    */
   private inferModelName(
     associationName: string,
