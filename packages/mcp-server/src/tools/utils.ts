@@ -81,3 +81,19 @@ export function formatEntityList(
 
   return lines.join('\n');
 }
+
+/**
+ * Count occurrences of each type in an array of objects with a `type` property.
+ *
+ * Useful for summarizing entity or relationship counts by type.
+ *
+ * @param items - Array of objects with a `type` property
+ * @returns Map of type names to counts
+ */
+export function countByType(items: { type: string }[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    counts.set(item.type, (counts.get(item.type) ?? 0) + 1);
+  }
+  return counts;
+}

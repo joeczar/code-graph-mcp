@@ -10,6 +10,7 @@ import { blastRadiusTool } from './tools/blast-radius.js';
 import { findEntityTool } from './tools/find-entity.js';
 import { getExportsTool } from './tools/get-exports.js';
 import { parseFileTool } from './tools/parse-file.js';
+import { parseDirectoryTool } from './tools/parse-directory.js';
 import { createErrorResponse, type ToolDefinition } from './tools/types.js';
 import { logger } from './tools/logger.js';
 
@@ -122,6 +123,7 @@ export function createServer(): McpServer {
   registerTool(server, findEntityTool);
   registerTool(server, getExportsTool);
   registerTool(server, parseFileTool);
+  registerTool(server, parseDirectoryTool);
 
   return server;
 }

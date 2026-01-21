@@ -13,17 +13,7 @@ import * as path from 'node:path';
 import { FileProcessor, getDatabase, initializeSchema } from '@code-graph/core';
 import { type ToolDefinition, createSuccessResponse, createErrorResponse } from './types.js';
 import { ResourceNotFoundError, ToolExecutionError } from './errors.js';
-
-/**
- * Count occurrences of each type in an array of objects with a `type` property
- */
-function countByType(items: { type: string }[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const item of items) {
-    counts.set(item.type, (counts.get(item.type) ?? 0) + 1);
-  }
-  return counts;
-}
+import { countByType } from './utils.js';
 
 const parseFileInputSchema = z.object({
   path: z.string().describe('Path to file to parse (absolute or relative to working directory)'),
