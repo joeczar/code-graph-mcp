@@ -459,4 +459,161 @@ end`;
       expect(methods[0]?.endLine).toBe(3);
     });
   });
+
+  describe('constants', () => {
+    it('extracts top-level constants with string values', async () => {
+      const code = `
+        API_VERSION = "2.0"
+      `;
+
+      const entities = await extractEntities(code);
+      const constants = entities.filter((e) => e.type === 'variable');
+
+      expect(constants).toHaveLength(1);
+      expect(constants[0]?.name).toBe('API_VERSION');
+      expect(constants[0]?.type).toBe('variable');
+      expect(constants[0]?.language).toBe('ruby');
+      expect(constants[0]?.filePath).toBe('/test/file.rb');
+      expect(constants[0]?.metadata).toEqual({
+        kind: 'constant',
+        constantName: 'API_VERSION',
+      });
+    });
+
+    it('extracts constants with different value types', async () => {
+      const code = `
+        MAX_COUNT = 100
+        DEFAULT_NAME = "Unknown"
+        ENABLED = true
+        CONFIG = { key: 'value' }
+        ITEMS = [1, 2, 3]
+      `;
+
+      const entities = await extractEntities(code);
+      const constants = entities.filter((e) => e.type === 'variable');
+
+      expect(constants).toHaveLength(5);
+      expect(constants.map((c) => c.name)).toEqual([
+        'MAX_COUNT',
+        'DEFAULT_NAME',
+        'ENABLED',
+        'CONFIG',
+        'ITEMS',
+      ]);
+    });
+
+    it('extracts constants inside classes', async () => {
+      const code = `
+        class MyClass
+          VERSION = "1.0"
+          MAX_SIZE = 1000
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const constants = entities.filter((e) => e.type === 'variable');
+
+      expect(constants).toHaveLength(2);
+      expect(constants[0]?.name).toBe('MyClass::VERSION');
+      expect(constants[0]?.metadata).toEqual({
+        kind: 'constant',
+        constantName: 'VERSION',
+        context: 'MyClass',
+      });
+      expect(constants[1]?.name).toBe('MyClass::MAX_SIZE');
+      expect(constants[1]?.metadata).toEqual({
+        kind: 'constant',
+        constantName: 'MAX_SIZE',
+        context: 'MyClass',
+      });
+    });
+
+    it('extracts constants inside modules', async () => {
+      const code = `
+        module MyModule
+          TIMEOUT = 30
+          RETRY_COUNT = 3
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const constants = entities.filter((e) => e.type === 'variable');
+
+      expect(constants).toHaveLength(2);
+      expect(constants[0]?.name).toBe('MyModule::TIMEOUT');
+      expect(constants[0]?.metadata).toEqual({
+        kind: 'constant',
+        constantName: 'TIMEOUT',
+        context: 'MyModule',
+      });
+      expect(constants[1]?.name).toBe('MyModule::RETRY_COUNT');
+      expect(constants[1]?.metadata).toEqual({
+        kind: 'constant',
+        constantName: 'RETRY_COUNT',
+        context: 'MyModule',
+      });
+    });
+
+    it('extracts nested constants (module -> class -> constant)', async () => {
+      const code = `
+        module Outer
+          module Middle
+            class Inner
+              API_KEY = "secret123"
+            end
+          end
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const constants = entities.filter((e) => e.type === 'variable');
+
+      expect(constants).toHaveLength(1);
+      expect(constants[0]?.name).toBe('Outer::Middle::Inner::API_KEY');
+      expect(constants[0]?.metadata).toEqual({
+        kind: 'constant',
+        constantName: 'API_KEY',
+        context: 'Outer::Middle::Inner',
+      });
+    });
+
+    it('does not extract regular variable assignments', async () => {
+      const code = `
+        my_var = 42
+        another_var = "hello"
+      `;
+
+      const entities = await extractEntities(code);
+      const variables = entities.filter((e) => e.type === 'variable');
+
+      // Regular variables (lowercase) should not be extracted
+      expect(variables).toHaveLength(0);
+    });
+
+    it('extracts multiple constants at different nesting levels', async () => {
+      const code = `
+        TOP_LEVEL = "global"
+
+        module MyModule
+          MODULE_CONSTANT = 100
+
+          class MyClass
+            CLASS_CONSTANT = 200
+
+            def method
+              local_var = 300
+            end
+          end
+        end
+      `;
+
+      const entities = await extractEntities(code);
+      const constants = entities.filter((e) => e.type === 'variable');
+
+      expect(constants).toHaveLength(3);
+      expect(constants[0]?.name).toBe('TOP_LEVEL');
+      expect(constants[1]?.name).toBe('MyModule::MODULE_CONSTANT');
+      expect(constants[2]?.name).toBe('MyModule::MyClass::CLASS_CONSTANT');
+    });
+  });
 });
