@@ -711,4 +711,187 @@ function second() {
       expect(entities[0]?.metadata?.['exported']).toBe(true);
     });
   });
+
+  describe('enums', () => {
+    it('extracts regular enum with auto-numbered members', async () => {
+      const code = `
+        enum Status {
+          Active,
+          Inactive,
+          Pending
+        }
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      expect(entities).toHaveLength(1);
+      expect(entities[0]).toMatchObject({
+        type: 'enum',
+        name: 'Status',
+        filePath: '/test/file.ts',
+        language: 'typescript',
+      });
+      expect(entities[0]?.metadata).toMatchObject({
+        exported: false,
+        const: false,
+        members: [
+          { name: 'Active' },
+          { name: 'Inactive' },
+          { name: 'Pending' },
+        ],
+      });
+    });
+
+    it('extracts enum with string values', async () => {
+      const code = `
+        enum Color {
+          Red = 'red',
+          Blue = 'blue',
+          Green = 'green'
+        }
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      expect(entities).toHaveLength(1);
+      expect(entities[0]?.metadata).toMatchObject({
+        exported: false,
+        const: false,
+        members: [
+          { name: 'Red', value: "'red'" },
+          { name: 'Blue', value: "'blue'" },
+          { name: 'Green', value: "'green'" },
+        ],
+      });
+    });
+
+    it('extracts enum with numeric values', async () => {
+      const code = `
+        enum HttpStatus {
+          OK = 200,
+          NotFound = 404,
+          ServerError = 500
+        }
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      expect(entities).toHaveLength(1);
+      expect(entities[0]?.metadata).toMatchObject({
+        members: [
+          { name: 'OK', value: '200' },
+          { name: 'NotFound', value: '404' },
+          { name: 'ServerError', value: '500' },
+        ],
+      });
+    });
+
+    it('extracts const enum', async () => {
+      const code = `
+        const enum Direction {
+          Up,
+          Down,
+          Left,
+          Right
+        }
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      expect(entities).toHaveLength(1);
+      expect(entities[0]?.metadata).toMatchObject({
+        exported: false,
+        const: true,
+      });
+    });
+
+    it('extracts exported enum', async () => {
+      const code = `
+        export enum LogLevel {
+          Debug,
+          Info,
+          Warn,
+          Error
+        }
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      expect(entities).toHaveLength(1);
+      expect(entities[0]?.metadata).toMatchObject({
+        exported: true,
+        const: false,
+      });
+    });
+
+    it('extracts named exported enum', async () => {
+      const code = `
+        enum Priority {
+          Low,
+          Medium,
+          High
+        }
+        export { Priority };
+      `;
+
+      const result = await parser.parse(code, 'typescript');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new TypeScriptExtractor({
+        filePath: '/test/file.ts',
+      });
+
+      const entities = extractor.extract(result.result.tree.rootNode);
+
+      expect(entities).toHaveLength(1);
+      expect(entities[0]?.metadata?.['exported']).toBe(true);
+    });
+  });
 });

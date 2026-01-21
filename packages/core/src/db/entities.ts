@@ -10,6 +10,7 @@ export const ALL_ENTITY_TYPES = [
   'file',
   'type',
   'variable',
+  'enum',
 ] as const;
 
 export type EntityType = (typeof ALL_ENTITY_TYPES)[number];

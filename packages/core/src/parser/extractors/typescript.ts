@@ -84,6 +84,9 @@ export class TypeScriptExtractor {
       case 'interface_declaration':
         this.extractInterface(node, entities);
         break;
+      case 'enum_declaration':
+        this.extractEnum(node, entities);
+        break;
     }
 
     // Recursively process children
@@ -439,6 +442,53 @@ export class TypeScriptExtractor {
         exported: isExported,
         typeParameters,
         interface: true,
+      },
+    });
+  }
+
+  private extractEnum(node: Node, entities: NewEntity[]): void {
+    const nameNode = node.childForFieldName('name');
+    if (!nameNode) {
+      return;
+    }
+
+    const name = nameNode.text;
+    const isExported = this.isExported(node, name);
+    const isConst = this.hasModifier(node, 'const');
+
+    // Extract enum members
+    const members: { name: string; value?: string }[] = [];
+    const bodyNode = node.childForFieldName('body');
+    if (bodyNode) {
+      for (const child of bodyNode.children) {
+        if (child.type === 'property_identifier') {
+          // Member without explicit value (auto-numbered)
+          members.push({ name: child.text });
+        } else if (child.type === 'enum_assignment') {
+          // Member with explicit value
+          const memberName = child.childForFieldName('name');
+          const memberValue = child.childForFieldName('value');
+          if (memberName) {
+            members.push({
+              name: memberName.text,
+              ...(memberValue && { value: memberValue.text }),
+            });
+          }
+        }
+      }
+    }
+
+    entities.push({
+      type: 'enum',
+      name,
+      filePath: this.filePath,
+      startLine: node.startPosition.row + 1,
+      endLine: node.endPosition.row + 1,
+      language: 'typescript',
+      metadata: {
+        exported: isExported,
+        const: isConst,
+        members,
       },
     });
   }
