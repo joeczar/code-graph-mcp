@@ -5,6 +5,8 @@
  * with sensible defaults.
  */
 
+import { logger } from './tools/logger.js';
+
 /**
  * Get the project ID from environment variables
  *
@@ -16,7 +18,13 @@
  */
 export function getProjectId(): string {
   const projectId = process.env['PROJECT_ID']?.trim();
-  // Using || intentionally: empty string should also fall back to 'unknown'
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  return projectId || 'unknown';
+  // Empty string or undefined should fall back to 'unknown'
+  if (!projectId) {
+    logger.warn(
+      'PROJECT_ID environment variable not set, defaulting to "unknown". ' +
+        'Set PROJECT_ID to identify this project in metrics.'
+    );
+    return 'unknown';
+  }
+  return projectId;
 }
