@@ -29,12 +29,11 @@ function registerTool<T extends z.ZodType>(
       description: tool.metadata.description,
       inputSchema: tool.metadata.inputSchema,
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    async (params: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+    (async (params: any) => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const validated = tool.metadata.inputSchema.parse(params.params);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const result = await tool.handler(validated);
         return {
           ...result,
@@ -44,7 +43,7 @@ function registerTool<T extends z.ZodType>(
         if (error instanceof z.ZodError) {
           logger.warn('Tool validation failed', {
             toolName: tool.metadata.name,
-            error: error.errors,
+            error: error.issues,
           });
         } else if (error instanceof Error) {
           logger.error('Tool execution failed', {
@@ -65,7 +64,8 @@ function registerTool<T extends z.ZodType>(
           content: errorResult.content.map(item => ({ ...item, type: 'text' as const })),
         };
       }
-    }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any
   );
 }
 
