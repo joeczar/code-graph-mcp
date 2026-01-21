@@ -94,9 +94,9 @@ Extract code structure from source files.
 | 3.4.3 | `get_exports` tool | ~100 |
 
 **Milestone 3 Exit Criteria:**
-- [ ] Can parse a mixed TS/Ruby codebase
-- [ ] Can answer "what calls X?" accurately via MCP
-- [ ] Incremental updates work (change file, graph updates)
+- [x] Can parse a mixed TS/Ruby codebase
+- [x] Can answer "what calls X?" accurately via MCP
+- [x] Incremental updates work (change file, graph updates)
 
 ---
 
