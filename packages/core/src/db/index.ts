@@ -29,3 +29,6 @@ export type {
   IncrementalUpdater,
   IncrementalUpdateResult,
 } from './incremental-updater.js';
+
+export { createMetricsStore } from './metrics.js';
+export type { ToolCall, ParseStats, MetricsStore } from './metrics.js';
