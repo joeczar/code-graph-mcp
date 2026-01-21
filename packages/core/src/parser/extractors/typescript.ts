@@ -234,16 +234,9 @@ export class TypeScriptExtractor {
       return valueNode;
     }
 
-    // Unwrap parenthesized expression: (x) => x becomes (() => x)
-    if (valueNode.type === 'parenthesized_expression') {
-      const inner = valueNode.children.find((c) => c.isNamed);
-      if (inner?.type === 'arrow_function') {
-        return inner;
-      }
-    }
-
-    // Unwrap type assertion: x as T or <T>x
-    if (valueNode.type === 'as_expression' || valueNode.type === 'type_assertion') {
+    // Unwrap common wrappers: parenthesized_expression, as_expression, type_assertion
+    const wrapperTypes = ['parenthesized_expression', 'as_expression', 'type_assertion'];
+    if (wrapperTypes.includes(valueNode.type)) {
       const inner = valueNode.children.find((c) => c.isNamed);
       if (inner?.type === 'arrow_function') {
         return inner;
