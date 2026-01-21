@@ -80,10 +80,14 @@ export {
   logCommit,
   getCommits,
   getWorkflowSummary,
+  setWorkflowPr,
+  setWorkflowMerged,
+  setWorkflowPrState,
 } from './checkpoint/index.js';
 export type {
   WorkflowStatus,
   WorkflowPhase,
+  PrState,
   Workflow,
   WorkflowAction,
   WorkflowCommit,

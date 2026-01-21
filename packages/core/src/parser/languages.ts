@@ -4,7 +4,7 @@ import { join, dirname } from 'node:path';
 
 const require = createRequire(import.meta.url);
 
-export type SupportedLanguage = 'typescript' | 'tsx' | 'ruby';
+export type SupportedLanguage = 'typescript' | 'tsx' | 'ruby' | 'vue';
 
 interface LanguageConfig {
   name: SupportedLanguage;
@@ -27,6 +27,11 @@ const languageConfigs: Record<SupportedLanguage, LanguageConfig> = {
     name: 'ruby',
     extensions: ['.rb'],
     wasmFile: 'tree-sitter-ruby.wasm',
+  },
+  vue: {
+    name: 'vue',
+    extensions: ['.vue'],
+    wasmFile: 'tree-sitter-vue.wasm',
   },
 };
 

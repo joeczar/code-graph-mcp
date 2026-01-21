@@ -24,6 +24,9 @@ export type {
 export { RubyExtractor } from './extractors/ruby.js';
 export type { RubyExtractorOptions } from './extractors/ruby.js';
 export { RubyRelationshipExtractor } from './extractors/ruby-relationships.js';
+export { VueExtractor } from './extractors/vue.js';
+export type { VueExtractorOptions } from './extractors/vue.js';
+export { VueRelationshipExtractor } from './extractors/vue-relationships.js';
 export { DirectoryParser } from './directory-parser.js';
 export type {
   DirectoryParseOptions,
