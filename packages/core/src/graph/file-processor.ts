@@ -196,16 +196,14 @@ export class FileProcessor {
         }
 
         // Create contains relationships from File to all code entities
-        for (const entity of entities) {
-          const codeEntityId = entityNameToId.get(entity.name);
-          if (codeEntityId) {
-            const containsRel = relationshipStore.create({
-              sourceId: storedFileEntity.id,
-              targetId: codeEntityId,
-              type: 'contains',
-            });
-            storedRelationships.push(containsRel);
-          }
+        // storedEntities[0] is the file entity, the rest are code entities
+        for (const codeEntity of storedEntities.slice(1)) {
+          const containsRel = relationshipStore.create({
+            sourceId: storedFileEntity.id,
+            targetId: codeEntity.id,
+            type: 'contains',
+          });
+          storedRelationships.push(containsRel);
         }
       });
 
