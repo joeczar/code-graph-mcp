@@ -71,8 +71,9 @@ export class TypeScriptExtractor {
         break;
       case 'lexical_declaration':
       case 'variable_declaration':
-        // Check for arrow functions: const x = () => {}
-        this.extractArrowFunction(node, entities);
+        // Extract arrow functions: const x = () => {}
+        // Also extract regular variables/constants
+        this.extractVariableOrArrowFunction(node, entities);
         break;
       case 'class_declaration':
         this.extractClass(node, entities);
@@ -122,32 +123,62 @@ export class TypeScriptExtractor {
     });
   }
 
-  private extractArrowFunction(node: Node, entities: NewEntity[]): void {
-    // Look for arrow_function in variable declarator
+  /**
+   * Extract variables, constants, or arrow functions from a declaration.
+   * Arrow functions are extracted as 'function' type, others as 'variable' type.
+   */
+  private extractVariableOrArrowFunction(
+    node: Node,
+    entities: NewEntity[]
+  ): void {
+    // Determine the variable kind (const, let, var)
+    const kind = this.getVariableKind(node);
+
     const declarators = node.descendantsOfType('variable_declarator');
     for (const declarator of declarators) {
       const nameNode = declarator.childForFieldName('name');
       const valueNode = declarator.childForFieldName('value');
 
-      if (!nameNode || !valueNode) {
-        continue;
-      }
-
-      // Find the arrow function - check direct value or immediate wrapper (parenthesized_expression)
-      const arrowFunc = this.findDirectArrowFunction(valueNode);
-      if (!arrowFunc) {
+      if (!nameNode) {
         continue;
       }
 
       const name = nameNode.text;
       const isExported = this.isExported(node.parent ?? node, name);
-      const isAsync = this.hasModifier(arrowFunc, 'async');
 
-      const parameters = this.extractParameters(arrowFunc);
-      const returnType = this.extractReturnType(arrowFunc);
+      // Check if this is an arrow function
+      if (valueNode) {
+        const arrowFunc = this.findDirectArrowFunction(valueNode);
+        if (arrowFunc) {
+          // Extract as function
+          const isAsync = this.hasModifier(arrowFunc, 'async');
+          const parameters = this.extractParameters(arrowFunc);
+          const returnType = this.extractReturnType(arrowFunc);
+
+          entities.push({
+            type: 'function',
+            name,
+            filePath: this.filePath,
+            startLine: declarator.startPosition.row + 1,
+            endLine: declarator.endPosition.row + 1,
+            language: 'typescript',
+            metadata: {
+              exported: isExported,
+              async: isAsync,
+              arrowFunction: true,
+              parameters,
+              returnType,
+            },
+          });
+          continue;
+        }
+      }
+
+      // Extract as variable
+      const typeAnnotation = this.extractTypeAnnotation(declarator);
 
       entities.push({
-        type: 'function',
+        type: 'variable',
         name,
         filePath: this.filePath,
         startLine: declarator.startPosition.row + 1,
@@ -155,13 +186,42 @@ export class TypeScriptExtractor {
         language: 'typescript',
         metadata: {
           exported: isExported,
-          async: isAsync,
-          arrowFunction: true,
-          parameters,
-          returnType,
+          kind,
+          typeAnnotation,
         },
       });
     }
+  }
+
+  /**
+   * Get the variable kind (const, let, var) from a declaration node.
+   */
+  private getVariableKind(node: Node): 'const' | 'let' | 'var' {
+    // lexical_declaration uses 'const' or 'let'
+    // variable_declaration uses 'var'
+    if (node.type === 'variable_declaration') {
+      return 'var';
+    }
+
+    // Check for 'const' or 'let' keyword
+    for (const child of node.children) {
+      if (child.type === 'const') {
+        return 'const';
+      }
+      if (child.type === 'let') {
+        return 'let';
+      }
+    }
+
+    return 'const'; // default fallback
+  }
+
+  /**
+   * Extract type annotation from a variable declarator.
+   */
+  private extractTypeAnnotation(declarator: Node): string | undefined {
+    const typeNode = declarator.childForFieldName('type');
+    return typeNode?.text;
   }
 
   /**

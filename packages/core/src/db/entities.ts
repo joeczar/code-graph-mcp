@@ -9,6 +9,7 @@ export const ALL_ENTITY_TYPES = [
   'module',
   'file',
   'type',
+  'variable',
 ] as const;
 
 export type EntityType = (typeof ALL_ENTITY_TYPES)[number];
