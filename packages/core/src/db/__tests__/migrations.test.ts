@@ -87,29 +87,39 @@ describe('MigrationRunner', () => {
 
       const db = getDatabase();
 
-      // Verify all tables exist (migrations 1 and 2)
+      // Verify all tables exist (migrations 1, 2, and 3)
       let tables = db
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('entities', 'relationships', 'files')")
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('entities', 'relationships', 'files', 'tool_calls', 'parse_stats')")
         .all() as { name: string }[];
-      expect(tables).toHaveLength(3);
+      expect(tables).toHaveLength(5);
 
-      // Rollback latest migration (migration 2 - files table)
+      // Rollback latest migration (migration 3 - metrics tables)
       runner.rollback();
 
-      // Verify files table dropped, but entities and relationships remain
+      // Verify metrics tables dropped, but other tables remain
       tables = db
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('entities', 'relationships', 'files')")
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('entities', 'relationships', 'files', 'tool_calls', 'parse_stats')")
         .all() as { name: string }[];
-      expect(tables).toHaveLength(2);
+      expect(tables).toHaveLength(3);
       expect(tables.map((t) => t.name)).toContain('entities');
       expect(tables.map((t) => t.name)).toContain('relationships');
+      expect(tables.map((t) => t.name)).toContain('files');
+
+      // Rollback migration 2 (files table)
+      runner.rollback();
+
+      // Verify files table dropped
+      tables = db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('entities', 'relationships', 'files', 'tool_calls', 'parse_stats')")
+        .all() as { name: string }[];
+      expect(tables).toHaveLength(2);
 
       // Rollback migration 1
       runner.rollback();
 
       // Verify all tables dropped
       tables = db
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('entities', 'relationships', 'files')")
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('entities', 'relationships', 'files', 'tool_calls', 'parse_stats')")
         .all() as { name: string }[];
       expect(tables).toHaveLength(0);
     });

@@ -77,6 +77,46 @@ export const migrations: Migration[] = [
       DROP TABLE IF EXISTS files;
     `,
   },
+  {
+    version: 3,
+    name: 'add_metrics_tables',
+    up: `
+      CREATE TABLE IF NOT EXISTS tool_calls (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        tool_name TEXT NOT NULL,
+        timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+        latency_ms INTEGER NOT NULL,
+        success INTEGER NOT NULL,
+        error_type TEXT,
+        input_summary TEXT,
+        output_size INTEGER
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_tool_calls_project ON tool_calls(project_id);
+      CREATE INDEX IF NOT EXISTS idx_tool_calls_tool ON tool_calls(tool_name);
+      CREATE INDEX IF NOT EXISTS idx_tool_calls_timestamp ON tool_calls(timestamp);
+
+      CREATE TABLE IF NOT EXISTS parse_stats (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+        files_total INTEGER NOT NULL,
+        files_success INTEGER NOT NULL,
+        files_error INTEGER NOT NULL,
+        entities_extracted INTEGER NOT NULL,
+        relationships_extracted INTEGER NOT NULL,
+        duration_ms INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_parse_stats_project ON parse_stats(project_id);
+      CREATE INDEX IF NOT EXISTS idx_parse_stats_timestamp ON parse_stats(timestamp);
+    `,
+    down: `
+      DROP TABLE IF EXISTS parse_stats;
+      DROP TABLE IF EXISTS tool_calls;
+    `,
+  },
 ];
 
 export interface MigrationRunner {
