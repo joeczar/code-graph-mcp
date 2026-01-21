@@ -6,10 +6,11 @@
  */
 
 import type { z } from 'zod';
-import type { MetricsStore } from '../../../core/src/db/metrics.js';
+import type { MetricsStore } from '@code-graph/core';
 import type { ToolHandler, ToolResponse } from './types.js';
 import { sanitizeInput } from './sanitize.js';
 import { classifyError } from './error-classifier.js';
+import { logger } from './logger.js';
 
 /**
  * Wrap a tool handler with metrics instrumentation
@@ -71,7 +72,7 @@ export function instrumentHandler<TInput extends z.ZodType>(
         );
       } catch (metricsError) {
         // Log but don't fail the tool call if metrics recording fails
-        console.error('Failed to record tool metrics:', metricsError);
+        logger.error('Failed to record tool metrics', { toolName, error: metricsError });
       }
     }
   };

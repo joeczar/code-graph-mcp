@@ -40,13 +40,8 @@ export type ErrorType =
  * @returns Standardized error type string
  */
 export function classifyError(error: unknown): ErrorType {
-  // Handle Zod validation errors
-  if (error instanceof z.ZodError) {
-    return 'ValidationError';
-  }
-
-  // Handle custom tool errors
-  if (error instanceof ToolValidationError) {
+  // Validation errors (Zod or custom)
+  if (error instanceof z.ZodError || error instanceof ToolValidationError) {
     return 'ValidationError';
   }
 

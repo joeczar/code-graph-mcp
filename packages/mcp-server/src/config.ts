@@ -16,5 +16,7 @@
  */
 export function getProjectId(): string {
   const projectId = process.env['PROJECT_ID']?.trim();
-  return projectId && projectId.length > 0 ? projectId : 'unknown';
+  // Using || intentionally: empty string should also fall back to 'unknown'
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+  return projectId || 'unknown';
 }

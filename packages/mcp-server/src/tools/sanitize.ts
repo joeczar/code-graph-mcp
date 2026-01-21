@@ -7,6 +7,8 @@
  * - Removes secrets and sensitive data
  */
 
+import { logger } from './logger.js';
+
 const MAX_LENGTH = 200;
 const SECRET_FIELDS = ['apikey', 'token', 'password', 'secret', 'auth', 'credential'];
 
@@ -55,8 +57,12 @@ export function sanitizeInput(input: unknown): string {
 
     // Truncate
     return truncate(json);
-  } catch {
-    // Fallback for circular references or other JSON errors
+  } catch (error) {
+    // Log the serialization failure for debugging, then return a safe fallback
+    logger.warn('Failed to serialize input for metrics', {
+      error: error instanceof Error ? error.message : String(error),
+      inputType: typeof input,
+    });
     return '[Unable to serialize input]';
   }
 }
