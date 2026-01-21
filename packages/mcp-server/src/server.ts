@@ -1,6 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { echoTool } from './tools/echo.js';
 import { graphStatusTool } from './tools/graph-status.js';
 import { whatCallsTool } from './tools/what-calls.js';
@@ -15,7 +14,6 @@ import { logger } from './tools/logger.js';
  * Register a tool with the MCP server using the standard pattern
  *
  * Handles:
- * - JSON Schema generation from Zod schema
  * - Input validation with Zod
  * - Error logging for non-validation errors
  * - Consistent response formatting
@@ -29,8 +27,7 @@ function registerTool<T extends z.ZodType>(
     {
       title: tool.metadata.name,
       description: tool.metadata.description,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-      inputSchema: zodToJsonSchema(tool.metadata.inputSchema) as any,
+      inputSchema: tool.metadata.inputSchema,
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async (params: any) => {
