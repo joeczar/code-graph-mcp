@@ -21,17 +21,8 @@ import {
 } from '@code-graph/core';
 import { type ToolDefinition, createSuccessResponse, createErrorResponse } from './types.js';
 import { ResourceNotFoundError, ToolExecutionError } from './errors.js';
-
-/**
- * Count occurrences of each type in an array of objects with a `type` property
- */
-function countByType(items: { type: string }[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const item of items) {
-    counts.set(item.type, (counts.get(item.type) ?? 0) + 1);
-  }
-  return counts;
-}
+import { countByType } from './utils.js';
+import { logger } from './logger.js';
 
 const parseDirectoryInputSchema = z.object({
   path: z.string().describe('Path to directory to parse recursively (absolute or relative to working directory)'),
@@ -143,12 +134,26 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
     if (pattern) {
       // Simple pattern matching - check if file path matches the pattern
       // This is a simplified version - for full glob support we'd need to use globby
-      const patternRegex = new RegExp(
-        pattern
-          .replace(/\./g, '\\.')
-          .replace(/\*\*/g, '.*')
-          .replace(/\*/g, '[^/]*')
-      );
+      let patternRegex: RegExp;
+      try {
+        patternRegex = new RegExp(
+          pattern
+            .replace(/\./g, '\\.')
+            .replace(/\*\*/g, '.*')
+            .replace(/\*/g, '[^/]*')
+        );
+      } catch (err) {
+        // Pattern contains characters that create invalid regex after transformation
+        // (e.g., unbalanced brackets, parentheses, or other regex metacharacters)
+        return createErrorResponse(
+          new ToolExecutionError(`Invalid filter pattern: ${pattern}`, {
+            path: resolvedPath,
+            pattern,
+            error: err instanceof Error ? err.message : String(err),
+            hint: 'The pattern may contain special characters that are not supported. Use simple glob patterns like "**/*.ts" or "src/**/*.js".',
+          })
+        );
+      }
       files = files.filter(f => patternRegex.test(f.filePath));
     }
 
@@ -163,7 +168,14 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
       if (!fileResult.success || !fileResult.result) {
         errorCount++;
         const relativePath = path.relative(resolvedPath, fileResult.filePath);
-        errors.push(`${relativePath}: ${fileResult.error ?? 'Unknown error'}`);
+        const errorMessage = fileResult.error ?? 'Unknown error';
+        errors.push(`${relativePath}: ${errorMessage}`);
+        // Log parsing failures for server-side visibility
+        logger.warn('File parsing failed during directory parse', {
+          filePath: fileResult.filePath,
+          directory: resolvedPath,
+          error: errorMessage,
+        });
         continue;
       }
 
@@ -176,25 +188,32 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
 
         if (storeResult.success) {
           successCount++;
-          // Collect entities and relationships (excluding file entities)
-          for (const entity of storeResult.entities) {
-            if (entity.type !== 'file') {
-              allEntities.push(entity);
-            }
-          }
-          for (const rel of storeResult.relationships) {
-            allRelationships.push(rel);
-          }
+          // Collect entities (excluding file entities) and relationships
+          allEntities.push(...storeResult.entities.filter(e => e.type !== 'file'));
+          allRelationships.push(...storeResult.relationships);
         } else {
           errorCount++;
           const relativePath = path.relative(resolvedPath, fileResult.filePath);
-          errors.push(`${relativePath}: ${storeResult.error ?? 'Unknown error'}`);
+          const errorMessage = storeResult.error ?? 'Unknown error';
+          errors.push(`${relativePath}: ${errorMessage}`);
+          // Log storage failures for server-side visibility
+          logger.warn('File storage failed during directory parse', {
+            filePath: fileResult.filePath,
+            directory: resolvedPath,
+            error: errorMessage,
+          });
         }
       } catch (err) {
         errorCount++;
         const relativePath = path.relative(resolvedPath, fileResult.filePath);
         const errorMsg = err instanceof Error ? err.message : String(err);
         errors.push(`${relativePath}: ${errorMsg}`);
+        // Log unexpected errors for server-side visibility
+        logger.error('Unexpected error processing file during directory parse', {
+          filePath: fileResult.filePath,
+          directory: resolvedPath,
+          error: errorMsg,
+        });
       }
     }
 
