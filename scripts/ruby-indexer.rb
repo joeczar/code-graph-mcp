@@ -51,16 +51,16 @@ def extract_entities_and_relationships(index, file_paths)
     index.index_single(RubyIndexer::IndexablePath.new(nil, abs_path))
   end
 
-  # Extract entities from index
-  index.instance_variable_get(:@entries).each do |name, entries|
+  # Extract entities from index (using public Enumerable API)
+  index.each do |name, entries|
     entries.each do |entry|
       entity = entry_to_entity(entry)
       entities << entity if entity
     end
   end
 
-  # Extract relationships from index
-  index.instance_variable_get(:@entries).each do |name, entries|
+  # Extract relationships from index (using public Enumerable API)
+  index.each do |name, entries|
     entries.each do |entry|
       rels = entry_to_relationships(entry, index)
       relationships.concat(rels)
