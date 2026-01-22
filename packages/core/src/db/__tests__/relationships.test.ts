@@ -103,6 +103,116 @@ describe('RelationshipStore', () => {
     });
   });
 
+  describe('createBatch', () => {
+    let thirdEntityId: string;
+
+    beforeEach(() => {
+      // Create a third entity for additional relationships
+      const third = entityStore.create({
+        type: 'function',
+        name: 'helper',
+        filePath: '/src/helper.ts',
+        startLine: 1,
+        endLine: 5,
+        language: 'typescript',
+      });
+      thirdEntityId = third.id;
+    });
+
+    it('inserts multiple relationships at once', () => {
+      const relationships: NewRelationship[] = [
+        { sourceId, targetId, type: 'calls' },
+        { sourceId, targetId: thirdEntityId, type: 'imports' },
+        { sourceId: thirdEntityId, targetId, type: 'calls' },
+      ];
+
+      const created = store.createBatch(relationships);
+
+      expect(created).toHaveLength(3);
+      expect(store.count()).toBe(3);
+    });
+
+    it('generates unique IDs for each relationship', () => {
+      const relationships: NewRelationship[] = [
+        { sourceId, targetId, type: 'calls' },
+        { sourceId, targetId: thirdEntityId, type: 'imports' },
+      ];
+
+      const created = store.createBatch(relationships);
+
+      expect(created[0]?.id).toBeDefined();
+      expect(created[1]?.id).toBeDefined();
+      expect(created[0]?.id).not.toBe(created[1]?.id);
+    });
+
+    it('preserves metadata', () => {
+      const relationships: NewRelationship[] = [
+        { sourceId, targetId, type: 'calls', metadata: { line: 10 } },
+        { sourceId, targetId: thirdEntityId, type: 'imports', metadata: { async: true } },
+      ];
+
+      const created = store.createBatch(relationships);
+
+      expect(created[0]?.metadata).toEqual({ line: 10 });
+      expect(created[1]?.metadata).toEqual({ async: true });
+    });
+
+    it('returns empty array for empty input', () => {
+      const created = store.createBatch([]);
+
+      expect(created).toHaveLength(0);
+      expect(store.count()).toBe(0);
+    });
+
+    it('silently ignores duplicate relationships', () => {
+      const relationships: NewRelationship[] = [
+        { sourceId, targetId, type: 'calls' },
+        { sourceId, targetId, type: 'calls' }, // Duplicate
+        { sourceId, targetId: thirdEntityId, type: 'imports' },
+      ];
+
+      const created = store.createBatch(relationships);
+
+      // Only 2 unique relationships should be inserted
+      expect(created).toHaveLength(2);
+      expect(store.count()).toBe(2);
+    });
+
+    it('does not throw on duplicate - uses INSERT OR IGNORE', () => {
+      // Insert one relationship first
+      store.create({ sourceId, targetId, type: 'calls' });
+
+      // Batch insert including the same relationship
+      const relationships: NewRelationship[] = [
+        { sourceId, targetId, type: 'calls' }, // Duplicate
+        { sourceId, targetId: thirdEntityId, type: 'imports' },
+      ];
+
+      // Should not throw
+      const created = store.createBatch(relationships);
+
+      // Only the new relationship should be in the result
+      expect(created).toHaveLength(1);
+      expect(created[0]?.targetId).toBe(thirdEntityId);
+      expect(store.count()).toBe(2);
+    });
+
+    it('relationships can be found after batch insert', () => {
+      const relationships: NewRelationship[] = [
+        { sourceId, targetId, type: 'calls' },
+        { sourceId, targetId: thirdEntityId, type: 'imports' },
+      ];
+
+      const created = store.createBatch(relationships);
+
+      const found1 = store.findById(created[0]!.id);
+      const found2 = store.findById(created[1]!.id);
+
+      expect(found1?.type).toBe('calls');
+      expect(found2?.type).toBe('imports');
+    });
+  });
+
   describe('findById', () => {
     it('finds an existing relationship', () => {
       const created = store.create(createSampleRelationship());

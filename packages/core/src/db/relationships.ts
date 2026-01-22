@@ -56,6 +56,13 @@ function rowToRelationship(row: RelationshipRow): Relationship {
 
 export interface RelationshipStore {
   create(rel: NewRelationship): Relationship;
+  /**
+   * Batch insert multiple relationships at once using INSERT OR IGNORE.
+   * Significantly faster than individual inserts for bulk operations.
+   * Duplicates (same source, target, type) are silently ignored.
+   * Returns the relationships that were actually inserted.
+   */
+  createBatch(relationships: NewRelationship[]): Relationship[];
   findById(id: string): Relationship | null;
   findBySource(sourceId: string): Relationship[];
   findByTarget(targetId: string): Relationship[];
@@ -70,6 +77,12 @@ export interface RelationshipStore {
 export function createRelationshipStore(db: Database.Database): RelationshipStore {
   const insertStmt = db.prepare(`
     INSERT INTO relationships (id, source_id, target_id, type, metadata)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+
+  // INSERT OR IGNORE for batch operations - silently skips duplicates
+  const insertIgnoreStmt = db.prepare(`
+    INSERT OR IGNORE INTO relationships (id, source_id, target_id, type, metadata)
     VALUES (?, ?, ?, ?, ?)
   `);
 
@@ -104,6 +117,49 @@ export function createRelationshipStore(db: Database.Database): RelationshipStor
 
       const created = selectByIdStmt.get(id) as RelationshipRow;
       return rowToRelationship(created);
+    },
+
+    createBatch(relationships: NewRelationship[]): Relationship[] {
+      if (relationships.length === 0) {
+        return [];
+      }
+
+      // Prepare data and track which relationships we're inserting
+      const prepared = relationships.map(rel => ({
+        id: randomUUID(),
+        sourceId: rel.sourceId,
+        targetId: rel.targetId,
+        type: rel.type,
+        metadata: rel.metadata ? JSON.stringify(rel.metadata) : null,
+      }));
+
+      // Insert all relationships using INSERT OR IGNORE
+      // Duplicates (same source, target, type) are silently skipped
+      const inserted: typeof prepared = [];
+      for (const rel of prepared) {
+        const result = insertIgnoreStmt.run(
+          rel.id,
+          rel.sourceId,
+          rel.targetId,
+          rel.type,
+          rel.metadata
+        );
+        // Only include relationships that were actually inserted
+        if (result.changes > 0) {
+          inserted.push(rel);
+        }
+      }
+
+      // Return relationships without re-querying DB
+      const now = new Date().toISOString();
+      return inserted.map(rel => ({
+        id: rel.id,
+        sourceId: rel.sourceId,
+        targetId: rel.targetId,
+        type: rel.type as RelationshipType,
+        ...(rel.metadata && { metadata: JSON.parse(rel.metadata) as Record<string, unknown> }),
+        createdAt: now,
+      }));
     },
 
     findById(id: string): Relationship | null {
