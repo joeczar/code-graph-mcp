@@ -80,8 +80,8 @@ export type {
 } from './db/index.js';
 
 // Graph exports
-export { FileProcessor } from './graph/index.js';
-export type { ProcessFileOptions, ProcessFileResult } from './graph/index.js';
+export { FileProcessor, TsMorphFileProcessor } from './graph/index.js';
+export type { ProcessFileOptions, ProcessFileResult, ProcessProjectOptions, ProcessProjectResult } from './graph/index.js';
 
 // Checkpoint exports
 export {
