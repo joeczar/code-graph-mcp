@@ -59,6 +59,25 @@ Or add to your global Claude settings (`~/.claude/settings.json`):
 
 Restart Claude Code after adding the configuration.
 
+### Quick Start
+
+After installation and configuration:
+
+1. **Verify connection** - The `ping` tool should return "pong"
+2. **Parse your codebase**:
+   ```
+   mcp__code-graph__parse_directory with path: "/path/to/your/project"
+   ```
+3. **Check the graph**:
+   ```
+   mcp__code-graph__graph_status
+   ```
+4. **Query the graph**:
+   ```
+   mcp__code-graph__find_entity with namePattern: "MyClass"
+   mcp__code-graph__blast_radius with filePath: "/path/to/file.ts"
+   ```
+
 ## Configuration
 
 ### Project ID
@@ -99,11 +118,24 @@ The project ID is used to distinguish metrics and data between different codebas
 | `ping` | Test connectivity (returns "pong") |
 | `echo` | Echo back a message (for testing) |
 | `graph_status` | Show graph stats (entities, relationships) and parsed files |
+| `parse_file` | Parse a single file into the graph |
+| `parse_directory` | Parse all files in a directory recursively |
+| `find_entity` | Search entities by name, type, or file path |
+| `get_exports` | List all exported entities from a file |
 | `what_calls` | Find all callers of a given entity |
 | `what_does_call` | Find all entities called by a given entity |
 | `blast_radius` | Analyze impact of changes to a file |
-| `find_entity` | Search entities by name, type, or file path |
-| `get_exports` | List all exported entities from a file |
+
+### Supported Languages
+
+| Language | Extensions | Entity Extraction | Relationships |
+|----------|------------|-------------------|---------------|
+| TypeScript | `.ts`, `.tsx` | ✅ Functions, classes, methods | ✅ extends |
+| JavaScript | `.js`, `.jsx` | ✅ Functions, classes, methods | ✅ extends |
+| Ruby | `.rb` | ✅ Functions, classes, methods, modules | ✅ extends |
+| Vue | `.vue` | ✅ Functions, classes, methods | ✅ extends |
+
+> **Note:** Function call relationships (`calls`) are not yet extracted. See [#132](https://github.com/joeczar/code-graph-mcp/issues/132) for progress.
 
 ## Development
 

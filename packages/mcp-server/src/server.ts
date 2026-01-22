@@ -26,7 +26,7 @@ import { getProjectId } from './config.js';
  * Callback type for MCP tool handlers.
  * The SDK validates input and passes typed args to this callback.
  */
-type McpToolCallback<T> = (
+type McpToolCallback<T extends z.ZodType> = (
   args: z.infer<T>,
   extra: RequestHandlerExtra<ServerRequest, ServerNotification>
 ) => Promise<CallToolResult>;
