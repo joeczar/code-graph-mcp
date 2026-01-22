@@ -8,6 +8,9 @@ import {
   type NewRelationship,
   createRelationshipStore,
 } from '../db/relationships.js';
+import { TypeScriptRelationshipExtractor } from '../parser/extractors/typescript-relationships.js';
+import { RubyRelationshipExtractor } from '../parser/extractors/ruby-relationships.js';
+import { VueRelationshipExtractor } from '../parser/extractors/vue-relationships.js';
 
 type SyntaxNode = Tree['rootNode'];
 
@@ -21,6 +24,23 @@ type PendingRelationship = Omit<NewRelationship, 'sourceId' | 'targetId'> & {
   sourceName: string;
   targetName: string;
 };
+
+/**
+ * Converts an extracted relationship to a pending relationship.
+ */
+function toPendingRelationship(rel: {
+  sourceName: string;
+  targetName: string;
+  type: string;
+  metadata?: Record<string, unknown>;
+}): PendingRelationship {
+  return {
+    sourceName: rel.sourceName,
+    targetName: rel.targetName,
+    type: rel.type as PendingRelationship['type'],
+    ...(rel.metadata && { metadata: rel.metadata }),
+  };
+}
 
 /**
  * Creates an entity from an AST node if it has a name field.
@@ -54,19 +74,6 @@ function forEachChild(node: SyntaxNode, callback: (child: SyntaxNode) => void): 
   }
 }
 
-/**
- * Finds a child node matching a predicate.
- */
-function findChild(
-  node: SyntaxNode,
-  predicate: (child: SyntaxNode) => boolean
-): SyntaxNode | undefined {
-  for (let i = 0; i < node.childCount; i++) {
-    const child = node.child(i);
-    if (child && predicate(child)) return child;
-  }
-  return undefined;
-}
 
 export interface ProcessFileOptions {
   filePath: string;
@@ -126,7 +133,13 @@ export class FileProcessor {
 
     // Step 4: Extract entities and relationships
     const entities = this.extractEntities(tree.rootNode, filePath, language);
-    const relationships = this.extractRelationships(tree.rootNode, language);
+    const relationships = await this.extractRelationships(
+      tree.rootNode,
+      language,
+      tree,
+      sourceCode,
+      filePath
+    );
 
     // Step 5: Store in database
     const entityStore = createEntityStore(db);
@@ -181,7 +194,12 @@ export class FileProcessor {
           const sourceId = entityNameToId.get(rel.sourceName);
           const targetId = entityNameToId.get(rel.targetName);
 
-          // Skip relationships where we can't resolve both entities
+          // Skip relationships where we can't resolve both entities within this file.
+          // This is acceptable for now since cross-file resolution is future work.
+          // Common cases that are skipped:
+          // - Calls to external functions/methods (e.g., console.log, Array.map)
+          // - Imports from external modules (e.g., 'node:fs', './other-file')
+          // - References to undefined entities in the current file
           if (!sourceId || !targetId) {
             continue;
           }
@@ -307,84 +325,78 @@ export class FileProcessor {
   }
 
   /**
-   * Extract relationships from AST.
-   *
-   * Simplified implementation - will be replaced with dedicated extractors.
+   * Extract relationships from AST using dedicated extractors.
    * Returns relationships with entity names (not IDs) - will be resolved later.
    */
-  private extractRelationships(
+  private async extractRelationships(
     node: SyntaxNode,
-    language: string
-  ): PendingRelationship[] {
+    language: string,
+    tree: Tree,
+    sourceCode: string,
+    filePath: string
+  ): Promise<PendingRelationship[]> {
     const relationships: PendingRelationship[] = [];
 
     if (language === 'typescript' || language === 'javascript') {
       this.extractTypeScriptRelationships(node, relationships);
     } else if (language === 'ruby') {
       this.extractRubyRelationships(node, relationships);
+    } else if (language === 'vue') {
+      await this.extractVueRelationships(tree, sourceCode, filePath, relationships);
     }
 
     return relationships;
   }
 
   /**
-   * Extract TypeScript/JavaScript class inheritance relationships.
+   * Extract TypeScript/JavaScript relationships using dedicated extractor.
    */
   private extractTypeScriptRelationships(
     node: SyntaxNode,
     relationships: PendingRelationship[]
   ): void {
-    if (node.type === 'class_declaration') {
-      const nameNode = node.childForFieldName('name');
-      const heritageNode = node.children.find(c => c.type === 'class_heritage');
+    const extractor = new TypeScriptRelationshipExtractor();
+    const parseResult = {
+      tree: { rootNode: node } as Tree,
+      filePath: '',
+      language: 'typescript' as const,
+      sourceCode: node.text,
+    };
 
-      if (nameNode && heritageNode) {
-        const extendsClause = heritageNode.children.find(
-          c => c.type === 'extends_clause'
-        );
-        const identifier = extendsClause?.children.find(
-          c => c.type === 'identifier'
-        );
-        if (identifier) {
-          relationships.push({
-            sourceName: nameNode.text,
-            targetName: identifier.text,
-            type: 'extends',
-          });
-        }
-      }
-    }
-
-    forEachChild(node, child => {
-      this.extractTypeScriptRelationships(child, relationships);
-    });
+    const extracted = extractor.extract(parseResult);
+    relationships.push(...extracted.map(toPendingRelationship));
   }
 
   /**
-   * Extract Ruby class inheritance relationships.
+   * Extract Ruby relationships using dedicated extractor.
    */
   private extractRubyRelationships(
     node: SyntaxNode,
     relationships: PendingRelationship[]
   ): void {
-    if (node.type === 'class') {
-      const nameNode = node.childForFieldName('name');
-      const superclassNode = node.childForFieldName('superclass');
+    const extractor = new RubyRelationshipExtractor();
+    const extracted = extractor.extract(node);
+    relationships.push(...extracted.map(toPendingRelationship));
+  }
 
-      if (nameNode && superclassNode) {
-        const constant = findChild(superclassNode, c => c.type === 'constant');
-        if (constant) {
-          relationships.push({
-            sourceName: nameNode.text,
-            targetName: constant.text,
-            type: 'extends',
-          });
-        }
-      }
-    }
+  /**
+   * Extract Vue relationships using dedicated extractor.
+   */
+  private async extractVueRelationships(
+    tree: Tree,
+    sourceCode: string,
+    filePath: string,
+    relationships: PendingRelationship[]
+  ): Promise<void> {
+    const extractor = new VueRelationshipExtractor();
+    const parseResult = {
+      tree,
+      filePath,
+      language: 'vue' as const,
+      sourceCode,
+    };
 
-    forEachChild(node, child => {
-      this.extractRubyRelationships(child, relationships);
-    });
+    const extracted = await extractor.extract(parseResult);
+    relationships.push(...extracted.map(toPendingRelationship));
   }
 }

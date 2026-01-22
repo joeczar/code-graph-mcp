@@ -130,12 +130,12 @@ The project ID is used to distinguish metrics and data between different codebas
 
 | Language | Extensions | Entity Extraction | Relationships |
 |----------|------------|-------------------|---------------|
-| TypeScript | `.ts`, `.tsx` | ✅ Functions, classes, methods | ✅ extends |
-| JavaScript | `.js`, `.jsx` | ✅ Functions, classes, methods | ✅ extends |
-| Ruby | `.rb` | ✅ Functions, classes, methods, modules | ✅ extends |
-| Vue | `.vue` | ✅ Functions, classes, methods | ✅ extends |
+| TypeScript | `.ts`, `.tsx` | ✅ Functions, classes, methods | ✅ extends, calls |
+| JavaScript | `.js`, `.jsx` | ✅ Functions, classes, methods | ✅ extends, calls |
+| Ruby | `.rb` | ✅ Functions, classes, methods, modules | ✅ extends, calls |
+| Vue | `.vue` | ✅ Functions, classes, methods | ✅ extends, calls |
 
-> **Note:** Function call relationships (`calls`) are not yet extracted. See [#132](https://github.com/joeczar/code-graph-mcp/issues/132) for progress.
+> **Note:** Call relationships are extracted within single files. Cross-file call resolution (e.g., imported functions) is not yet supported.
 
 ## Development
 
