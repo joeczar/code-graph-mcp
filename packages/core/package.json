@@ -27,8 +27,10 @@
   },
   "dependencies": {
     "@repomix/tree-sitter-wasms": "^0.1.16",
+    "@vue/compiler-sfc": "^3.5.13",
     "better-sqlite3": "^12.6.2",
     "globby": "^16.1.0",
+    "ts-morph": "^24.0.0",
     "web-tree-sitter": "^0.26.3"
   },
   "devDependencies": {
