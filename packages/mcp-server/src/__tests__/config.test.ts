@@ -10,6 +10,15 @@ vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
 }));
 
+vi.mock('../tools/logger.js', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
@@ -48,6 +57,12 @@ describe('config', () => {
       it('should trim whitespace from PROJECT_ID', () => {
         process.env['PROJECT_ID'] = '  my-project  ';
         expect(getProjectId()).toBe('my-project');
+      });
+
+      it('should fall through when PROJECT_ID is only whitespace', () => {
+        process.env['PROJECT_ID'] = '   ';
+        vi.mocked(execSync).mockReturnValue('git@github.com:owner/repo.git\n');
+        expect(getProjectId()).toBe('repo');
       });
     });
 

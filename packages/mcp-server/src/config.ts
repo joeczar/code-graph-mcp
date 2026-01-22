@@ -33,30 +33,16 @@ function detectProjectIdFromGit(): string | null {
       return null;
     }
 
-    // Extract repo name from various URL formats
-    // SSH: git@github.com:owner/repo.git
-    // HTTPS: https://github.com/owner/repo.git
-    // HTTPS no .git: https://github.com/owner/repo
-
-    // Remove .git suffix if present
-    const url = output.endsWith('.git') ? output.slice(0, -4) : output;
-
-    // Extract the last path component (repo name)
-    // For SSH format (contains :), split on : and take the last part
-    // For HTTPS format, split on / and take the last part
-    const parts = url.includes(':') ? url.split(':') : url.split('/');
-    const repoPath = parts[parts.length - 1];
-
-    if (!repoPath) {
-      return null;
-    }
-
-    // Handle owner/repo format by taking just the repo
-    const repoName = repoPath.includes('/') ? repoPath.split('/').pop() : repoPath;
-
-    return repoName ?? null;
-  } catch {
+    // Extract repo name from URL (handles SSH and HTTPS formats)
+    // SSH: git@github.com:owner/repo.git → repo
+    // HTTPS: https://github.com/owner/repo.git → repo
+    const match = /[/:]([^/]+?)(?:\.git)?$/.exec(output);
+    return match?.[1] ?? null;
+  } catch (error) {
     // Git command failed (not a git repo, no remote, etc.)
+    logger.debug('Git project ID detection failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
@@ -84,13 +70,14 @@ function detectProjectIdFromPackageJson(): string | null {
       return null;
     }
 
-    // Strip @scope/ prefix for scoped packages
-    // @myorg/my-package → my-package
-    const scopeRegex = /^@[^/]+\/(.+)$/;
-    const scopeMatch = scopeRegex.exec(name);
-    return scopeMatch?.[1] ?? name;
-  } catch {
+    // Strip @scope/ prefix for scoped packages (@myorg/my-package → my-package)
+    return name.replace(/^@[^/]+\//, '');
+  } catch (error) {
     // File doesn't exist, invalid JSON, or no name field
+    logger.debug('package.json project ID detection failed', {
+      path: `${process.cwd()}/package.json`,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
