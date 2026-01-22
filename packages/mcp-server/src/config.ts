@@ -145,3 +145,27 @@ export function getProjectId(): string {
   cachedProjectId = 'unknown';
   return cachedProjectId;
 }
+
+/**
+ * Get Ruby LSP configuration from environment variables
+ *
+ * Environment variables:
+ * - USE_RUBY_LSP: Set to 'true' or '1' to enable Ruby LSP integration
+ * - RUBY_PATH: Path to Ruby executable (defaults to 'ruby')
+ *
+ * @returns Configuration object for FileProcessor
+ */
+export function getRubyLSPConfig(): { useRubyLSP: boolean; rubyPath?: string } {
+  const useRubyLSP =
+    process.env['USE_RUBY_LSP'] === 'true' || process.env['USE_RUBY_LSP'] === '1';
+  const rubyPath = process.env['RUBY_PATH'];
+
+  if (useRubyLSP) {
+    logger.info('Ruby LSP integration enabled', { rubyPath: rubyPath ?? 'ruby' });
+  }
+
+  return {
+    useRubyLSP,
+    ...(rubyPath && { rubyPath }),
+  };
+}

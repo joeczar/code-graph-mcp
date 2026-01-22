@@ -14,6 +14,7 @@ import { FileProcessor, getDatabase, initializeSchema } from '@code-graph/core';
 import { type ToolDefinition, createSuccessResponse, createErrorResponse } from './types.js';
 import { ResourceNotFoundError, ToolExecutionError } from './errors.js';
 import { countByType } from './utils.js';
+import { getRubyLSPConfig } from '../config.js';
 
 const parseFileInputSchema = z.object({
   path: z.string().describe('Path to file to parse (absolute or relative to working directory)'),
@@ -104,7 +105,8 @@ export const parseFileTool: ToolDefinition<typeof parseFileInputSchema> = {
     // Process the file
     let result;
     try {
-      const processor = new FileProcessor();
+      const rubyLSPConfig = getRubyLSPConfig();
+      const processor = new FileProcessor(rubyLSPConfig);
       result = await processor.processFile({
         filePath: resolvedPath,
         db,

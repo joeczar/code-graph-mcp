@@ -23,6 +23,7 @@ import { type ToolDefinition, createSuccessResponse, createErrorResponse } from 
 import { ResourceNotFoundError, ToolExecutionError } from './errors.js';
 import { countByType } from './utils.js';
 import { logger } from './logger.js';
+import { getRubyLSPConfig } from '../config.js';
 
 const parseDirectoryInputSchema = z.object({
   path: z.string().describe('Path to directory to parse recursively (absolute or relative to working directory)'),
@@ -110,7 +111,8 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
 
     // Use DirectoryParser to find files and FileProcessor to store in DB
     const directoryParser = new DirectoryParser();
-    const processor = new FileProcessor();
+    const rubyLSPConfig = getRubyLSPConfig();
+    const processor = new FileProcessor(rubyLSPConfig);
 
     // Parse directory using DirectoryParser (respects .gitignore)
     let parseResult;

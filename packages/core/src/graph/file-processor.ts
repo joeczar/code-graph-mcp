@@ -95,6 +95,8 @@ export interface ProcessFileResult {
 export interface FileProcessorOptions {
   /** Enable Ruby LSP integration for cross-file method resolution (optional) */
   useRubyLSP?: boolean;
+  /** Path to Ruby executable (defaults to 'ruby') */
+  rubyPath?: string;
 }
 
 /**
@@ -113,7 +115,9 @@ export class FileProcessor {
     this.useRubyLSP = options.useRubyLSP ?? false;
 
     if (this.useRubyLSP) {
-      this.rubyLSPParser = new RubyLSPParser();
+      this.rubyLSPParser = new RubyLSPParser(
+        options.rubyPath ? { rubyPath: options.rubyPath } : {}
+      );
     }
   }
 
