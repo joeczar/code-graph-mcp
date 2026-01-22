@@ -9,7 +9,7 @@ let dbInstance: Database.Database | null = null;
 let currentFilePath: string | null = null;
 
 export function getDatabase(options?: DatabaseOptions): Database.Database {
-  const filePath = options?.filePath ?? ':memory:';
+  const filePath = options?.filePath ?? process.env['CODE_GRAPH_DB_PATH'] ?? ':memory:';
 
   if (dbInstance) {
     // Warn if attempting to open a different database without resetting first
