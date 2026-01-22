@@ -36,6 +36,7 @@ interface RubyIndexerRelationship {
   sourceName: string;
   targetName: string;
   metadata?: Record<string, unknown>;
+  targetFilePath?: string;
 }
 
 /**
@@ -179,6 +180,7 @@ export class RubyLSPParser {
       sourceName: rel.sourceName,
       targetName: rel.targetName,
       ...(rel.metadata && { metadata: rel.metadata }),
+      ...(rel.targetFilePath && { targetFilePath: rel.targetFilePath }),
     };
   }
 }
