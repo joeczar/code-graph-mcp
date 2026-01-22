@@ -72,6 +72,15 @@ function isRubyFile(filePath: string): boolean {
 }
 
 /**
+ * Get the language identifier for a file based on its extension
+ */
+function getLanguageForFile(filePath: string): string {
+  if (isTsJsFile(filePath)) return 'typescript';
+  if (isRubyFile(filePath)) return 'ruby';
+  return 'unknown';
+}
+
+/**
  * Send a progress notification to the MCP client
  * Logs progress to console and sends MCP notification if client supports it
  */
@@ -479,16 +488,7 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
     // Update file hashes for successfully parsed files
     // This enables incremental updates on subsequent parses
     for (const [filePath, hash] of fileHashes) {
-      const ext = path.extname(filePath).toLowerCase();
-      let language: string;
-      if (TS_JS_EXTENSIONS.includes(ext)) {
-        language = 'typescript';
-      } else if (RUBY_EXTENSIONS.includes(ext)) {
-        language = 'ruby';
-      } else {
-        language = 'unknown';
-      }
-      incrementalUpdater.markFileUpdated(filePath, hash, language);
+      incrementalUpdater.markFileUpdated(filePath, hash, getLanguageForFile(filePath));
     }
 
     // Format success response

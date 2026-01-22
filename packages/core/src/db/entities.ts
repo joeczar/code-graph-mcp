@@ -147,6 +147,7 @@ export function createEntityStore(db: Database.Database): EntityStore {
   const selectByNameAndFileStmt = db.prepare(
     'SELECT * FROM entities WHERE name = ? AND file_path = ?'
   );
+  const selectAllStmt = db.prepare('SELECT * FROM entities');
 
   return {
     create(entity: NewEntity): Entity {
@@ -173,47 +174,39 @@ export function createEntityStore(db: Database.Database): EntityStore {
         return [];
       }
 
-      // Generate IDs and prepare data
-      const prepared = entities.map(entity => ({
-        id: randomUUID(),
-        type: entity.type,
-        name: entity.name,
-        filePath: entity.filePath,
-        startLine: entity.startLine,
-        endLine: entity.endLine,
-        language: entity.language,
-        metadata: entity.metadata ? JSON.stringify(entity.metadata) : null,
-      }));
+      const now = new Date().toISOString();
+      const results: Entity[] = [];
 
-      // Insert all entities using prepared statement
-      for (const entity of prepared) {
+      for (const entity of entities) {
+        const id = randomUUID();
+        const metadataJson = entity.metadata ? JSON.stringify(entity.metadata) : null;
+
         insertStmt.run(
-          entity.id,
+          id,
           entity.type,
           entity.name,
           entity.filePath,
           entity.startLine,
           entity.endLine,
           entity.language,
-          entity.metadata
+          metadataJson
         );
+
+        results.push({
+          id,
+          type: entity.type,
+          name: entity.name,
+          filePath: entity.filePath,
+          startLine: entity.startLine,
+          endLine: entity.endLine,
+          language: entity.language,
+          ...(entity.metadata && { metadata: entity.metadata }),
+          createdAt: now,
+          updatedAt: now,
+        });
       }
 
-      // Return entities without re-querying DB
-      // Build result directly from inserted data with current timestamp
-      const now = new Date().toISOString();
-      return prepared.map(entity => ({
-        id: entity.id,
-        type: entity.type,
-        name: entity.name,
-        filePath: entity.filePath,
-        startLine: entity.startLine,
-        endLine: entity.endLine,
-        language: entity.language,
-        ...(entity.metadata && { metadata: JSON.parse(entity.metadata) as Record<string, unknown> }),
-        createdAt: now,
-        updatedAt: now,
-      }));
+      return results;
     },
 
     findById(id: string): Entity | null {
@@ -242,7 +235,6 @@ export function createEntityStore(db: Database.Database): EntityStore {
     },
 
     getAll(): Entity[] {
-      const selectAllStmt = db.prepare('SELECT * FROM entities');
       const rows = selectAllStmt.all() as EntityRow[];
       return rows.map(rowToEntity);
     },

@@ -124,42 +124,29 @@ export function createRelationshipStore(db: Database.Database): RelationshipStor
         return [];
       }
 
-      // Prepare data and track which relationships we're inserting
-      const prepared = relationships.map(rel => ({
-        id: randomUUID(),
-        sourceId: rel.sourceId,
-        targetId: rel.targetId,
-        type: rel.type,
-        metadata: rel.metadata ? JSON.stringify(rel.metadata) : null,
-      }));
+      const now = new Date().toISOString();
+      const results: Relationship[] = [];
 
-      // Insert all relationships using INSERT OR IGNORE
-      // Duplicates (same source, target, type) are silently skipped
-      const inserted: typeof prepared = [];
-      for (const rel of prepared) {
-        const result = insertIgnoreStmt.run(
-          rel.id,
-          rel.sourceId,
-          rel.targetId,
-          rel.type,
-          rel.metadata
-        );
-        // Only include relationships that were actually inserted
+      for (const rel of relationships) {
+        const id = randomUUID();
+        const metadataJson = rel.metadata ? JSON.stringify(rel.metadata) : null;
+
+        // INSERT OR IGNORE silently skips duplicates (same source, target, type)
+        const result = insertIgnoreStmt.run(id, rel.sourceId, rel.targetId, rel.type, metadataJson);
+
         if (result.changes > 0) {
-          inserted.push(rel);
+          results.push({
+            id,
+            sourceId: rel.sourceId,
+            targetId: rel.targetId,
+            type: rel.type,
+            ...(rel.metadata && { metadata: rel.metadata }),
+            createdAt: now,
+          });
         }
       }
 
-      // Return relationships without re-querying DB
-      const now = new Date().toISOString();
-      return inserted.map(rel => ({
-        id: rel.id,
-        sourceId: rel.sourceId,
-        targetId: rel.targetId,
-        type: rel.type,
-        ...(rel.metadata && { metadata: JSON.parse(rel.metadata) as Record<string, unknown> }),
-        createdAt: now,
-      }));
+      return results;
     },
 
     findById(id: string): Relationship | null {

@@ -73,6 +73,27 @@ function toNewEntity(entity: TsMorphEntity): NewEntity {
   };
 }
 
+/**
+ * Entity cache: filePath -> (name -> entityId)
+ * Enables O(1) lookup for cross-file relationship resolution.
+ */
+type EntityCache = Map<string, Map<string, string>>;
+
+/**
+ * Add an entity to the cache. Returns true if the entity was a new addition,
+ * false if it overwrote an existing entry (name collision within the same file).
+ */
+function addToEntityCache(cache: EntityCache, entity: { filePath: string; name: string; id: string }): boolean {
+  let nameMap = cache.get(entity.filePath);
+  if (!nameMap) {
+    nameMap = new Map<string, string>();
+    cache.set(entity.filePath, nameMap);
+  }
+  const isNew = !nameMap.has(entity.name);
+  nameMap.set(entity.name, entity.id);
+  return isNew;
+}
+
 export interface ProcessProjectOptions {
   projectPath: string;
   db: Database.Database;
@@ -180,40 +201,20 @@ export class TsMorphFileProcessor {
       // Wrap database operations in a transaction for atomicity
       const transaction = db.transaction(() => {
         // Pre-load existing entities into cache for O(1) cross-file lookups
-        // This avoids expensive individual DB queries during relationship resolution
-        const entityCache = new Map<string, Map<string, string>>();
-        const existingEntities = entityStore.getAll();
-        for (const entity of existingEntities) {
-          let nameMap = entityCache.get(entity.filePath);
-          if (!nameMap) {
-            nameMap = new Map<string, string>();
-            entityCache.set(entity.filePath, nameMap);
-          }
-          nameMap.set(entity.name, entity.id);
+        const entityCache: EntityCache = new Map();
+        for (const entity of entityStore.getAll()) {
+          addToEntityCache(entityCache, entity);
         }
 
-        // Batch insert all entities
+        // Batch insert all entities and add to cache
         storedEntities = entityStore.createBatch(entities);
-
-        // Build file->name->id mapping for newly inserted entities
-        // and add them to the cache for relationship resolution
         const nameCollisions: string[] = [];
         for (const entity of storedEntities) {
-          let nameMap = entityCache.get(entity.filePath);
-          if (!nameMap) {
-            nameMap = new Map<string, string>();
-            entityCache.set(entity.filePath, nameMap);
-          }
-
-          // Check for name collisions within the same file
-          if (nameMap.has(entity.name)) {
+          if (!addToEntityCache(entityCache, entity)) {
             nameCollisions.push(`${entity.filePath}:${entity.name}`);
           }
-
-          nameMap.set(entity.name, entity.id);
         }
 
-        // Log warning for name collisions (indicates potential data quality issues)
         if (nameCollisions.length > 0) {
           console.warn(
             `[TsMorphFileProcessor] Name collisions detected: ${nameCollisions.join(', ')}. ` +
@@ -221,8 +222,7 @@ export class TsMorphFileProcessor {
           );
         }
 
-        // Resolve relationships using in-memory cache only
-        // All lookups are O(1) - no DB queries needed
+        // Resolve relationships using in-memory cache (O(1) lookups)
         const resolvedRelationships: NewRelationship[] = [];
 
         for (const rel of relationships) {
