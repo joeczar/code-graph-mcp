@@ -9,6 +9,7 @@ import {
   createRelationshipStore,
 } from '../db/relationships.js';
 import { TypeScriptRelationshipExtractor } from '../parser/extractors/typescript-relationships.js';
+import { RubyRelationshipExtractor } from '../parser/extractors/ruby-relationships.js';
 
 type SyntaxNode = Tree['rootNode'];
 
@@ -55,19 +56,6 @@ function forEachChild(node: SyntaxNode, callback: (child: SyntaxNode) => void): 
   }
 }
 
-/**
- * Finds a child node matching a predicate.
- */
-function findChild(
-  node: SyntaxNode,
-  predicate: (child: SyntaxNode) => boolean
-): SyntaxNode | undefined {
-  for (let i = 0; i < node.childCount; i++) {
-    const child = node.child(i);
-    if (child && predicate(child)) return child;
-  }
-  return undefined;
-}
 
 export interface ProcessFileOptions {
   filePath: string;
@@ -359,30 +347,23 @@ export class FileProcessor {
   }
 
   /**
-   * Extract Ruby class inheritance relationships.
+   * Extract Ruby relationships using dedicated extractor.
    */
   private extractRubyRelationships(
     node: SyntaxNode,
     relationships: PendingRelationship[]
   ): void {
-    if (node.type === 'class') {
-      const nameNode = node.childForFieldName('name');
-      const superclassNode = node.childForFieldName('superclass');
+    const extractor = new RubyRelationshipExtractor();
+    const extractedRelationships = extractor.extract(node);
 
-      if (nameNode && superclassNode) {
-        const constant = findChild(superclassNode, c => c.type === 'constant');
-        if (constant) {
-          relationships.push({
-            sourceName: nameNode.text,
-            targetName: constant.text,
-            type: 'extends',
-          });
-        }
-      }
+    // Convert ExtractedRelationship to PendingRelationship format
+    for (const rel of extractedRelationships) {
+      relationships.push({
+        sourceName: rel.sourceName,
+        targetName: rel.targetName,
+        type: rel.type,
+        ...(rel.metadata && { metadata: rel.metadata }),
+      });
     }
-
-    forEachChild(node, child => {
-      this.extractRubyRelationships(child, relationships);
-    });
   }
 }
