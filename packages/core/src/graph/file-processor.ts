@@ -171,7 +171,12 @@ export class FileProcessor {
           const sourceId = entityNameToId.get(rel.sourceName);
           const targetId = entityNameToId.get(rel.targetName);
 
-          // Skip relationships where we can't resolve both entities
+          // Skip relationships where we can't resolve both entities within this file.
+          // This is acceptable for now since cross-file resolution is future work.
+          // Common cases that are skipped:
+          // - Calls to external functions/methods (e.g., console.log, Array.map)
+          // - Imports from external modules (e.g., 'node:fs', './other-file')
+          // - References to undefined entities in the current file
           if (!sourceId || !targetId) {
             continue;
           }
