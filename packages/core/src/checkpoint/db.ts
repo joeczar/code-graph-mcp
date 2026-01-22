@@ -601,9 +601,11 @@ export function addMilestoneRunForceResolved(
     const run = getMilestoneRun(db, id);
     if (!run) return false;
 
-    const currentResolved: number[] = run.force_resolved
-      ? (JSON.parse(run.force_resolved) as number[])
-      : [];
+    const parsed: unknown = run.force_resolved ? JSON.parse(run.force_resolved) : [];
+    const currentResolved: number[] =
+      Array.isArray(parsed) && parsed.every((i) => typeof i === 'number')
+        ? parsed
+        : [];
     if (!currentResolved.includes(issueNumber)) {
       currentResolved.push(issueNumber);
     }

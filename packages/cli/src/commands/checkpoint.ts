@@ -333,9 +333,23 @@ function handleMilestoneAction(action: string, args: string[]): void {
       }
       let waveIssues: Record<string, number[]>;
       try {
-        waveIssues = JSON.parse(wavesJson) as Record<string, number[]>;
-      } catch {
-        throw new Error(`Invalid JSON for --waves: ${wavesJson}`);
+        const parsed: unknown = JSON.parse(wavesJson);
+        // Validate structure: must be an object with string keys and number[] values
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          throw new Error('Must be an object');
+        }
+        for (const [key, value] of Object.entries(parsed)) {
+          if (!/^\d+$/.test(key)) {
+            throw new Error(`Key "${key}" must be a numeric string`);
+          }
+          if (!Array.isArray(value) || !value.every((v) => typeof v === 'number')) {
+            throw new Error(`Value for key "${key}" must be an array of numbers`);
+          }
+        }
+        waveIssues = parsed as Record<string, number[]>;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Parse error';
+        throw new Error(`Invalid JSON for --waves: ${wavesJson}\n${msg}`);
       }
 
       // Parse --parallel argument (optional)
