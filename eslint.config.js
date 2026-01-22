@@ -35,6 +35,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/*.js', '**/*.mjs', '**/fixtures/**'],
+    ignores: ['**/dist/**', '**/node_modules/**', '**/*.js', '**/*.mjs', '**/fixtures/**', '.worktrees/**'],
   }
 );
