@@ -44,7 +44,7 @@ describe('getExportsTool', () => {
       const db = getDatabase();
       const entityStore = createEntityStore(db);
 
-      // Create entity without isExported metadata
+      // Create entity without exported metadata
       entityStore.create({
         type: 'function',
         name: 'privateFunction',
@@ -80,7 +80,7 @@ describe('getExportsTool', () => {
         endLine: 15,
         language: 'typescript',
         metadata: {
-          isExported: true,
+          exported: true,
           exportType: 'named',
           signature: '(name: string) => string',
         },
@@ -95,7 +95,7 @@ describe('getExportsTool', () => {
         endLine: 30,
         language: 'typescript',
         metadata: {
-          isExported: true,
+          exported: true,
           exportType: 'named',
         },
       });
@@ -127,7 +127,7 @@ describe('getExportsTool', () => {
         endLine: 50,
         language: 'typescript',
         metadata: {
-          isExported: true,
+          exported: true,
           exportType: 'default',
           signature: 'class Calculator { add(a: number, b: number): number }',
         },
@@ -159,7 +159,7 @@ describe('getExportsTool', () => {
         endLine: 100,
         language: 'typescript',
         metadata: {
-          isExported: true,
+          exported: true,
           exportType: 'default',
         },
       });
@@ -173,7 +173,7 @@ describe('getExportsTool', () => {
         endLine: 110,
         language: 'typescript',
         metadata: {
-          isExported: true,
+          exported: true,
           exportType: 'named',
         },
       });
@@ -186,7 +186,7 @@ describe('getExportsTool', () => {
         endLine: 112,
         language: 'typescript',
         metadata: {
-          isExported: true,
+          exported: true,
           exportType: 'named',
         },
       });
@@ -216,7 +216,7 @@ describe('getExportsTool', () => {
         endLine: 5,
         language: 'typescript',
         metadata: {
-          isExported: true,
+          exported: true,
         },
       });
 
@@ -248,7 +248,7 @@ describe('getExportsTool', () => {
       const db = getDatabase();
       const entityStore = createEntityStore(db);
 
-      // Private function (no isExported metadata)
+      // Private function (no exported metadata)
       entityStore.create({
         type: 'function',
         name: 'privateHelper',
@@ -267,11 +267,11 @@ describe('getExportsTool', () => {
         endLine: 15,
         language: 'typescript',
         metadata: {
-          isExported: true,
+          exported: true,
         },
       });
 
-      // Another private function (isExported: false)
+      // Another private function (exported: false)
       entityStore.create({
         type: 'function',
         name: 'anotherPrivate',
@@ -280,7 +280,7 @@ describe('getExportsTool', () => {
         endLine: 25,
         language: 'typescript',
         metadata: {
-          isExported: false,
+          exported: false,
         },
       });
 

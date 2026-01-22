@@ -21,7 +21,7 @@ const getExportsInputSchema = z.object({
  * Get exports tool definition
  *
  * Retrieves all entities from a file and filters for those with
- * isExported metadata set to true.
+ * exported metadata set to true.
  */
 export const getExportsTool: ToolDefinition<typeof getExportsInputSchema> = {
   metadata: {
@@ -38,7 +38,7 @@ export const getExportsTool: ToolDefinition<typeof getExportsInputSchema> = {
 
     // Filter for exported entities
     const exports = entities.filter(
-      (e) => e.metadata?.['isExported'] === true
+      (e) => e.metadata?.['exported'] === true
     );
 
     // Format output
