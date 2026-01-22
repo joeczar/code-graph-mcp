@@ -601,18 +601,12 @@ export function extractRelationships(
       return;
     }
 
-    // Only set targetFilePath for cross-file calls (when target is in a different file)
-    const relationship: TsMorphRelationship = {
+    relationships.push({
       sourceName,
       targetName: target.name,
       type: 'calls',
-    };
-
-    if (target.filePath !== filePath) {
-      relationship.targetFilePath = target.filePath;
-    }
-
-    relationships.push(relationship);
+      ...(target.filePath !== filePath && { targetFilePath: target.filePath }),
+    });
   });
 
   // Class extends relationships
