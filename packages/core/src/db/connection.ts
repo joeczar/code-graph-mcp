@@ -33,6 +33,14 @@ export function getDatabase(options?: DatabaseOptions): Database.Database {
     }
     dbInstance.pragma('foreign_keys = ON');
 
+    // Performance optimizations for bulk indexing operations
+    // synchronous=NORMAL: trades some durability for significant write speed gain
+    // cache_size=10000: ~40MB cache (10000 pages * 4KB default page size)
+    // temp_store=MEMORY: keep temporary tables in memory
+    dbInstance.pragma('synchronous = NORMAL');
+    dbInstance.pragma('cache_size = 10000');
+    dbInstance.pragma('temp_store = MEMORY');
+
     currentFilePath = filePath;
     return dbInstance;
   } catch (err) {

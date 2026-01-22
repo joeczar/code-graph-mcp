@@ -45,4 +45,20 @@ describe('Database Connection', () => {
     // File-based databases will use 'wal' mode
     expect(['wal', 'memory']).toContain(result[0]?.journal_mode);
   });
+
+  it('has performance optimizations enabled', () => {
+    const db = getDatabase();
+
+    // synchronous=NORMAL (1) for write performance
+    const syncResult = db.pragma('synchronous') as { synchronous: number }[];
+    expect(syncResult[0]?.synchronous).toBe(1);
+
+    // cache_size should be 10000 pages (negative means KB, positive means pages)
+    const cacheResult = db.pragma('cache_size') as { cache_size: number }[];
+    expect(cacheResult[0]?.cache_size).toBe(10000);
+
+    // temp_store=MEMORY (2)
+    const tempResult = db.pragma('temp_store') as { temp_store: number }[];
+    expect(tempResult[0]?.temp_store).toBe(2);
+  });
 });

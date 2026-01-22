@@ -43,6 +43,21 @@ export const RELATIONSHIPS_INDEXES = [
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_rel_unique ON relationships(source_id, target_id, type)',
 ];
 
+export const FILES_TABLE = `
+CREATE TABLE IF NOT EXISTS files (
+  id TEXT PRIMARY KEY,
+  file_path TEXT NOT NULL UNIQUE,
+  content_hash TEXT NOT NULL,
+  language TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+)
+`;
+
+export const FILES_INDEXES = [
+  'CREATE INDEX IF NOT EXISTS idx_files_path ON files(file_path)',
+  'CREATE INDEX IF NOT EXISTS idx_files_hash ON files(content_hash)',
+];
+
 export function initializeSchema(db: Database.Database): void {
   try {
     db.exec(ENTITIES_TABLE);
@@ -73,6 +88,22 @@ export function initializeSchema(db: Database.Database): void {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       throw new Error(`Failed to create relationship index: ${message}`);
+    }
+  }
+
+  try {
+    db.exec(FILES_TABLE);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    throw new Error(`Failed to create files table: ${message}`);
+  }
+
+  for (const index of FILES_INDEXES) {
+    try {
+      db.exec(index);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      throw new Error(`Failed to create file index: ${message}`);
     }
   }
 }

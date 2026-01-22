@@ -56,6 +56,13 @@ function rowToRelationship(row: RelationshipRow): Relationship {
 
 export interface RelationshipStore {
   create(rel: NewRelationship): Relationship;
+  /**
+   * Batch insert multiple relationships at once using INSERT OR IGNORE.
+   * Significantly faster than individual inserts for bulk operations.
+   * Duplicates (same source, target, type) are silently ignored.
+   * Returns the relationships that were actually inserted.
+   */
+  createBatch(relationships: NewRelationship[]): Relationship[];
   findById(id: string): Relationship | null;
   findBySource(sourceId: string): Relationship[];
   findByTarget(targetId: string): Relationship[];
@@ -70,6 +77,12 @@ export interface RelationshipStore {
 export function createRelationshipStore(db: Database.Database): RelationshipStore {
   const insertStmt = db.prepare(`
     INSERT INTO relationships (id, source_id, target_id, type, metadata)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+
+  // INSERT OR IGNORE for batch operations - silently skips duplicates
+  const insertIgnoreStmt = db.prepare(`
+    INSERT OR IGNORE INTO relationships (id, source_id, target_id, type, metadata)
     VALUES (?, ?, ?, ?, ?)
   `);
 
@@ -104,6 +117,36 @@ export function createRelationshipStore(db: Database.Database): RelationshipStor
 
       const created = selectByIdStmt.get(id) as RelationshipRow;
       return rowToRelationship(created);
+    },
+
+    createBatch(relationships: NewRelationship[]): Relationship[] {
+      if (relationships.length === 0) {
+        return [];
+      }
+
+      const now = new Date().toISOString();
+      const results: Relationship[] = [];
+
+      for (const rel of relationships) {
+        const id = randomUUID();
+        const metadataJson = rel.metadata ? JSON.stringify(rel.metadata) : null;
+
+        // INSERT OR IGNORE silently skips duplicates (same source, target, type)
+        const result = insertIgnoreStmt.run(id, rel.sourceId, rel.targetId, rel.type, metadataJson);
+
+        if (result.changes > 0) {
+          results.push({
+            id,
+            sourceId: rel.sourceId,
+            targetId: rel.targetId,
+            type: rel.type,
+            ...(rel.metadata && { metadata: rel.metadata }),
+            createdAt: now,
+          });
+        }
+      }
+
+      return results;
     },
 
     findById(id: string): Relationship | null {

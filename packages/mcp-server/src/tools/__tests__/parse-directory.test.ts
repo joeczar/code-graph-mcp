@@ -236,18 +236,41 @@ describe('parseDirectoryTool', () => {
 
     describe('idempotency', () => {
       it('should handle re-parsing the same directory', async () => {
-        // Parse twice
-        const response1 = await parseDirectoryTool.handler({ path: FIXTURES_DIR });
-        const response2 = await parseDirectoryTool.handler({ path: FIXTURES_DIR });
+        // Create a temp directory for isolated testing to avoid cross-test contamination
+        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'parse-dir-idem-'));
 
-        expect(response1.isError).toBeUndefined();
-        expect(response2.isError).toBeUndefined();
+        try {
+          // Create test files
+          fs.writeFileSync(path.join(tempDir, 'test.ts'), 'export const x = 1;');
+          fs.writeFileSync(path.join(tempDir, 'test2.ts'), 'export const y = 2;');
 
-        // Both should succeed (idempotent operation)
-        const text1 = response1.content[0]?.text ?? '';
-        const text2 = response2.content[0]?.text ?? '';
-        expect(text1).toContain('Directory Parsed Successfully');
-        expect(text2).toContain('Directory Parsed Successfully');
+          // Parse twice (use force=true for first to ensure clean state)
+          const response1 = await parseDirectoryTool.handler({ path: tempDir, force: true });
+          const response2 = await parseDirectoryTool.handler({ path: tempDir });
+
+          expect(response1.isError).toBeUndefined();
+          expect(response2.isError).toBeUndefined();
+
+          // First parse should succeed, second should return cached results (incremental update)
+          const text1 = response1.content[0]?.text ?? '';
+          const text2 = response2.content[0]?.text ?? '';
+          expect(text1).toContain('Directory Parsed Successfully');
+          // Second call returns cached results since files haven't changed
+          expect(text2).toContain('Directory Already Indexed');
+        } finally {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      });
+
+      it('should reparse when force=true is used', async () => {
+        // First parse
+        await parseDirectoryTool.handler({ path: FIXTURES_DIR });
+        // Force reparse
+        const response = await parseDirectoryTool.handler({ path: FIXTURES_DIR, force: true });
+
+        expect(response.isError).toBeUndefined();
+        const text = response.content[0]?.text ?? '';
+        expect(text).toContain('Directory Parsed Successfully');
       });
     });
 

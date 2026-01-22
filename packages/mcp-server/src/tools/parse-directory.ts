@@ -22,6 +22,9 @@ import {
   getDatabase,
   initializeSchema,
   DirectoryParser,
+  createIncrementalUpdater,
+  computeFileHashFromPath,
+  createEntityStore,
   type Entity,
   type Relationship,
   type ProgressCallback,
@@ -69,6 +72,15 @@ function isRubyFile(filePath: string): boolean {
 }
 
 /**
+ * Get the language identifier for a file based on its extension
+ */
+function getLanguageForFile(filePath: string): string {
+  if (isTsJsFile(filePath)) return 'typescript';
+  if (isRubyFile(filePath)) return 'ruby';
+  return 'unknown';
+}
+
+/**
  * Send a progress notification to the MCP client
  * Logs progress to console and sends MCP notification if client supports it
  */
@@ -111,6 +123,7 @@ async function sendProgress(
 const parseDirectoryInputSchema = z.object({
   path: z.string().describe('Path to directory to parse recursively (absolute or relative to working directory)'),
   pattern: z.string().optional().describe('Optional glob pattern to filter files (e.g., "**/*.ts", "src/**/*.js")'),
+  force: z.boolean().optional().describe('Force full reparse even if files have not changed (default: false)'),
 });
 
 /**
@@ -128,7 +141,7 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
   },
 
   handler: async (input, extra) => {
-    const { path: inputPath, pattern } = input;
+    const { path: inputPath, pattern, force = false } = input;
 
     // Resolve path (handle relative paths)
     const resolvedPath = path.isAbsolute(inputPath)
@@ -251,6 +264,73 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
     const totalFiles = tsJsFiles.length + rubyFiles.length;
 
     await sendProgress(extra, 0, totalFiles, `Found ${String(totalFiles)} files to process (${String(tsJsFiles.length)} TS/JS, ${String(rubyFiles.length)} Ruby)`);
+
+    // Create incremental updater for change detection
+    const incrementalUpdater = createIncrementalUpdater(db);
+    const entityStore = createEntityStore(db);
+
+    // Compute file hashes and determine which files need reparsing
+    await sendProgress(extra, 0, totalFiles, 'Computing file hashes for incremental update...');
+
+    const allFilePaths = [...tsJsFiles, ...rubyFiles].map(f => f.filePath);
+    const fileHashes = new Map<string, string>();
+    const filesToReparse: string[] = [];
+
+    for (const filePath of allFilePaths) {
+      const hash = await computeFileHashFromPath(filePath);
+      if (hash) {
+        fileHashes.set(filePath, hash);
+        if (force || incrementalUpdater.shouldReparse(filePath, hash)) {
+          filesToReparse.push(filePath);
+        }
+      }
+    }
+
+    // Remove stale files (files in DB that no longer exist in the directory)
+    const staleResults = incrementalUpdater.removeStaleFiles(allFilePaths);
+    const staleFilesRemoved = staleResults.filter(r => r.action === 'deleted').length;
+    if (staleFilesRemoved > 0) {
+      logger.info(`Removed ${String(staleFilesRemoved)} stale files from database`);
+    }
+
+    // Check if any files need reparsing
+    const unchangedCount = allFilePaths.length - filesToReparse.length;
+    if (!force && filesToReparse.length === 0 && allFilePaths.length > 0) {
+      // No files changed - return cached results (only when there are files to check)
+      const cachedEntities = entityStore.getAll();
+      const lines: string[] = [];
+      lines.push(`=== Directory Already Indexed (No Changes) ===\n`);
+      lines.push(`Directory: ${resolvedPath}`);
+      if (pattern) {
+        lines.push(`Pattern: ${pattern}`);
+      }
+      lines.push(`Total Files: ${String(totalFiles)}`);
+      lines.push(`  Unchanged: ${String(unchangedCount)}`);
+      lines.push(`  Stale files removed: ${String(staleFilesRemoved)}`);
+      lines.push('');
+      lines.push(`=== Cached Entities (${String(cachedEntities.length)}) ===`);
+      if (cachedEntities.length === 0) {
+        lines.push('  (no entities in cache)');
+      } else {
+        for (const [type, count] of countByType(cachedEntities)) {
+          lines.push(`  ${type}: ${String(count)}`);
+        }
+      }
+      lines.push('');
+      lines.push('Use force=true to reparse all files.');
+
+      return createSuccessResponse(lines.join('\n'));
+    }
+
+    // Log incremental update info
+    logger.info(`Incremental update: ${String(filesToReparse.length)}/${String(allFilePaths.length)} files to reparse`);
+
+    // Delete entities from files that will be reparsed (for clean reparse)
+    // This is necessary because we're doing a full project reparse for TS/JS
+    // to maintain cross-file relationship resolution
+    for (const filePath of filesToReparse) {
+      entityStore.deleteByFile(filePath);
+    }
 
     // Initialize result tracking
     let successCount = 0;
@@ -405,6 +485,12 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
       `Completed: ${String(successCount)} successful, ${String(errorCount)} errors`
     );
 
+    // Update file hashes for successfully parsed files
+    // This enables incremental updates on subsequent parses
+    for (const [filePath, hash] of fileHashes) {
+      incrementalUpdater.markFileUpdated(filePath, hash, getLanguageForFile(filePath));
+    }
+
     // Format success response
     const lines: string[] = [];
     lines.push(`=== Directory Parsed Successfully ===\n`);
@@ -415,6 +501,10 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
     lines.push(`Total Files: ${String(totalFiles)}`);
     lines.push(`  TypeScript/JavaScript: ${String(tsJsFiles.length)} (ts-morph with cross-file resolution)`);
     lines.push(`  Ruby: ${String(rubyFiles.length)} (tree-sitter)`);
+    lines.push(`  Reparsed: ${String(filesToReparse.length)}${unchangedCount > 0 ? ` (${String(unchangedCount)} unchanged)` : ''}`);
+    if (staleFilesRemoved > 0) {
+      lines.push(`  Stale files removed: ${String(staleFilesRemoved)}`);
+    }
     lines.push(`Successful: ${String(successCount)}`);
     lines.push(`Errors: ${String(errorCount)}`);
     lines.push('');

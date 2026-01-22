@@ -73,6 +73,27 @@ function toNewEntity(entity: TsMorphEntity): NewEntity {
   };
 }
 
+/**
+ * Entity cache: filePath -> (name -> entityId)
+ * Enables O(1) lookup for cross-file relationship resolution.
+ */
+type EntityCache = Map<string, Map<string, string>>;
+
+/**
+ * Add an entity to the cache. Returns true if the entity was a new addition,
+ * false if it overwrote an existing entry (name collision within the same file).
+ */
+function addToEntityCache(cache: EntityCache, entity: { filePath: string; name: string; id: string }): boolean {
+  let nameMap = cache.get(entity.filePath);
+  if (!nameMap) {
+    nameMap = new Map<string, string>();
+    cache.set(entity.filePath, nameMap);
+  }
+  const isNew = !nameMap.has(entity.name);
+  nameMap.set(entity.name, entity.id);
+  return isNew;
+}
+
 export interface ProcessProjectOptions {
   projectPath: string;
   db: Database.Database;
@@ -169,43 +190,31 @@ export class TsMorphFileProcessor {
         return pending;
       });
 
-    // Step 4: Store in database
+    // Step 4: Store in database using batch operations for performance
     const entityStore = createEntityStore(db);
     const relationshipStore = createRelationshipStore(db);
 
-    const storedEntities: Entity[] = [];
-    const storedRelationships: Relationship[] = [];
-
-    // Build file->name->id mapping for cross-file relationship resolution
-    const fileNameToId = new Map<string, Map<string, string>>();
-
-    // Track name collisions within files for diagnostics
-    const nameCollisions: string[] = [];
+    let storedEntities: Entity[] = [];
+    let storedRelationships: Relationship[] = [];
 
     try {
       // Wrap database operations in a transaction for atomicity
       const transaction = db.transaction(() => {
-        // Store all entities and build lookup map
-        for (const entity of entities) {
-          const stored = entityStore.create(entity);
-          storedEntities.push(stored);
-
-          // Build file->name->id mapping
-          let nameMap = fileNameToId.get(entity.filePath);
-          if (!nameMap) {
-            nameMap = new Map<string, string>();
-            fileNameToId.set(entity.filePath, nameMap);
-          }
-
-          // Check for name collisions within the same file
-          if (nameMap.has(entity.name)) {
-            nameCollisions.push(`${entity.filePath}:${entity.name}`);
-          }
-
-          nameMap.set(entity.name, stored.id);
+        // Pre-load existing entities into cache for O(1) cross-file lookups
+        const entityCache: EntityCache = new Map();
+        for (const entity of entityStore.getAll()) {
+          addToEntityCache(entityCache, entity);
         }
 
-        // Log warning for name collisions (indicates potential data quality issues)
+        // Batch insert all entities and add to cache
+        storedEntities = entityStore.createBatch(entities);
+        const nameCollisions: string[] = [];
+        for (const entity of storedEntities) {
+          if (!addToEntityCache(entityCache, entity)) {
+            nameCollisions.push(`${entity.filePath}:${entity.name}`);
+          }
+        }
+
         if (nameCollisions.length > 0) {
           console.warn(
             `[TsMorphFileProcessor] Name collisions detected: ${nameCollisions.join(', ')}. ` +
@@ -213,39 +222,19 @@ export class TsMorphFileProcessor {
           );
         }
 
-        // Store relationships with cross-file resolution
-        // Two-phase resolution: local lookup first, then database fallback
-        // Track seen relationships to prevent duplicates (same source, target, type)
-        const seenRelationships = new Set<string>();
+        // Resolve relationships using in-memory cache (O(1) lookups)
+        const resolvedRelationships: NewRelationship[] = [];
 
         for (const rel of relationships) {
           let sourceId: string | undefined;
           let targetId: string | undefined;
 
-          // Phase 1: Try local lookup first (O(1) - fast path)
-          // Most relationships are within the same file or just parsed
+          // Look up source and target IDs from cache
           if (rel.sourceFilePath) {
-            sourceId = fileNameToId.get(rel.sourceFilePath)?.get(rel.sourceName);
+            sourceId = entityCache.get(rel.sourceFilePath)?.get(rel.sourceName);
           }
           if (rel.targetFilePath) {
-            targetId = fileNameToId.get(rel.targetFilePath)?.get(rel.targetName);
-          }
-
-          // Phase 2: Database fallback for cross-file resolution
-          // This enables relationships where target is in a different file
-          // that was previously parsed and stored in the database.
-          if (!targetId && rel.targetFilePath) {
-            const targetEntity = entityStore.findByNameAndFile(rel.targetName, rel.targetFilePath);
-            if (targetEntity) {
-              targetId = targetEntity.id;
-            }
-          }
-
-          if (!sourceId && rel.sourceFilePath) {
-            const sourceEntity = entityStore.findByNameAndFile(rel.sourceName, rel.sourceFilePath);
-            if (sourceEntity) {
-              sourceId = sourceEntity.id;
-            }
+            targetId = entityCache.get(rel.targetFilePath)?.get(rel.targetName);
           }
 
           // Skip relationships where we can't resolve both entities.
@@ -253,27 +242,21 @@ export class TsMorphFileProcessor {
           // - Calls to external functions/methods (e.g., console.log, Array.map)
           // - Imports from external modules (e.g., 'node:fs', 'react')
           // - References to undefined entities
-          // - Cross-file references where target file hasn't been parsed yet
           if (!sourceId || !targetId) {
             continue;
           }
 
-          // Deduplicate relationships (same source, target, type)
-          // This prevents UNIQUE constraint violations in the database
-          const relationshipKey = `${sourceId}:${targetId}:${rel.type}`;
-          if (seenRelationships.has(relationshipKey)) {
-            continue;
-          }
-          seenRelationships.add(relationshipKey);
-
-          const stored = relationshipStore.create({
+          resolvedRelationships.push({
             sourceId,
             targetId,
             type: rel.type,
             ...(rel.metadata && { metadata: rel.metadata }),
           });
-          storedRelationships.push(stored);
         }
+
+        // Batch insert relationships with INSERT OR IGNORE
+        // SQLite handles duplicate prevention - no need for manual dedup Set
+        storedRelationships = relationshipStore.createBatch(resolvedRelationships);
       });
 
       transaction();
