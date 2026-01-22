@@ -19,6 +19,8 @@ export const ENTITIES_INDEXES = [
   'CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(type)',
   'CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name)',
   'CREATE INDEX IF NOT EXISTS idx_entities_file ON entities(file_path)',
+  // Composite index for cross-file relationship resolution (name + file_path lookup)
+  'CREATE INDEX IF NOT EXISTS idx_entities_name_file ON entities(name, file_path)',
 ];
 
 export const RELATIONSHIPS_TABLE = `

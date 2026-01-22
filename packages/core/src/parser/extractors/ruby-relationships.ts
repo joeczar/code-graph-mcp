@@ -7,6 +7,10 @@ export interface ExtractedRelationship {
   sourceLocation?: { line: number; column: number };
   targetName: string;
   metadata?: Record<string, unknown>;
+  /** File path where the target entity is defined (for cross-file resolution) */
+  targetFilePath?: string;
+  /** File path where the source entity is defined (for cross-file resolution) */
+  sourceFilePath?: string;
 }
 
 type SyntaxNode = Tree['rootNode'];

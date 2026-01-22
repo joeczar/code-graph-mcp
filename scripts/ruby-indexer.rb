@@ -174,7 +174,10 @@ def entry_to_relationships(entry, index)
       parent_name = ancestors[1]
 
       if parent_name && parent_name != 'Object' && parent_name != 'BasicObject'
-        relationships << {
+        parent_entries = index[parent_name]
+        parent_file_path = parent_entries&.first&.file_path
+
+        rel = {
           type: 'extends',
           sourceName: entry.name,
           targetName: parent_name,
@@ -182,6 +185,8 @@ def entry_to_relationships(entry, index)
             kind: 'inheritance'
           }
         }
+        rel[:targetFilePath] = parent_file_path if parent_file_path && parent_file_path != entry.file_path
+        relationships << rel
       end
 
       # Remaining ancestors (excluding Object/BasicObject) are included modules
@@ -193,7 +198,9 @@ def entry_to_relationships(entry, index)
         is_module = ancestor_entries&.any? { |e| e.is_a?(RubyIndexer::Entry::Module) }
 
         if is_module
-          relationships << {
+          module_file_path = ancestor_entries&.first&.file_path
+
+          rel = {
             type: 'implements',
             sourceName: entry.name,
             targetName: ancestor_name,
@@ -201,6 +208,8 @@ def entry_to_relationships(entry, index)
               kind: 'module_inclusion'
             }
           }
+          rel[:targetFilePath] = module_file_path if module_file_path && module_file_path != entry.file_path
+          relationships << rel
         end
       end
     end
@@ -217,7 +226,10 @@ def entry_to_relationships(entry, index)
       ancestors[1..].each do |ancestor_name|
         next if ancestor_name == 'Object' || ancestor_name == 'BasicObject'
 
-        relationships << {
+        ancestor_entries = index[ancestor_name]
+        ancestor_file_path = ancestor_entries&.first&.file_path
+
+        rel = {
           type: 'implements',
           sourceName: entry.name,
           targetName: ancestor_name,
@@ -225,6 +237,8 @@ def entry_to_relationships(entry, index)
             kind: 'module_inclusion'
           }
         }
+        rel[:targetFilePath] = ancestor_file_path if ancestor_file_path && ancestor_file_path != entry.file_path
+        relationships << rel
       end
     end
   end

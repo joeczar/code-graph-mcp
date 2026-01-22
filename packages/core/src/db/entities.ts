@@ -89,6 +89,12 @@ export interface EntityStore {
   findByFile(filePath: string): Entity[];
   findByType(type: EntityType): Entity[];
   findEntity(query: EntityQuery): Entity[];
+  /**
+   * Find an entity by name and file path.
+   * Used for cross-file relationship resolution.
+   * Returns first match or null if not found.
+   */
+  findByNameAndFile(name: string, filePath: string): Entity | null;
   update(id: string, updates: Partial<NewEntity>): Entity | null;
   delete(id: string): boolean;
   deleteByFile(filePath: string): number;
@@ -127,6 +133,9 @@ export function createEntityStore(db: Database.Database): EntityStore {
     ORDER BY lastUpdated DESC
     LIMIT ?
   `);
+  const selectByNameAndFileStmt = db.prepare(
+    'SELECT * FROM entities WHERE name = ? AND file_path = ?'
+  );
 
   return {
     create(entity: NewEntity): Entity {
@@ -166,6 +175,11 @@ export function createEntityStore(db: Database.Database): EntityStore {
     findByType(type: EntityType): Entity[] {
       const rows = selectByTypeStmt.all(type) as EntityRow[];
       return rows.map(rowToEntity);
+    },
+
+    findByNameAndFile(name: string, filePath: string): Entity | null {
+      const row = selectByNameAndFileStmt.get(name, filePath) as EntityRow | undefined;
+      return row ? rowToEntity(row) : null;
     },
 
     update(id: string, updates: Partial<NewEntity>): Entity | null {

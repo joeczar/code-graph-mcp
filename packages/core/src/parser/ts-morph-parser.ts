@@ -26,12 +26,20 @@ export interface TsMorphEntity extends NewEntity {
 
 /**
  * Relationship between entities (by name, not ID).
+ *
+ * Optional file path fields enable cross-file relationship resolution:
+ * - When provided, allows database lookup for entities in other files
+ * - When absent, falls back to local-only resolution (current file)
  */
 export interface TsMorphRelationship {
   sourceName: string;
   targetName: string;
   type: 'calls' | 'imports' | 'exports' | 'extends' | 'implements';
   metadata?: Record<string, unknown>;
+  /** File path where the target entity is defined (for cross-file resolution) */
+  targetFilePath?: string;
+  /** File path where the source entity is defined (for cross-file resolution) */
+  sourceFilePath?: string;
 }
 
 /**
@@ -390,7 +398,7 @@ export function findBestMatch(
 }
 
 /**
- * Resolve a call expression to its actual definition entity name.
+ * Resolve a call expression to its actual definition entity name and file path.
  * Uses multi-pass resolution strategy to minimize orphaned relationships.
  *
  * Pass 1: ts-morph type system resolution
@@ -403,7 +411,7 @@ export function findBestMatch(
  * @param basePath - Base path for package
  * @param entityLookupMap - Map of entity names to entities (for Pass 3)
  * @param importMap - Map of imported symbols to file paths (for Pass 2)
- * @returns Entity name of the called function, or null if unresolvable
+ * @returns Object with entity name and file path, or null if unresolvable
  */
 function resolveCallTarget(
   call: CallExpression,
@@ -411,7 +419,7 @@ function resolveCallTarget(
   basePath: string,
   entityLookupMap: Map<string, TsMorphEntity[]>,
   importMap: Map<string, string>,
-): string | null {
+): { name: string; filePath: string } | null {
   // Get the expression being called using ts-morph's typed API
   const expression = call.getExpression();
   const calledName = expression.getText();
@@ -456,7 +464,7 @@ function resolveCallTarget(
         // Verify this entity exists in our entity map
         const candidates = entityLookupMap.get(defName);
         if (candidates?.some((e) => e.filePath === defFilePath)) {
-          return defName;
+          return { name: defName, filePath: defFilePath };
         }
       }
     }
@@ -487,7 +495,7 @@ function resolveCallTarget(
       ];
       const match = candidates.find((e) => possiblePaths.includes(e.filePath));
       if (match) {
-        return match.name;
+        return { name: match.name, filePath: match.filePath };
       }
       return null;
     }
@@ -505,7 +513,7 @@ function resolveCallTarget(
     // Use findBestMatch to select most likely candidate
     const bestMatch = findBestMatch(candidates, currentFilePath, false);
     if (bestMatch) {
-      return bestMatch.name;
+      return { name: bestMatch.name, filePath: bestMatch.filePath };
     }
   }
 
@@ -580,7 +588,7 @@ export function extractRelationships(
     }
 
     // Resolve the called function to its definition
-    const targetName = resolveCallTarget(
+    const target = resolveCallTarget(
       call,
       filePath,
       basePath,
@@ -589,14 +597,15 @@ export function extractRelationships(
     );
 
     // Skip unresolvable calls (e.g., method calls, property access)
-    if (targetName === null) {
+    if (target === null) {
       return;
     }
 
     relationships.push({
       sourceName,
-      targetName,
+      targetName: target.name,
       type: 'calls',
+      ...(target.filePath !== filePath && { targetFilePath: target.filePath }),
     });
   });
 

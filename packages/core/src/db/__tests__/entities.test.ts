@@ -130,6 +130,53 @@ describe('EntityStore', () => {
     });
   });
 
+  describe('findByNameAndFile', () => {
+    it('finds entity by name and file path', () => {
+      store.create(sampleEntity);
+      store.create({ ...sampleEntity, name: 'greet', filePath: '/src/other.ts' });
+
+      const found = store.findByNameAndFile('greet', '/src/utils.ts');
+
+      expect(found).not.toBeNull();
+      expect(found?.name).toBe('greet');
+      expect(found?.filePath).toBe('/src/utils.ts');
+    });
+
+    it('returns null when name matches but file path does not', () => {
+      store.create(sampleEntity);
+
+      const found = store.findByNameAndFile('greet', '/src/other.ts');
+
+      expect(found).toBeNull();
+    });
+
+    it('returns null when file path matches but name does not', () => {
+      store.create(sampleEntity);
+
+      const found = store.findByNameAndFile('helper', '/src/utils.ts');
+
+      expect(found).toBeNull();
+    });
+
+    it('returns null for non-existent entity', () => {
+      const found = store.findByNameAndFile('nonexistent', '/nonexistent.ts');
+
+      expect(found).toBeNull();
+    });
+
+    it('returns first match when multiple entities have same name and file (edge case)', () => {
+      // This is an edge case - normally name+file should be unique
+      // But the method should still work
+      store.create(sampleEntity);
+      store.create({ ...sampleEntity, startLine: 20, endLine: 25 });
+
+      const found = store.findByNameAndFile('greet', '/src/utils.ts');
+
+      expect(found).not.toBeNull();
+      expect(found?.name).toBe('greet');
+    });
+  });
+
   describe('update', () => {
     it('updates entity fields', () => {
       const created = store.create(sampleEntity);

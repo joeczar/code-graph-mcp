@@ -414,6 +414,81 @@ describe('extractJsDocContent', () => {
   });
 });
 
+describe('cross-file call resolution', () => {
+  it('should populate targetFilePath for cross-file function calls', () => {
+    const project = new Project({ useInMemoryFileSystem: true });
+
+    // Create utils.ts with exported helper function
+    const utilsFile = project.createSourceFile(
+      '/test/utils.ts',
+      `
+      export function helper() {
+        return 42;
+      }
+      `
+    );
+
+    // Create main.ts that imports and calls helper
+    const mainFile = project.createSourceFile(
+      '/test/main.ts',
+      `
+      import { helper } from './utils';
+
+      function main() {
+        return helper();
+      }
+      `
+    );
+
+    // Extract entities from both files
+    const utilsEntities = extractEntities(utilsFile, '/test');
+    const mainEntities = extractEntities(mainFile, '/test');
+    const allEntities = [...utilsEntities, ...mainEntities];
+
+    // Build lookup map with entities from both files
+    const entityLookupMap = buildEntityLookupMap(allEntities);
+
+    // Extract relationships from main.ts
+    const relationships = extractRelationships(mainFile, '/test', entityLookupMap);
+
+    // Find the call relationship from main -> helper
+    const callRel = relationships.find(
+      (r) => r.type === 'calls' && r.sourceName === 'main' && r.targetName === 'helper'
+    );
+
+    expect(callRel).toBeDefined();
+    expect(callRel?.targetFilePath).toBe('utils.ts');
+  });
+
+  it('should not populate targetFilePath for same-file calls', () => {
+    const project = new Project({ useInMemoryFileSystem: true });
+    const sourceFile = project.createSourceFile(
+      '/test/test.ts',
+      `
+      function helper() {
+        return 42;
+      }
+
+      function main() {
+        return helper();
+      }
+      `
+    );
+
+    const entities = extractEntities(sourceFile, '/test');
+    const entityLookupMap = buildEntityLookupMap(entities);
+    const relationships = extractRelationships(sourceFile, '/test', entityLookupMap);
+
+    const callRel = relationships.find(
+      (r) => r.type === 'calls' && r.sourceName === 'main' && r.targetName === 'helper'
+    );
+
+    expect(callRel).toBeDefined();
+    // For same-file calls, targetFilePath should not be set
+    expect(callRel?.targetFilePath).toBeUndefined();
+  });
+});
+
 describe('extractVueScript', () => {
   const testDir = join(process.cwd(), 'test-temp-vue');
 
