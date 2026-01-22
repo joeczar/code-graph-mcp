@@ -169,7 +169,8 @@ describe('FileProcessor', () => {
       const methods = result.entities.filter(e => e.type === 'method');
       expect(methods.length).toBeGreaterThan(0);
 
-      const addMethod = methods.find(f => f.name === 'add');
+      // RubyExtractor produces fully qualified names (Class#method)
+      const addMethod = methods.find(f => f.name === 'Calculator#add');
       expect(addMethod).toBeDefined();
       expect(addMethod?.filePath).toBe(filePath);
       expect(addMethod?.language).toBe('ruby');
