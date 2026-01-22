@@ -27,6 +27,17 @@ export {
 
   // Summary
   getWorkflowSummary,
+
+  // Milestone run operations
+  createMilestoneRun,
+  getMilestoneRun,
+  findMilestoneRunByName,
+  listMilestoneRuns,
+  setMilestoneRunWave,
+  incrementMilestoneRunCompleted,
+  setMilestoneRunStatus,
+  addMilestoneRunForceResolved,
+  deleteMilestoneRun,
 } from './db.js';
 
 export type {
@@ -38,4 +49,7 @@ export type {
   WorkflowCommit,
   NewWorkflow,
   WorkflowSummary,
+  MilestoneRunStatus,
+  MilestoneRun,
+  NewMilestoneRun,
 } from './db.js';
