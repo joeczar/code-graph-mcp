@@ -59,6 +59,39 @@ Or add to your global Claude settings (`~/.claude/settings.json`):
 
 Restart Claude Code after adding the configuration.
 
+## Configuration
+
+### Project ID
+
+The server automatically identifies your project using the following detection methods (in order):
+
+1. **Environment Variable** (explicit configuration)
+   ```json
+   {
+     "mcpServers": {
+       "code-graph": {
+         "command": "node",
+         "args": ["path/to/code-graph-mcp/packages/mcp-server/dist/index.js"],
+         "env": {
+           "PROJECT_ID": "my-project"
+         }
+       }
+     }
+   }
+   ```
+
+2. **Git Remote Origin URL** (automatic detection)
+   - Extracts repository name from `git config --get remote.origin.url`
+   - Supports SSH and HTTPS formats: `git@github.com:owner/repo.git` → `repo`
+
+3. **package.json Name** (automatic detection)
+   - Reads the `name` field from `package.json` in the current directory
+   - Strips `@scope/` prefix for scoped packages: `@myorg/my-package` → `my-package`
+
+4. **Fallback to 'unknown'** if all detection methods fail
+
+The project ID is used to distinguish metrics and data between different codebases when using the same server instance.
+
 ### Available Tools
 
 | Tool | Description |
