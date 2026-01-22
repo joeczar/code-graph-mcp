@@ -35,6 +35,8 @@ export interface ParseWorkerConfig {
   force?: boolean;
   checkpointDbPath: string;
   progressLogPath: string;
+  /** Path to the code graph database file (required for data persistence) */
+  codeGraphDbPath: string;
 }
 
 /**
@@ -83,7 +85,7 @@ const PROGRESS_THROTTLE_MS = 500;
  * Run the parse worker with the given configuration
  */
 async function runWorker(config: ParseWorkerConfig): Promise<void> {
-  const { taskId, directoryPath, pattern, force = false, checkpointDbPath, progressLogPath } = config;
+  const { taskId, directoryPath, pattern, force = false, checkpointDbPath, progressLogPath, codeGraphDbPath } = config;
 
   // Initialize progress logger
   const logDir = path.dirname(progressLogPath);
@@ -99,8 +101,8 @@ async function runWorker(config: ParseWorkerConfig): Promise<void> {
     // Update status to running
     setParseTaskStatus(checkpointDb, taskId, 'running');
 
-    // Initialize code graph database
-    const db = getDatabase();
+    // Initialize code graph database with explicit path for persistence
+    const db = getDatabase({ filePath: codeGraphDbPath });
     initializeSchema(db);
 
     // Use DirectoryParser to find files

@@ -152,6 +152,27 @@ export function getProjectId(): string {
 const DEFAULT_CHECKPOINT_DB_PATH = join(process.cwd(), '.claude', 'execution-state.db');
 
 /**
+ * Default path for code graph database
+ */
+const DEFAULT_CODE_GRAPH_DB_PATH = join(process.cwd(), '.claude', 'code-graph.db');
+
+/**
+ * Get the code graph database path from environment or default
+ *
+ * Environment variable: CODE_GRAPH_DB_PATH
+ * Default: .claude/code-graph.db in current working directory
+ *
+ * IMPORTANT: Without this, getDatabase() defaults to ':memory:' which
+ * doesn't persist data across processes (critical for async parse workers).
+ *
+ * @returns Code graph database path
+ */
+export function getCodeGraphDbPath(): string {
+  const envPath = process.env['CODE_GRAPH_DB_PATH'];
+  return envPath ?? DEFAULT_CODE_GRAPH_DB_PATH;
+}
+
+/**
  * Get the checkpoint database path from environment or default
  *
  * Environment variable: CHECKPOINT_DB_PATH

@@ -27,7 +27,7 @@ import {
 import { type ToolDefinition, createSuccessResponse, createErrorResponse } from './types.js';
 import { ResourceNotFoundError, ToolExecutionError } from './errors.js';
 import { logger } from './logger.js';
-import { getCheckpointDbPath } from '../config.js';
+import { getCheckpointDbPath, getCodeGraphDbPath } from '../config.js';
 
 /**
  * File extensions supported by the parser
@@ -170,6 +170,7 @@ export const parseDirectoryStartTool: ToolDefinition<typeof parseDirectoryStartI
     checkpointDb.prepare('UPDATE parse_tasks SET progress_log_path = ? WHERE id = ?').run(progressLogPath, task.id);
 
     // Prepare worker config
+    const codeGraphDbPath = getCodeGraphDbPath();
     const workerConfig: ParseWorkerConfig = {
       taskId: task.id,
       directoryPath: resolvedPath,
@@ -177,6 +178,7 @@ export const parseDirectoryStartTool: ToolDefinition<typeof parseDirectoryStartI
       ...(force && { force }),
       checkpointDbPath,
       progressLogPath,
+      codeGraphDbPath,
     };
 
     let worker: ChildProcess;
