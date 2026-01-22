@@ -8,6 +8,7 @@ import {
   extractRelationships,
   extractJsDocContent,
   extractVueScript,
+  type TsMorphEntity,
 } from '../ts-morph-parser.js';
 import { join } from 'node:path';
 import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
@@ -88,7 +89,7 @@ describe('extractEntities', () => {
     expect(types).toHaveLength(2);
     expect(types[0]?.name).toBe('UserId');
     expect(types[1]?.name).toBe('User');
-    expect(types[1]?.metadata?.interfaceType).toBe(true);
+    expect(types[1]?.metadata?.['interfaceType']).toBe(true);
   });
 
   it('should extract arrow functions', () => {
@@ -200,7 +201,7 @@ describe('extractImportMap', () => {
 
 describe('buildEntityLookupMap', () => {
   it('should group entities by name', () => {
-    const entities = [
+    const entities: TsMorphEntity[] = [
       { type: 'function', name: 'foo', filePath: 'a.ts', startLine: 1, endLine: 3, language: 'typescript' },
       { type: 'function', name: 'foo', filePath: 'b.ts', startLine: 1, endLine: 3, language: 'typescript' },
       { type: 'function', name: 'bar', filePath: 'a.ts', startLine: 5, endLine: 7, language: 'typescript' },
@@ -222,7 +223,7 @@ describe('findBestMatch', () => {
   });
 
   it('should return the only candidate', () => {
-    const candidates = [
+    const candidates: TsMorphEntity[] = [
       { type: 'function', name: 'foo', filePath: 'a.ts', startLine: 1, endLine: 3, language: 'typescript', exported: false },
     ];
 
@@ -231,7 +232,7 @@ describe('findBestMatch', () => {
   });
 
   it('should prefer same file over different file', () => {
-    const candidates = [
+    const candidates: TsMorphEntity[] = [
       { type: 'function', name: 'foo', filePath: 'a.ts', startLine: 1, endLine: 3, language: 'typescript', exported: false },
       { type: 'function', name: 'foo', filePath: 'test.ts', startLine: 1, endLine: 3, language: 'typescript', exported: false },
     ];
@@ -241,7 +242,7 @@ describe('findBestMatch', () => {
   });
 
   it('should prefer exported entities when isImported=true', () => {
-    const candidates = [
+    const candidates: TsMorphEntity[] = [
       { type: 'function', name: 'foo', filePath: 'a.ts', startLine: 1, endLine: 3, language: 'typescript', exported: false },
       { type: 'function', name: 'foo', filePath: 'b.ts', startLine: 1, endLine: 3, language: 'typescript', exported: true },
     ];

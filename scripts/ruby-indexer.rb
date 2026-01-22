@@ -2,7 +2,9 @@
 # frozen_string_literal: true
 
 require 'json'
-require 'ruby_lsp/ruby_lsp'
+require 'bundler'
+require 'prism'
+require 'ruby_indexer/ruby_indexer'
 
 # Ruby LSP Indexer Script
 #
@@ -47,20 +49,28 @@ def extract_entities_and_relationships(index, file_paths)
       next
     end
 
-    # Index the file
-    index.index_single(RubyIndexer::IndexablePath.new(nil, abs_path))
+    # Index the file using new API (ruby-lsp >= 0.20)
+    source = File.read(abs_path)
+    uri = URI::Generic.build(scheme: 'file', path: abs_path)
+    index.index_single(uri, source)
   end
 
-  # Extract entities from index (using public Enumerable API)
-  index.each do |name, entries|
+  # Extract entities from index using names iterator
+  index.names.each do |name|
+    entries = index[name]
+    next unless entries
+
     entries.each do |entry|
       entity = entry_to_entity(entry)
       entities << entity if entity
     end
   end
 
-  # Extract relationships from index (using public Enumerable API)
-  index.each do |name, entries|
+  # Extract relationships from index
+  index.names.each do |name|
+    entries = index[name]
+    next unless entries
+
     entries.each do |entry|
       rels = entry_to_relationships(entry, index)
       relationships.concat(rels)
@@ -75,7 +85,7 @@ end
 
 def entry_to_entity(entry)
   location = entry.location
-  file_path = location.uri.to_standardized_path
+  file_path = entry.file_path
 
   case entry
   when RubyIndexer::Entry::Class
@@ -83,8 +93,8 @@ def entry_to_entity(entry)
       type: 'class',
       name: entry.name,
       filePath: file_path,
-      startLine: location.start_line + 1, # LSP uses 0-based lines
-      endLine: location.end_line + 1,
+      startLine: location.start_line,
+      endLine: location.end_line,
       language: 'ruby',
       metadata: {
         nesting: entry.nesting.join('::')
@@ -95,8 +105,8 @@ def entry_to_entity(entry)
       type: 'module',
       name: entry.name,
       filePath: file_path,
-      startLine: location.start_line + 1,
-      endLine: location.end_line + 1,
+      startLine: location.start_line,
+      endLine: location.end_line,
       language: 'ruby',
       metadata: {
         nesting: entry.nesting.join('::')
@@ -107,8 +117,8 @@ def entry_to_entity(entry)
       type: 'method',
       name: entry.name,
       filePath: file_path,
-      startLine: location.start_line + 1,
-      endLine: location.end_line + 1,
+      startLine: location.start_line,
+      endLine: location.end_line,
       language: 'ruby',
       metadata: {
         owner: entry.owner&.name,
@@ -152,7 +162,12 @@ def entry_to_relationships(entry, index)
   case entry
   when RubyIndexer::Entry::Class
     # Extract inheritance relationships using linearized_ancestors_of
-    ancestors = index.linearized_ancestors_of(entry.name)
+    begin
+      ancestors = index.linearized_ancestors_of(entry.name)
+    rescue RubyIndexer::Index::NonExistingNamespaceError
+      # Class inherits from something not in the index
+      ancestors = nil
+    end
 
     if ancestors && ancestors.length > 1
       # First ancestor after self is the direct parent
@@ -191,7 +206,11 @@ def entry_to_relationships(entry, index)
     end
   when RubyIndexer::Entry::Module
     # Modules can also include other modules
-    ancestors = index.linearized_ancestors_of(entry.name)
+    begin
+      ancestors = index.linearized_ancestors_of(entry.name)
+    rescue RubyIndexer::Index::NonExistingNamespaceError
+      ancestors = nil
+    end
 
     if ancestors && ancestors.length > 1
       # Skip first element (self) and process included modules

@@ -271,16 +271,8 @@ export function extractImportMap(
       moduleSpecifier,
     ).replace(/\\/g, '/');
 
-    // Try with .ts extension (most common)
-    const possiblePaths = [
-      `${resolvedPath}.ts`,
-      `${resolvedPath}/index.ts`,
-      resolvedPath,
-    ];
-
-    // Use first possibility as best guess
-    const targetPath = possiblePaths[0];
-    if (!targetPath) return; // Skip if no target path
+    // Use .ts extension as best guess (most common)
+    const targetPath = `${resolvedPath}.ts`;
 
     // Named imports
     imp.getNamedImports().forEach((named) => {
