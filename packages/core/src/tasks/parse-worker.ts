@@ -23,6 +23,7 @@ import {
 import { createProgressLogger, type ParsePhase } from './progress-logger.js';
 import type { ProgressCallback } from '../parser/index.js';
 import * as path from 'node:path';
+import micromatch from 'micromatch';
 
 /**
  * Configuration passed to the worker via IPC
@@ -112,16 +113,14 @@ async function runWorker(config: ParseWorkerConfig): Promise<void> {
       directory: directoryPath,
     });
 
-    // Filter by pattern if provided
+    // Filter by pattern if provided using micromatch for proper glob support
     let files = parseResult.files;
     if (pattern) {
-      const patternRegex = new RegExp(
-        pattern
-          .replace(/\./g, '\\.')
-          .replace(/\*\*/g, '.*')
-          .replace(/\*/g, '[^/]*')
-      );
-      files = files.filter(f => patternRegex.test(f.filePath));
+      files = files.filter(f => {
+        // Use relative path for matching as patterns are typically relative
+        const relativePath = path.relative(directoryPath, f.filePath);
+        return micromatch.isMatch(relativePath, pattern);
+      });
     }
 
     // Separate files by type
@@ -257,24 +256,6 @@ async function runWorker(config: ParseWorkerConfig): Promise<void> {
 
         const relativePath = path.relative(directoryPath, fileResult.filePath);
 
-        // Throttle progress updates to avoid flooding
-        const now = Date.now();
-        if (now - lastRubyProgressUpdate >= PROGRESS_THROTTLE_MS || i === rubyFiles.length - 1) {
-          lastRubyProgressUpdate = now;
-          logger.logProgress(
-            tsJsFiles.length + i + 1,
-            totalFiles,
-            'ruby',
-            `Processing: ${relativePath}`
-          );
-          updateParseTaskProgress(checkpointDb, taskId, {
-            current_file: relativePath,
-            processed_files: processedFiles,
-            entities_count: totalEntities,
-            relationships_count: totalRelationships,
-          });
-        }
-
         if (!fileResult.success || !fileResult.result) {
           continue; // Skip failed files
         }
@@ -299,6 +280,24 @@ async function runWorker(config: ParseWorkerConfig): Promise<void> {
             'ruby',
             `Error processing ${relativePath}: ${errorMsg}`
           );
+        }
+
+        // Throttle progress updates AFTER processing to report accurate counts
+        const now = Date.now();
+        if (now - lastRubyProgressUpdate >= PROGRESS_THROTTLE_MS || i === rubyFiles.length - 1) {
+          lastRubyProgressUpdate = now;
+          logger.logProgress(
+            tsJsFiles.length + i + 1,
+            totalFiles,
+            'ruby',
+            `Processed: ${relativePath}`
+          );
+          updateParseTaskProgress(checkpointDb, taskId, {
+            current_file: relativePath,
+            processed_files: processedFiles,
+            entities_count: totalEntities,
+            relationships_count: totalRelationships,
+          });
         }
       }
     }
