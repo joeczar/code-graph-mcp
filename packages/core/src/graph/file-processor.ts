@@ -10,6 +10,7 @@ import {
 } from '../db/relationships.js';
 import { TypeScriptRelationshipExtractor } from '../parser/extractors/typescript-relationships.js';
 import { RubyRelationshipExtractor } from '../parser/extractors/ruby-relationships.js';
+import { VueRelationshipExtractor } from '../parser/extractors/vue-relationships.js';
 
 type SyntaxNode = Tree['rootNode'];
 
@@ -115,7 +116,7 @@ export class FileProcessor {
 
     // Step 4: Extract entities and relationships
     const entities = this.extractEntities(tree.rootNode, filePath, language);
-    const relationships = this.extractRelationships(tree.rootNode, language);
+    const relationships = await this.extractRelationships(tree.rootNode, language, parseResult.result);
 
     // Step 5: Store in database
     const entityStore = createEntityStore(db);
@@ -296,21 +297,22 @@ export class FileProcessor {
   }
 
   /**
-   * Extract relationships from AST.
-   *
-   * Simplified implementation - will be replaced with dedicated extractors.
+   * Extract relationships from AST using dedicated extractors.
    * Returns relationships with entity names (not IDs) - will be resolved later.
    */
-  private extractRelationships(
+  private async extractRelationships(
     node: SyntaxNode,
-    language: string
-  ): PendingRelationship[] {
+    language: string,
+    parseResult: { tree: Tree; filePath: string; language: string; sourceCode: string }
+  ): Promise<PendingRelationship[]> {
     const relationships: PendingRelationship[] = [];
 
     if (language === 'typescript' || language === 'javascript') {
       this.extractTypeScriptRelationships(node, relationships);
     } else if (language === 'ruby') {
       this.extractRubyRelationships(node, relationships);
+    } else if (language === 'vue') {
+      await this.extractVueRelationships(parseResult, relationships);
     }
 
     return relationships;
@@ -355,6 +357,27 @@ export class FileProcessor {
   ): void {
     const extractor = new RubyRelationshipExtractor();
     const extractedRelationships = extractor.extract(node);
+
+    // Convert ExtractedRelationship to PendingRelationship format
+    for (const rel of extractedRelationships) {
+      relationships.push({
+        sourceName: rel.sourceName,
+        targetName: rel.targetName,
+        type: rel.type,
+        ...(rel.metadata && { metadata: rel.metadata }),
+      });
+    }
+  }
+
+  /**
+   * Extract Vue relationships using dedicated extractor.
+   */
+  private async extractVueRelationships(
+    parseResult: { tree: Tree; filePath: string; language: string; sourceCode: string },
+    relationships: PendingRelationship[]
+  ): Promise<void> {
+    const extractor = new VueRelationshipExtractor();
+    const extractedRelationships = await extractor.extract(parseResult);
 
     // Convert ExtractedRelationship to PendingRelationship format
     for (const rel of extractedRelationships) {
