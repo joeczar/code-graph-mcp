@@ -602,10 +602,12 @@ export function addMilestoneRunForceResolved(
     if (!run) return false;
 
     const parsed: unknown = run.force_resolved ? JSON.parse(run.force_resolved) : [];
-    const currentResolved: number[] =
-      Array.isArray(parsed) && parsed.every((i) => typeof i === 'number')
-        ? parsed
-        : [];
+    if (run.force_resolved && (!Array.isArray(parsed) || !parsed.every((i) => typeof i === 'number'))) {
+      throw new Error(
+        `Corrupted force_resolved data for milestone run ${id}: expected number[], got ${typeof parsed}`
+      );
+    }
+    const currentResolved: number[] = Array.isArray(parsed) ? (parsed as number[]) : [];
     if (!currentResolved.includes(issueNumber)) {
       currentResolved.push(issueNumber);
     }

@@ -86,15 +86,25 @@ function parseListOptions<T extends string>(
   const limitValue = limitArg?.split('=')[1];
 
   const options: { status?: T; limit?: number } = {};
-  if (statusValue && validStatuses.includes(statusValue as T)) {
+
+  if (statusValue) {
+    if (!validStatuses.includes(statusValue as T)) {
+      throw new Error(`Invalid status: "${statusValue}"\nValid values: ${validStatuses.join(', ')}`);
+    }
     options.status = statusValue as T;
   }
+
   if (limitValue) {
     const limit = parseInt(limitValue, 10);
-    if (!isNaN(limit) && limit > 0) {
-      options.limit = limit;
+    if (isNaN(limit)) {
+      throw new Error(`Invalid limit: "${limitValue}" is not a number`);
     }
+    if (limit <= 0) {
+      throw new Error(`Invalid limit: must be a positive number`);
+    }
+    options.limit = limit;
   }
+
   return options;
 }
 
@@ -107,6 +117,18 @@ function updateAndLog(
   if (updateFn()) {
     const entity = getFn();
     console.log(JSON.stringify(entity, null, 2));
+  } else {
+    throw new Error(`${entityName} not found: ${id}`);
+  }
+}
+
+function deleteAndLog(
+  id: string,
+  deleteFn: () => boolean,
+  entityName: string
+): void {
+  if (deleteFn()) {
+    console.log(`Deleted ${entityName}: ${id}`);
   } else {
     throw new Error(`${entityName} not found: ${id}`);
   }
@@ -295,13 +317,7 @@ function handleWorkflowAction(action: string, args: string[]): void {
       if (!workflowId) {
         throw new Error('Usage: checkpoint workflow delete <workflow_id>');
       }
-
-      const success = deleteWorkflow(db, workflowId);
-      if (success) {
-        console.log(`Deleted workflow: ${workflowId}`);
-      } else {
-        throw new Error(`Workflow not found: ${workflowId}`);
-      }
+      deleteAndLog(workflowId, () => deleteWorkflow(db, workflowId), 'workflow');
       break;
     }
 
@@ -476,13 +492,7 @@ function handleMilestoneAction(action: string, args: string[]): void {
       if (!runId) {
         throw new Error('Usage: checkpoint milestone delete <run_id>');
       }
-
-      const success = deleteMilestoneRun(db, runId);
-      if (success) {
-        console.log(`Deleted milestone run: ${runId}`);
-      } else {
-        throw new Error(`Milestone run not found: ${runId}`);
-      }
+      deleteAndLog(runId, () => deleteMilestoneRun(db, runId), 'milestone run');
       break;
     }
 
