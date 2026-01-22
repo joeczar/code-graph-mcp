@@ -56,10 +56,11 @@ describe('RelationshipStore', () => {
     it('creates a relationship with generated id', () => {
       const rel = store.create(createSampleRelationship());
 
-      expect(rel.id).toBeDefined();
-      expect(rel.sourceId).toBe(sourceId);
-      expect(rel.targetId).toBe(targetId);
-      expect(rel.type).toBe('calls');
+      expect(rel).not.toBeNull();
+      expect(rel?.id).toBeDefined();
+      expect(rel?.sourceId).toBe(sourceId);
+      expect(rel?.targetId).toBe(targetId);
+      expect(rel?.type).toBe('calls');
     });
 
     it('stores metadata as JSON', () => {
@@ -68,12 +69,14 @@ describe('RelationshipStore', () => {
         metadata: { isAsync: true, lineNumber: 42 },
       });
 
-      expect(rel.metadata).toEqual({ isAsync: true, lineNumber: 42 });
+      expect(rel).not.toBeNull();
+      expect(rel?.metadata).toEqual({ isAsync: true, lineNumber: 42 });
     });
 
     it('sets createdAt timestamp', () => {
       const rel = store.create(createSampleRelationship());
-      expect(rel.createdAt).toBeDefined();
+      expect(rel).not.toBeNull();
+      expect(rel?.createdAt).toBeDefined();
     });
 
     it('silently ignores duplicate relationships', () => {
@@ -223,10 +226,12 @@ describe('RelationshipStore', () => {
   describe('findById', () => {
     it('finds an existing relationship', () => {
       const created = store.create(createSampleRelationship());
-      const found = store.findById(created.id);
+      expect(created).not.toBeNull();
+
+      const found = store.findById(created!.id);
 
       expect(found).not.toBeNull();
-      expect(found?.id).toBe(created.id);
+      expect(found?.id).toBe(created!.id);
     });
 
     it('returns null for non-existent id', () => {
@@ -313,10 +318,12 @@ describe('RelationshipStore', () => {
   describe('delete', () => {
     it('deletes an existing relationship', () => {
       const created = store.create(createSampleRelationship());
-      const deleted = store.delete(created.id);
+      expect(created).not.toBeNull();
+
+      const deleted = store.delete(created!.id);
 
       expect(deleted).toBe(true);
-      expect(store.findById(created.id)).toBeNull();
+      expect(store.findById(created!.id)).toBeNull();
     });
 
     it('returns false for non-existent relationship', () => {
