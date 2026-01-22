@@ -14,6 +14,7 @@ See [docs/VISION.md](docs/VISION.md) for the full vision.
 
 - Node.js 22+
 - pnpm 9+
+- (Optional) Ruby with `ruby-lsp` gem for enhanced Ruby cross-file resolution
 
 ### Setup
 
@@ -132,10 +133,25 @@ The project ID is used to distinguish metrics and data between different codebas
 |----------|------------|-------------------|---------------|
 | TypeScript | `.ts`, `.tsx` | ✅ Functions, classes, methods | ✅ extends, calls |
 | JavaScript | `.js`, `.jsx` | ✅ Functions, classes, methods | ✅ extends, calls |
-| Ruby | `.rb` | ✅ Functions, classes, methods, modules | ✅ extends, calls |
+| Ruby | `.rb` | ✅ Functions, classes, methods, modules | ✅ extends, calls, implements* |
 | Vue | `.vue` | ✅ Functions, classes, methods | ✅ extends, calls |
 
-> **Note:** Call relationships are extracted within single files. Cross-file call resolution (e.g., imported functions) is not yet supported.
+> **Note:** Call relationships are extracted within single files by default. Cross-file call resolution is not yet supported for TypeScript/JavaScript.
+
+#### Ruby LSP Integration (Optional)
+
+For enhanced Ruby parsing with cross-file inheritance and module resolution, install the `ruby-lsp` gem:
+
+```bash
+gem install ruby-lsp
+```
+
+When available, Ruby LSP provides:
+- Full inheritance chain resolution via `linearized_ancestors_of`
+- Module inclusion tracking (`implements` relationships)
+- Cross-file class/module resolution
+
+The parser automatically falls back to tree-sitter-only parsing if `ruby-lsp` is not installed.
 
 ## Development
 
