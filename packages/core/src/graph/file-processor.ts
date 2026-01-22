@@ -116,7 +116,13 @@ export class FileProcessor {
 
     // Step 4: Extract entities and relationships
     const entities = this.extractEntities(tree.rootNode, filePath, language);
-    const relationships = await this.extractRelationships(tree.rootNode, language, parseResult.result);
+    const relationships = await this.extractRelationships(
+      tree.rootNode,
+      language,
+      tree,
+      sourceCode,
+      filePath
+    );
 
     // Step 5: Store in database
     const entityStore = createEntityStore(db);
@@ -308,7 +314,9 @@ export class FileProcessor {
   private async extractRelationships(
     node: SyntaxNode,
     language: string,
-    parseResult: { tree: Tree; filePath: string; language: string; sourceCode: string }
+    tree: Tree,
+    sourceCode: string,
+    filePath: string
   ): Promise<PendingRelationship[]> {
     const relationships: PendingRelationship[] = [];
 
@@ -317,7 +325,7 @@ export class FileProcessor {
     } else if (language === 'ruby') {
       this.extractRubyRelationships(node, relationships);
     } else if (language === 'vue') {
-      await this.extractVueRelationships(parseResult, relationships);
+      await this.extractVueRelationships(tree, sourceCode, filePath, relationships);
     }
 
     return relationships;
@@ -378,10 +386,21 @@ export class FileProcessor {
    * Extract Vue relationships using dedicated extractor.
    */
   private async extractVueRelationships(
-    parseResult: { tree: Tree; filePath: string; language: string; sourceCode: string },
+    tree: Tree,
+    sourceCode: string,
+    filePath: string,
     relationships: PendingRelationship[]
   ): Promise<void> {
     const extractor = new VueRelationshipExtractor();
+
+    // Create ParseResult for extractor
+    const parseResult = {
+      tree,
+      filePath,
+      language: 'vue' as const,
+      sourceCode,
+    };
+
     const extractedRelationships = await extractor.extract(parseResult);
 
     // Convert ExtractedRelationship to PendingRelationship format
