@@ -204,7 +204,7 @@ export function createEntityStore(db: Database.Database): EntityStore {
       const now = new Date().toISOString();
       return prepared.map(entity => ({
         id: entity.id,
-        type: entity.type as EntityType,
+        type: entity.type,
         name: entity.name,
         filePath: entity.filePath,
         startLine: entity.startLine,

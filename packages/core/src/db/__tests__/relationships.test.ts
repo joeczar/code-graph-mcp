@@ -205,8 +205,10 @@ describe('RelationshipStore', () => {
 
       const created = store.createBatch(relationships);
 
-      const found1 = store.findById(created[0]!.id);
-      const found2 = store.findById(created[1]!.id);
+      const firstRel = created[0];
+      const secondRel = created[1];
+      const found1 = firstRel ? store.findById(firstRel.id) : null;
+      const found2 = secondRel ? store.findById(secondRel.id) : null;
 
       expect(found1?.type).toBe('calls');
       expect(found2?.type).toBe('imports');

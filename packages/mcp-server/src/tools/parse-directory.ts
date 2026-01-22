@@ -28,7 +28,6 @@ import {
   type Entity,
   type Relationship,
   type ProgressCallback,
-  type IncrementalUpdater,
 } from '@code-graph/core';
 import { type ToolDefinition, type McpExtra, createSuccessResponse, createErrorResponse } from './types.js';
 import { ResourceNotFoundError, ToolExecutionError } from './errors.js';

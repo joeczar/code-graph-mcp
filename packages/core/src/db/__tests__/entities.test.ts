@@ -113,8 +113,10 @@ describe('EntityStore', () => {
 
       const created = store.createBatch(entities);
 
-      const found1 = store.findById(created[0]!.id);
-      const found2 = store.findById(created[1]!.id);
+      const firstEntity = created[0];
+      const secondEntity = created[1];
+      const found1 = firstEntity ? store.findById(firstEntity.id) : null;
+      const found2 = secondEntity ? store.findById(secondEntity.id) : null;
 
       expect(found1?.name).toBe('fn1');
       expect(found2?.name).toBe('fn2');

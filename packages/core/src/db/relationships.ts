@@ -156,7 +156,7 @@ export function createRelationshipStore(db: Database.Database): RelationshipStor
         id: rel.id,
         sourceId: rel.sourceId,
         targetId: rel.targetId,
-        type: rel.type as RelationshipType,
+        type: rel.type,
         ...(rel.metadata && { metadata: JSON.parse(rel.metadata) as Record<string, unknown> }),
         createdAt: now,
       }));
