@@ -6,11 +6,13 @@ Autonomous workflow for implementing a GitHub issue without gates. Use for trust
 
 ```
 /auto-issue <issue_number>
+/auto-issue <issue_number> --worktree <path>
 ```
 
 ## Arguments
 
 - `issue_number` (required): The GitHub issue number to work on
+- `--worktree <path>` (optional): Path to a git worktree to work in (for parallel execution)
 
 ## When to Use
 
@@ -25,6 +27,51 @@ Use `/work-on-issue` instead when:
 - Significant architectural changes
 - You want to review the plan before implementation
 - First time working on this area of code
+
+## Worktree Mode
+
+When `--worktree <path>` is provided, the workflow operates in an isolated git worktree:
+
+### Before Starting
+
+```bash
+# Change to worktree directory
+cd <worktree_path>
+
+# Verify we're in the right place
+git rev-parse --show-toplevel  # Should match worktree_path
+```
+
+All subsequent operations (git, pnpm, file edits) happen within the worktree directory.
+
+### Branch Handling
+
+In worktree mode:
+- The branch already exists (created by worktree-manager)
+- Skip branch creation in setup-agent
+- Just verify we're on the correct branch
+
+### State Updates
+
+After creating a PR, update worktree state:
+
+```bash
+"$CLAUDE_PROJECT_DIR/scripts/worktree-manager.sh" update-status {issue_number} pr-created {pr_number}
+```
+
+### Output for Orchestrator
+
+When running in worktree mode (spawned by /auto-milestone), return structured output:
+
+```json
+{
+  "issue": <issue_number>,
+  "status": "success" | "failed",
+  "pr_number": <pr_number or null>,
+  "branch": "<branch_name>",
+  "error": "<error message if failed>"
+}
+```
 
 ## Agents Summary
 
@@ -76,7 +123,7 @@ If resuming, jump to the saved phase with the existing `workflow_id`.
 **Agent:** `setup-agent`
 
 Task(setup-agent):
-  Input:  { issue_number: <N> }
+  Input:  { issue_number: <N>, worktree_path?: <path> }
   Output: { workflow_id, branch, issue, resumed }
 
 The setup-agent will:
@@ -85,6 +132,12 @@ The setup-agent will:
 - Create checkpoint workflow (or resume existing)
 - Assign self to issue
 - Add "in-progress" label
+
+**In worktree mode:**
+- Change to worktree directory first: `cd <worktree_path>`
+- Branch already exists (created by worktree-manager)
+- Skip branch creation, just verify we're on correct branch
+- All git operations happen in worktree context
 
 *Proceed immediately to Phase 2*
 
@@ -187,7 +240,7 @@ pnpm build
 **Agent:** `finalize-agent`
 
 Task(finalize-agent):
-  Input:  { issue, branch, workflow_id, commits }
+  Input:  { issue, branch, workflow_id, commits, worktree_path? }
   Output: { pr, validation, board_updated }
 
 The finalize-agent will:
@@ -197,6 +250,13 @@ The finalize-agent will:
 - Log PR creation to checkpoint
 - Mark workflow as completed
 - Report PR URL
+
+**In worktree mode (additional steps):**
+- Update worktree state with PR number:
+  ```bash
+  "$CLAUDE_PROJECT_DIR/scripts/worktree-manager.sh" update-status {issue_number} pr-created {pr_number}
+  ```
+- Return structured output for orchestrator (see Worktree Mode section)
 
 ---
 

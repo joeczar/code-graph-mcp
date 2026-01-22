@@ -193,11 +193,11 @@ pnpm checkpoint workflow find <blocker_issue_number>
 
 ### Phase 8: Parallelization Analysis
 
-Calculate safe parallel execution limit:
+Calculate safe parallel execution limit based on wave sizes and issue complexity:
 
 ```
 max_independent = size of largest wave (all issues can run simultaneously)
-recommended_parallel = min(max_independent, 2)  # Conservative default
+recommended_parallel = min(max_independent, 3)  # Default max for safety
 ```
 
 **Smart default logic:**
@@ -205,11 +205,20 @@ recommended_parallel = min(max_independent, 2)  # Conservative default
 ```
 If --parallel not specified:
   If all issues independent (single wave):
-    recommend: parallel = 2
+    recommend: parallel = min(wave_size, 3)
   If waves exist:
-    recommend: parallel = min(largest_wave_size, 2)
+    recommend: parallel = min(largest_wave_size, 3)
   Always output recommendation with explanation
 ```
+
+**Parallelizability factors for each wave:**
+
+| Factor | Impact on Parallel Recommendation |
+|--------|-----------------------------------|
+| Wave size | More issues = higher potential parallelism |
+| Issue complexity | Complex issues = lower recommendation |
+| File overlap | Issues touching same files = lower recommendation |
+| Test isolation | Shared test fixtures = recommend sequential |
 
 **Output:**
 
@@ -218,10 +227,29 @@ If --parallel not specified:
   "parallelization": {
     "largest_wave_size": 3,
     "recommended_parallel": 2,
-    "rationale": "Wave 2 has 3 independent issues. Using 2 for safety."
+    "rationale": "Wave 2 has 3 independent issues. Recommending 2 for safety margin.",
+    "wave_analysis": [
+      {"wave": 1, "size": 2, "can_parallelize": true, "file_conflicts": false},
+      {"wave": 2, "size": 3, "can_parallelize": true, "file_conflicts": false},
+      {"wave": 3, "size": 2, "can_parallelize": true, "file_conflicts": true, "conflict_reason": "#14 and #17 both modify parser.ts"}
+    ]
   }
 }
 ```
+
+**File conflict detection:**
+
+For each wave, check if multiple issues modify the same files:
+
+```bash
+# Get files from issue description or linked PRs
+gh issue view <number> --json body -q '.body' | grep -oE '\b[a-zA-Z0-9_/-]+\.(ts|tsx|js|json)\b'
+```
+
+If conflict detected:
+- Flag wave with `file_conflicts: true`
+- Add `conflict_reason` with details
+- Recommend running those issues sequentially or reducing parallelism
 
 ## Output Format
 

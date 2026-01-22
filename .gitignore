@@ -36,3 +36,6 @@ coverage/
 .claude/execution-state.db
 .claude/execution-state.db-wal
 .claude/execution-state.db-shm
+
+# Git worktrees for parallel development
+.worktrees/
