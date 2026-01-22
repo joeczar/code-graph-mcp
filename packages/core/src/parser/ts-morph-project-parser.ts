@@ -8,8 +8,8 @@
  */
 
 import { Project } from 'ts-morph';
-import { resolve, relative } from 'node:path';
-import { readdirSync, statSync } from 'node:fs';
+import { relative } from 'node:path';
+import { globbySync } from 'globby';
 import {
   extractEntities,
   extractRelationships,
@@ -78,79 +78,19 @@ const DEFAULT_EXCLUDE_PATTERNS = [
 ];
 
 /**
- * Find all TypeScript, JavaScript, and Vue files in a directory recursively.
+ * Find all TypeScript, JavaScript, and Vue files in a directory using globby.
  *
  * @param dir - Directory to search
- * @param exclude - Patterns to exclude
+ * @param exclude - Glob patterns to exclude
  * @returns Array of absolute file paths
  */
-/** Supported source file extensions */
-const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.vue']);
-
-/**
- * Convert a glob pattern to a regex pattern.
- * Properly escapes regex metacharacters before converting glob wildcards.
- */
-function globToRegex(pattern: string): RegExp {
-  // First, escape regex metacharacters (except * which we handle specially)
-  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
-  // Then convert glob patterns: ** matches anything, * matches non-slash characters
-  const regexPattern = escaped.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*');
-  return new RegExp(regexPattern);
-}
-
 function findSourceFiles(dir: string, exclude: string[]): string[] {
-  const files: string[] = [];
-  const excludePatterns = exclude.map(globToRegex);
-
-  function shouldExclude(path: string): boolean {
-    return excludePatterns.some((pattern) => pattern.test(path));
-  }
-
-  function walk(currentDir: string): void {
-    try {
-      const entries = readdirSync(currentDir);
-
-      for (const entry of entries) {
-        const fullPath = resolve(currentDir, entry);
-        const relativePath = relative(dir, fullPath);
-
-        // Check if this path matches exclusion patterns
-        if (shouldExclude(relativePath)) {
-          continue;
-        }
-
-        let stat;
-        try {
-          stat = statSync(fullPath);
-        } catch (error) {
-          // Skip files we can't stat (permissions, symlink loops, etc.)
-          if (process.env['DEBUG_CODE_GRAPH']) {
-            console.debug(
-              `[findSourceFiles] Skipping ${fullPath}:`,
-              error instanceof Error ? error.message : String(error)
-            );
-          }
-          continue;
-        }
-
-        if (stat.isDirectory()) {
-          walk(fullPath);
-        } else {
-          // Check if file has a supported source extension
-          const ext = fullPath.slice(fullPath.lastIndexOf('.'));
-          if (SOURCE_EXTENSIONS.has(ext)) {
-            files.push(fullPath);
-          }
-        }
-      }
-    } catch (error) {
-      console.warn(`[TsMorphProjectParser] Error reading directory ${currentDir}:`, error);
-    }
-  }
-
-  walk(dir);
-  return files;
+  return globbySync('**/*.{ts,tsx,js,jsx,vue}', {
+    cwd: dir,
+    absolute: true,
+    ignore: exclude,
+    gitignore: true, // Respect .gitignore patterns
+  });
 }
 
 /**

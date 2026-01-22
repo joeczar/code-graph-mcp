@@ -9,9 +9,9 @@
  */
 
 import { SyntaxKind } from 'ts-morph';
-import type { SourceFile, Node, JSDoc } from 'ts-morph';
+import type { SourceFile, Node, JSDoc, CallExpression } from 'ts-morph';
 import { readFileSync } from 'node:fs';
-import { join, relative, dirname } from 'node:path';
+import { relative, join, dirname } from 'node:path';
 import { parse as parseVueSFC } from '@vue/compiler-sfc';
 import type { NewEntity } from '../db/entities.js';
 
@@ -227,7 +227,7 @@ export function extractEntities(
     const initializer = decl.getInitializer();
     const isArrowFn = initializer?.getKind() === SyntaxKind.ArrowFunction;
 
-    entities.push({
+    const entity: TsMorphEntity = {
       type: isArrowFn ? 'function' : 'variable',
       name,
       filePath,
@@ -235,7 +235,18 @@ export function extractEntities(
       endLine: decl.getEndLineNumber(),
       language: 'typescript',
       exported: decl.isExported(),
-    });
+    };
+
+    // Extract JSDoc from parent VariableStatement (where JSDoc is attached)
+    const variableStatement = decl.getVariableStatement();
+    if (variableStatement) {
+      const jsDocContent = extractJsDocContent(variableStatement);
+      if (jsDocContent) {
+        entity.jsDocContent = jsDocContent;
+      }
+    }
+
+    entities.push(entity);
   });
 
   return entities;
@@ -243,7 +254,7 @@ export function extractEntities(
 
 /**
  * Extract import map from a source file for call resolution.
- * Maps imported symbol names to their source file paths (best guess).
+ * Uses ts-morph's module resolution when available, falls back to path guessing.
  *
  * @param sourceFile - ts-morph SourceFile to extract imports from
  * @param basePath - Base path for relative file resolution
@@ -257,22 +268,30 @@ export function extractImportMap(
   const currentFilePath = relative(basePath, sourceFile.getFilePath());
 
   sourceFile.getImportDeclarations().forEach((imp) => {
-    const moduleSpecifier = imp.getModuleSpecifierValue();
-    const isRelative = moduleSpecifier.startsWith('.');
+    // Try ts-morph's module resolution first (most accurate)
+    const moduleSpecifierSourceFile = imp.getModuleSpecifierSourceFile();
 
-    if (!isRelative) {
-      // Skip external imports (node_modules, etc.)
-      return;
+    let targetPath: string;
+    if (moduleSpecifierSourceFile) {
+      // ts-morph resolved the import - use the actual file path
+      targetPath = relative(basePath, moduleSpecifierSourceFile.getFilePath());
+    } else {
+      // Fall back to manual path resolution for unresolved imports
+      const moduleSpecifier = imp.getModuleSpecifierValue();
+      const isRelative = moduleSpecifier.startsWith('.');
+
+      if (!isRelative) {
+        // Skip external imports (node_modules, etc.)
+        return;
+      }
+
+      // Resolve relative path and guess .ts extension
+      const resolvedPath = join(
+        dirname(currentFilePath),
+        moduleSpecifier,
+      ).replace(/\\/g, '/');
+      targetPath = `${resolvedPath}.ts`;
     }
-
-    // Resolve the import target file path
-    const resolvedPath = join(
-      dirname(currentFilePath),
-      moduleSpecifier,
-    ).replace(/\\/g, '/');
-
-    // Use .ts extension as best guess (most common)
-    const targetPath = `${resolvedPath}.ts`;
 
     // Named imports
     imp.getNamedImports().forEach((named) => {
@@ -387,14 +406,14 @@ export function findBestMatch(
  * @returns Entity name of the called function, or null if unresolvable
  */
 function resolveCallTarget(
-  call: Node,
+  call: CallExpression,
   currentFilePath: string,
   basePath: string,
   entityLookupMap: Map<string, TsMorphEntity[]>,
   importMap: Map<string, string>,
 ): string | null {
-  // Get the expression being called
-  const expression = call.getChildAtIndex(0); // Left side of the call
+  // Get the expression being called using ts-morph's typed API
+  const expression = call.getExpression();
   const calledName = expression.getText();
 
   // PASS 1: Try to resolve using ts-morph type system
