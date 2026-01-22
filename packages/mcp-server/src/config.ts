@@ -6,6 +6,7 @@
  */
 
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { logger } from './tools/logger.js';
 
 /**
@@ -56,6 +57,39 @@ function detectProjectIdFromGit(): string | null {
     return repoName || null;
   } catch {
     // Git command failed (not a git repo, no remote, etc.)
+    return null;
+  }
+}
+
+/**
+ * Detect project ID from package.json name field
+ *
+ * Reads package.json from the current working directory and extracts
+ * the name field. Handles scoped packages by stripping the @scope/ prefix.
+ *
+ * Examples:
+ * - "my-package" → my-package
+ * - "@myorg/my-package" → my-package
+ *
+ * @returns Package name or null if detection fails
+ */
+function detectProjectIdFromPackageJson(): string | null {
+  try {
+    const packageJsonPath = `${process.cwd()}/package.json`;
+    const content = readFileSync(packageJsonPath, 'utf-8');
+    const packageJson = JSON.parse(content) as { name?: string };
+
+    const name = packageJson.name?.trim();
+    if (!name) {
+      return null;
+    }
+
+    // Strip @scope/ prefix for scoped packages
+    // @myorg/my-package → my-package
+    const scopeMatch = name.match(/^@[^/]+\/(.+)$/);
+    return scopeMatch?.[1] ?? name;
+  } catch {
+    // File doesn't exist, invalid JSON, or no name field
     return null;
   }
 }
