@@ -30,10 +30,17 @@ import {
   setMilestoneRunStatus,
   addMilestoneRunForceResolved,
   deleteMilestoneRun,
+  createWorktree,
+  getWorktree,
+  findWorktreeByIssue,
+  listWorktrees,
+  setWorktreeStatus,
+  deleteWorktree,
   type WorkflowPhase,
   type WorkflowStatus,
   type PrState,
   type MilestoneRunStatus,
+  type WorktreeStatus,
 } from '@code-graph/core/checkpoint';
 
 // ============================================================================
@@ -46,6 +53,7 @@ const WORKFLOW_STATUSES: WorkflowStatus[] = ['running', 'paused', 'completed', '
 const WORKFLOW_PHASES: WorkflowPhase[] = ['setup', 'research', 'implement', 'review', 'finalize', 'merge'];
 const PR_STATES: PrState[] = ['open', 'merged', 'closed'];
 const MILESTONE_STATUSES: MilestoneRunStatus[] = ['running', 'paused', 'completed', 'failed', 'deadlocked'];
+const WORKTREE_STATUSES: WorktreeStatus[] = ['created', 'running', 'pr-created', 'merged', 'failed'];
 const ACTION_STATUSES = ['success', 'failed', 'skipped'] as const;
 
 // ============================================================================
@@ -142,8 +150,8 @@ export function runCheckpointCommand(args: string[]): void {
     return;
   }
 
-  if (subcommand !== 'workflow' && subcommand !== 'milestone') {
-    throw new Error(`Unknown checkpoint subcommand: ${subcommand}\nUse: checkpoint workflow <action> or checkpoint milestone <action>`);
+  if (subcommand !== 'workflow' && subcommand !== 'milestone' && subcommand !== 'worktree') {
+    throw new Error(`Unknown checkpoint subcommand: ${subcommand}\nUse: checkpoint workflow|milestone|worktree <action>`);
   }
 
   const action = args[1];
@@ -156,8 +164,10 @@ export function runCheckpointCommand(args: string[]): void {
   try {
     if (subcommand === 'workflow') {
       handleWorkflowAction(action, actionArgs);
-    } else {
+    } else if (subcommand === 'milestone') {
       handleMilestoneAction(action, actionArgs);
+    } else {
+      handleWorktreeAction(action, actionArgs);
     }
   } finally {
     closeCheckpointDb();
@@ -502,13 +512,99 @@ function handleMilestoneAction(action: string, args: string[]): void {
   }
 }
 
+// ============================================================================
+// Worktree Actions
+// ============================================================================
+
+function handleWorktreeAction(action: string, args: string[]): void {
+  const db = getDb();
+
+  switch (action) {
+    case 'create': {
+      const [workflowId, issueNumberStr, branchName, worktreePath] = args;
+      if (!workflowId || !issueNumberStr || !branchName || !worktreePath) {
+        throw new Error('Usage: checkpoint worktree create <workflow_id> <issue_number> <branch_name> <worktree_path>');
+      }
+      const issueNumber = parseIntRequired(issueNumberStr, 'issue_number');
+
+      const existing = findWorktreeByIssue(db, issueNumber);
+      if (existing) {
+        console.log(JSON.stringify(existing, null, 2));
+        throw new Error(`Worktree already exists for issue #${String(issueNumber)}`);
+      }
+
+      const worktree = createWorktree(db, {
+        workflow_id: workflowId,
+        issue_number: issueNumber,
+        branch_name: branchName,
+        worktree_path: worktreePath,
+      });
+      console.log(JSON.stringify(worktree, null, 2));
+      break;
+    }
+
+    case 'find': {
+      const issueNumber = parseIntRequired(args[0], 'issue_number');
+      const worktree = findWorktreeByIssue(db, issueNumber);
+      console.log(worktree ? JSON.stringify(worktree, null, 2) : 'null');
+      break;
+    }
+
+    case 'get': {
+      const [worktreeId] = args;
+      if (!worktreeId) {
+        throw new Error('Usage: checkpoint worktree get <worktree_id>');
+      }
+      const worktree = getWorktree(db, worktreeId);
+      console.log(worktree ? JSON.stringify(worktree, null, 2) : 'null');
+      break;
+    }
+
+    case 'list': {
+      const options = parseListOptions(args, WORKTREE_STATUSES);
+      const worktrees = listWorktrees(db, options);
+      console.log(JSON.stringify(worktrees, null, 2));
+      break;
+    }
+
+    case 'update': {
+      const [issueNumberStr, status, prNumberStr] = args;
+      if (!issueNumberStr || !status) {
+        throw new Error(`Usage: checkpoint worktree update <issue_number> <status> [pr_number]\nStatuses: ${WORKTREE_STATUSES.join(', ')}`);
+      }
+      const issueNumber = parseIntRequired(issueNumberStr, 'issue_number');
+      const validStatus = validateEnum(status, WORKTREE_STATUSES, 'status');
+      const prNumber = prNumberStr ? parseIntRequired(prNumberStr, 'pr_number') : undefined;
+
+      if (setWorktreeStatus(db, issueNumber, validStatus, prNumber)) {
+        const worktree = findWorktreeByIssue(db, issueNumber);
+        console.log(JSON.stringify(worktree, null, 2));
+      } else {
+        throw new Error(`Worktree not found for issue #${String(issueNumber)}`);
+      }
+      break;
+    }
+
+    case 'remove': {
+      const issueNumber = parseIntRequired(args[0], 'issue_number');
+      deleteAndLog(String(issueNumber), () => deleteWorktree(db, issueNumber), `worktree for issue #${String(issueNumber)}`);
+      break;
+    }
+
+    default:
+      printCheckpointHelp();
+      throw new Error(`Unknown worktree action: ${action}`);
+  }
+}
+
 function printCheckpointHelp(): void {
   console.log(`
-checkpoint - Manage workflow and milestone state
+checkpoint - Manage workflow, milestone, and worktree state
 
 USAGE:
   code-graph checkpoint workflow <action> [args]
   code-graph checkpoint milestone <action> [args]
+  code-graph checkpoint worktree <action> [args]
 
 === WORKFLOW ACTIONS ===
 
@@ -590,6 +686,30 @@ USAGE:
   delete <run_id>
     Delete a milestone run.
 
+=== WORKTREE ACTIONS ===
+
+  create <workflow_id> <issue_number> <branch_name> <worktree_path>
+    Create a worktree entry linked to a workflow.
+    Returns the created worktree with its ID.
+
+  find <issue_number>
+    Find worktree by issue number.
+    Returns the worktree or null.
+
+  get <worktree_id>
+    Get worktree details by ID.
+
+  list [--status=<status>] [--limit=<n>]
+    List worktrees. Optionally filter by status.
+    Statuses: created, running, pr-created, merged, failed
+
+  update <issue_number> <status> [pr_number]
+    Update worktree status and optionally set PR number.
+    Statuses: created, running, pr-created, merged, failed
+
+  remove <issue_number>
+    Delete a worktree entry.
+
 === WORKFLOW EXAMPLES ===
 
   # Start working on issue #12
@@ -632,5 +752,28 @@ USAGE:
 
   # Mark milestone as completed
   code-graph checkpoint milestone set-status abc-123 completed
+
+=== WORKTREE EXAMPLES ===
+
+  # Create worktree entry after git worktree creation
+  code-graph checkpoint worktree create abc-123 145 "feat/issue-145" "/path/to/.worktrees/issue-145"
+
+  # Find worktree by issue number
+  code-graph checkpoint worktree find 145
+
+  # Update worktree status to running
+  code-graph checkpoint worktree update 145 running
+
+  # Update status to pr-created and set PR number
+  code-graph checkpoint worktree update 145 pr-created 42
+
+  # Mark as merged
+  code-graph checkpoint worktree update 145 merged
+
+  # Remove worktree entry
+  code-graph checkpoint worktree remove 145
+
+  # List all worktrees
+  code-graph checkpoint worktree list
 `);
 }
