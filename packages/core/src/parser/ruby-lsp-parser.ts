@@ -149,34 +149,24 @@ export class RubyLSPParser {
   }
 
   private convertEntity(entity: RubyIndexerEntity): NewEntity {
-    const newEntity: NewEntity = {
+    return {
       type: entity.type === 'method' ? 'method' : entity.type,
       name: entity.name,
       filePath: entity.filePath,
       startLine: entity.startLine,
       endLine: entity.endLine,
       language: 'ruby',
+      ...(entity.metadata && { metadata: entity.metadata }),
     };
-
-    if (entity.metadata) {
-      newEntity.metadata = entity.metadata;
-    }
-
-    return newEntity;
   }
 
   private convertRelationship(rel: RubyIndexerRelationship): ExtractedRelationship {
-    const relationship: ExtractedRelationship = {
+    return {
       type: rel.type,
       sourceName: rel.sourceName,
       targetName: rel.targetName,
+      ...(rel.metadata && { metadata: rel.metadata }),
     };
-
-    if (rel.metadata) {
-      relationship.metadata = rel.metadata;
-    }
-
-    return relationship;
   }
 }
 
