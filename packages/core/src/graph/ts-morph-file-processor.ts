@@ -5,7 +5,7 @@ import {
   type NewRelationship,
   createRelationshipStore,
 } from '../db/relationships.js';
-import { parseProject, type ProjectParseResult } from '../parser/ts-morph-project-parser.js';
+import { parseProject, type ProjectParseResult, type ProgressCallback, type FailedFile } from '../parser/ts-morph-project-parser.js';
 import type { TsMorphEntity, TsMorphRelationship } from '../parser/ts-morph-parser.js';
 
 /**
@@ -77,6 +77,11 @@ export interface ProcessProjectOptions {
   projectPath: string;
   db: Database.Database;
   exclude?: string[];
+  /**
+   * Optional progress callback for reporting parsing progress.
+   * Called at each phase: scan, load, entities, relationships.
+   */
+  onProgress?: ProgressCallback;
 }
 
 export interface ProcessProjectResult {
@@ -85,8 +90,11 @@ export interface ProcessProjectResult {
   relationships: Relationship[];
   success: boolean;
   error?: string;
+  /** Files that failed to load or parse */
+  failedFiles?: FailedFile[];
   stats?: {
     filesScanned: number;
+    filesLoaded: number;
     vueFilesProcessed: number;
     entitiesByType: Record<string, number>;
     relationshipsByType: Record<string, number>;
@@ -105,7 +113,7 @@ export class TsMorphFileProcessor {
    * Process an entire TypeScript/JavaScript project: parse, extract entities/relationships, store in DB.
    */
   processProject(options: ProcessProjectOptions): ProcessProjectResult {
-    const { projectPath, db, exclude } = options;
+    const { projectPath, db, exclude, onProgress } = options;
 
     // Step 1: Parse project using ts-morph
     let parseResult: ProjectParseResult;
@@ -113,6 +121,7 @@ export class TsMorphFileProcessor {
       parseResult = parseProject({
         projectPath,
         ...(exclude && { exclude }),
+        ...(onProgress && { onProgress }),
       });
     } catch (error) {
       return {
@@ -124,7 +133,7 @@ export class TsMorphFileProcessor {
       };
     }
 
-    const { entities: tsMorphEntities, relationships: tsMorphRelationships, stats } = parseResult;
+    const { entities: tsMorphEntities, relationships: tsMorphRelationships, stats, failedFiles } = parseResult;
 
     // Step 2: Build entity file path map for relationship enrichment
     // Map entity names to their file paths (for adding sourceFilePath to relationships)
@@ -283,6 +292,7 @@ export class TsMorphFileProcessor {
       entities: storedEntities,
       relationships: storedRelationships,
       success: true,
+      failedFiles,
       stats,
     };
   }
