@@ -56,6 +56,71 @@ describe('EntityStore', () => {
     });
   });
 
+  describe('createBatch', () => {
+    it('inserts multiple entities at once', () => {
+      const entities: NewEntity[] = [
+        { ...sampleEntity, name: 'fn1' },
+        { ...sampleEntity, name: 'fn2' },
+        { ...sampleEntity, name: 'fn3' },
+      ];
+
+      const created = store.createBatch(entities);
+
+      expect(created).toHaveLength(3);
+      expect(created[0]?.name).toBe('fn1');
+      expect(created[1]?.name).toBe('fn2');
+      expect(created[2]?.name).toBe('fn3');
+      expect(store.count()).toBe(3);
+    });
+
+    it('generates unique IDs for each entity', () => {
+      const entities: NewEntity[] = [
+        { ...sampleEntity, name: 'fn1' },
+        { ...sampleEntity, name: 'fn2' },
+      ];
+
+      const created = store.createBatch(entities);
+
+      expect(created[0]?.id).toBeDefined();
+      expect(created[1]?.id).toBeDefined();
+      expect(created[0]?.id).not.toBe(created[1]?.id);
+    });
+
+    it('preserves metadata', () => {
+      const entities: NewEntity[] = [
+        { ...sampleEntity, name: 'fn1', metadata: { exported: true } },
+        { ...sampleEntity, name: 'fn2', metadata: { exported: false } },
+      ];
+
+      const created = store.createBatch(entities);
+
+      expect(created[0]?.metadata).toEqual({ exported: true });
+      expect(created[1]?.metadata).toEqual({ exported: false });
+    });
+
+    it('returns empty array for empty input', () => {
+      const created = store.createBatch([]);
+
+      expect(created).toHaveLength(0);
+      expect(store.count()).toBe(0);
+    });
+
+    it('entities can be found after batch insert', () => {
+      const entities: NewEntity[] = [
+        { ...sampleEntity, name: 'fn1', filePath: '/src/a.ts' },
+        { ...sampleEntity, name: 'fn2', filePath: '/src/b.ts' },
+      ];
+
+      const created = store.createBatch(entities);
+
+      const found1 = store.findById(created[0]!.id);
+      const found2 = store.findById(created[1]!.id);
+
+      expect(found1?.name).toBe('fn1');
+      expect(found2?.name).toBe('fn2');
+    });
+  });
+
   describe('findById', () => {
     it('finds an existing entity', () => {
       const created = store.create(sampleEntity);
@@ -285,6 +350,24 @@ describe('EntityStore', () => {
       expect(counts.module).toBe(0);
       expect(counts.file).toBe(0);
       expect(counts.type).toBe(0);
+    });
+  });
+
+  describe('getAll', () => {
+    it('returns all entities', () => {
+      store.create({ ...sampleEntity, name: 'fn1' });
+      store.create({ ...sampleEntity, name: 'fn2' });
+      store.create({ ...sampleEntity, name: 'fn3' });
+
+      const all = store.getAll();
+
+      expect(all).toHaveLength(3);
+      expect(all.map(e => e.name).sort()).toEqual(['fn1', 'fn2', 'fn3']);
+    });
+
+    it('returns empty array for empty database', () => {
+      const all = store.getAll();
+      expect(all).toHaveLength(0);
     });
   });
 

@@ -84,6 +84,12 @@ export interface EntityQuery {
 
 export interface EntityStore {
   create(entity: NewEntity): Entity;
+  /**
+   * Batch insert multiple entities at once.
+   * Significantly faster than individual inserts for bulk operations.
+   * Returns the created entities with generated IDs.
+   */
+  createBatch(entities: NewEntity[]): Entity[];
   findById(id: string): Entity | null;
   findByName(name: string): Entity[];
   findByFile(filePath: string): Entity[];
@@ -95,6 +101,11 @@ export interface EntityStore {
    * Returns first match or null if not found.
    */
   findByNameAndFile(name: string, filePath: string): Entity | null;
+  /**
+   * Get all entities in the database.
+   * Used to pre-populate entity lookup cache for batch processing.
+   */
+  getAll(): Entity[];
   update(id: string, updates: Partial<NewEntity>): Entity | null;
   delete(id: string): boolean;
   deleteByFile(filePath: string): number;
@@ -157,6 +168,54 @@ export function createEntityStore(db: Database.Database): EntityStore {
       return rowToEntity(created);
     },
 
+    createBatch(entities: NewEntity[]): Entity[] {
+      if (entities.length === 0) {
+        return [];
+      }
+
+      // Generate IDs and prepare data
+      const prepared = entities.map(entity => ({
+        id: randomUUID(),
+        type: entity.type,
+        name: entity.name,
+        filePath: entity.filePath,
+        startLine: entity.startLine,
+        endLine: entity.endLine,
+        language: entity.language,
+        metadata: entity.metadata ? JSON.stringify(entity.metadata) : null,
+      }));
+
+      // Insert all entities using prepared statement
+      for (const entity of prepared) {
+        insertStmt.run(
+          entity.id,
+          entity.type,
+          entity.name,
+          entity.filePath,
+          entity.startLine,
+          entity.endLine,
+          entity.language,
+          entity.metadata
+        );
+      }
+
+      // Return entities without re-querying DB
+      // Build result directly from inserted data with current timestamp
+      const now = new Date().toISOString();
+      return prepared.map(entity => ({
+        id: entity.id,
+        type: entity.type as EntityType,
+        name: entity.name,
+        filePath: entity.filePath,
+        startLine: entity.startLine,
+        endLine: entity.endLine,
+        language: entity.language,
+        ...(entity.metadata && { metadata: JSON.parse(entity.metadata) as Record<string, unknown> }),
+        createdAt: now,
+        updatedAt: now,
+      }));
+    },
+
     findById(id: string): Entity | null {
       const row = selectByIdStmt.get(id) as EntityRow | undefined;
       return row ? rowToEntity(row) : null;
@@ -180,6 +239,12 @@ export function createEntityStore(db: Database.Database): EntityStore {
     findByNameAndFile(name: string, filePath: string): Entity | null {
       const row = selectByNameAndFileStmt.get(name, filePath) as EntityRow | undefined;
       return row ? rowToEntity(row) : null;
+    },
+
+    getAll(): Entity[] {
+      const selectAllStmt = db.prepare('SELECT * FROM entities');
+      const rows = selectAllStmt.all() as EntityRow[];
+      return rows.map(rowToEntity);
     },
 
     update(id: string, updates: Partial<NewEntity>): Entity | null {
