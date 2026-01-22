@@ -16,7 +16,8 @@
     "./db": {
       "import": "./dist/db/index.js",
       "types": "./dist/db/index.d.ts"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist"
@@ -30,10 +31,12 @@
     "@vue/compiler-sfc": "^3.5.13",
     "better-sqlite3": "^12.6.2",
     "globby": "^16.1.0",
+    "micromatch": "^4.0.8",
     "ts-morph": "^24.0.0",
     "web-tree-sitter": "^0.26.3"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13"
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/micromatch": "^4.0.10"
   }
 }

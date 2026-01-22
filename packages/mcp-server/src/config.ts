@@ -147,6 +147,24 @@ export function getProjectId(): string {
 }
 
 /**
+ * Default path for checkpoint database
+ */
+const DEFAULT_CHECKPOINT_DB_PATH = join(process.cwd(), '.claude', 'execution-state.db');
+
+/**
+ * Get the checkpoint database path from environment or default
+ *
+ * Environment variable: CHECKPOINT_DB_PATH
+ * Default: .claude/execution-state.db in current working directory
+ *
+ * @returns Checkpoint database path
+ */
+export function getCheckpointDbPath(): string {
+  const envPath = process.env['CHECKPOINT_DB_PATH'];
+  return envPath ?? DEFAULT_CHECKPOINT_DB_PATH;
+}
+
+/**
  * Get Ruby LSP configuration from environment variables
  *
  * Environment variables:

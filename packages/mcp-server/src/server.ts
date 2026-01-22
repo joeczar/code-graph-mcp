@@ -17,6 +17,8 @@ import { findEntityTool } from './tools/find-entity.js';
 import { getExportsTool } from './tools/get-exports.js';
 import { parseFileTool } from './tools/parse-file.js';
 import { parseDirectoryTool } from './tools/parse-directory.js';
+import { parseDirectoryStartTool } from './tools/parse-directory-start.js';
+import { parseDirectoryStatusTool } from './tools/parse-directory-status.js';
 import { createErrorResponse, type ToolDefinition } from './tools/types.js';
 import { logger } from './tools/logger.js';
 import { instrumentHandler } from './tools/instrument.js';
@@ -154,6 +156,8 @@ export function createServer(): McpServer {
   registerTool(server, getExportsTool, metricsStore, projectId);
   registerTool(server, parseFileTool, metricsStore, projectId);
   registerTool(server, parseDirectoryTool, metricsStore, projectId);
+  registerTool(server, parseDirectoryStartTool, metricsStore, projectId);
+  registerTool(server, parseDirectoryStatusTool, metricsStore, projectId);
 
   return server;
 }

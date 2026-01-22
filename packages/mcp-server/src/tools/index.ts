@@ -47,3 +47,5 @@ export { findEntityTool } from './find-entity.js';
 export { getExportsTool } from './get-exports.js';
 export { parseFileTool } from './parse-file.js';
 export { parseDirectoryTool } from './parse-directory.js';
+export { parseDirectoryStartTool } from './parse-directory-start.js';
+export { parseDirectoryStatusTool } from './parse-directory-status.js';

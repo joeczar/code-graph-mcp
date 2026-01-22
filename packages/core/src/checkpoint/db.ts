@@ -12,6 +12,7 @@ export type WorkflowPhase = 'setup' | 'research' | 'implement' | 'review' | 'fin
 export type PrState = 'open' | 'merged' | 'closed';
 export type MilestoneRunStatus = 'running' | 'paused' | 'completed' | 'failed' | 'deadlocked';
 export type WorktreeStatus = 'created' | 'running' | 'pr-created' | 'merged' | 'failed';
+export type ParseTaskStatus = 'pending' | 'running' | 'completed' | 'failed';
 
 export interface Workflow {
   id: string;
@@ -43,6 +44,28 @@ export interface NewWorktree {
   issue_number: number;
   branch_name: string;
   worktree_path: string;
+}
+
+export interface ParseTask {
+  id: string;
+  directory_path: string;
+  pattern: string | null;
+  status: ParseTaskStatus;
+  total_files: number;
+  processed_files: number;
+  entities_count: number;
+  relationships_count: number;
+  current_file: string | null;
+  error: string | null;
+  progress_log_path: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NewParseTask {
+  directory_path: string;
+  pattern?: string;
+  progress_log_path?: string;
 }
 
 export interface WorkflowAction {
@@ -164,6 +187,24 @@ CREATE TABLE IF NOT EXISTS worktrees (
 )
 `;
 
+const PARSE_TASKS_TABLE = `
+CREATE TABLE IF NOT EXISTS parse_tasks (
+  id TEXT PRIMARY KEY,
+  directory_path TEXT NOT NULL,
+  pattern TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  total_files INTEGER DEFAULT 0,
+  processed_files INTEGER DEFAULT 0,
+  entities_count INTEGER DEFAULT 0,
+  relationships_count INTEGER DEFAULT 0,
+  current_file TEXT,
+  error TEXT,
+  progress_log_path TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+)
+`;
+
 const INDEXES = [
   'CREATE INDEX IF NOT EXISTS idx_workflows_issue ON workflows(issue_number)',
   'CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status)',
@@ -176,6 +217,8 @@ const INDEXES = [
   'CREATE INDEX IF NOT EXISTS idx_worktrees_workflow ON worktrees(workflow_id)',
   'CREATE INDEX IF NOT EXISTS idx_worktrees_issue ON worktrees(issue_number)',
   'CREATE INDEX IF NOT EXISTS idx_worktrees_status ON worktrees(status)',
+  'CREATE INDEX IF NOT EXISTS idx_parse_tasks_status ON parse_tasks(status)',
+  'CREATE INDEX IF NOT EXISTS idx_parse_tasks_directory ON parse_tasks(directory_path)',
 ];
 
 // Columns to add via migration (for existing databases)
@@ -228,6 +271,7 @@ function initializeCheckpointSchema(db: Database.Database): void {
   db.exec(WORKFLOW_COMMITS_TABLE);
   db.exec(MILESTONE_RUNS_TABLE);
   db.exec(WORKTREES_TABLE);
+  db.exec(PARSE_TASKS_TABLE);
 
   for (const index of INDEXES) {
     db.exec(index);
@@ -758,5 +802,133 @@ export function setWorktreeStatus(
 export function deleteWorktree(db: Database.Database, issueNumber: number): boolean {
   const stmt = db.prepare('DELETE FROM worktrees WHERE issue_number = ?');
   const result = stmt.run(issueNumber);
+  return result.changes > 0;
+}
+
+// ============================================================================
+// Parse Task Operations
+// ============================================================================
+
+export function createParseTask(db: Database.Database, data: NewParseTask): ParseTask {
+  const id = randomUUID();
+  const now = new Date().toISOString();
+
+  const stmt = db.prepare(`
+    INSERT INTO parse_tasks (id, directory_path, pattern, status, total_files, processed_files, entities_count, relationships_count, current_file, error, progress_log_path, created_at, updated_at)
+    VALUES (?, ?, ?, 'pending', 0, 0, 0, 0, NULL, NULL, ?, ?, ?)
+  `);
+
+  stmt.run(id, data.directory_path, data.pattern ?? null, data.progress_log_path ?? null, now, now);
+
+  return {
+    id,
+    directory_path: data.directory_path,
+    pattern: data.pattern ?? null,
+    status: 'pending',
+    total_files: 0,
+    processed_files: 0,
+    entities_count: 0,
+    relationships_count: 0,
+    current_file: null,
+    error: null,
+    progress_log_path: data.progress_log_path ?? null,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+export function getParseTask(db: Database.Database, id: string): ParseTask | null {
+  const stmt = db.prepare('SELECT * FROM parse_tasks WHERE id = ?');
+  const row = stmt.get(id) as ParseTask | undefined;
+  return row ?? null;
+}
+
+export function listParseTasks(
+  db: Database.Database,
+  options?: { status?: ParseTaskStatus; limit?: number }
+): ParseTask[] {
+  let query = 'SELECT * FROM parse_tasks';
+  const params: (string | number)[] = [];
+
+  if (options?.status) {
+    query += ' WHERE status = ?';
+    params.push(options.status);
+  }
+
+  query += ' ORDER BY updated_at DESC';
+
+  if (options?.limit) {
+    query += ' LIMIT ?';
+    params.push(options.limit);
+  }
+
+  const stmt = db.prepare(query);
+  return stmt.all(...params) as ParseTask[];
+}
+
+export function setParseTaskStatus(
+  db: Database.Database,
+  id: string,
+  status: ParseTaskStatus,
+  error?: string
+): boolean {
+  const now = new Date().toISOString();
+  const stmt = db.prepare(`
+    UPDATE parse_tasks SET status = ?, error = ?, updated_at = ? WHERE id = ?
+  `);
+  const result = stmt.run(status, error ?? null, now, id);
+  return result.changes > 0;
+}
+
+export function updateParseTaskProgress(
+  db: Database.Database,
+  id: string,
+  update: {
+    total_files?: number;
+    processed_files?: number;
+    entities_count?: number;
+    relationships_count?: number;
+    current_file?: string | null;
+  }
+): boolean {
+  const now = new Date().toISOString();
+
+  // Build dynamic update query based on provided fields
+  const updates: string[] = ['updated_at = ?'];
+  const params: (string | number | null)[] = [now];
+
+  if (update.total_files !== undefined) {
+    updates.push('total_files = ?');
+    params.push(update.total_files);
+  }
+  if (update.processed_files !== undefined) {
+    updates.push('processed_files = ?');
+    params.push(update.processed_files);
+  }
+  if (update.entities_count !== undefined) {
+    updates.push('entities_count = ?');
+    params.push(update.entities_count);
+  }
+  if (update.relationships_count !== undefined) {
+    updates.push('relationships_count = ?');
+    params.push(update.relationships_count);
+  }
+  if (update.current_file !== undefined) {
+    updates.push('current_file = ?');
+    params.push(update.current_file);
+  }
+
+  params.push(id);
+
+  const stmt = db.prepare(`
+    UPDATE parse_tasks SET ${updates.join(', ')} WHERE id = ?
+  `);
+  const result = stmt.run(...params);
+  return result.changes > 0;
+}
+
+export function deleteParseTask(db: Database.Database, id: string): boolean {
+  const stmt = db.prepare('DELETE FROM parse_tasks WHERE id = ?');
+  const result = stmt.run(id);
   return result.changes > 0;
 }
