@@ -33,3 +33,23 @@ export type {
   DirectoryParseResult,
   FileParseResult,
 } from './directory-parser.js';
+
+// ts-morph parser exports
+export { parseProject } from './ts-morph-project-parser.js';
+export type {
+  ProjectParseOptions,
+  ProjectParseResult,
+} from './ts-morph-project-parser.js';
+export {
+  extractEntities,
+  extractRelationships,
+  extractImportMap,
+  extractVueScript,
+  extractJsDocContent,
+  buildEntityLookupMap,
+  findBestMatch,
+} from './ts-morph-parser.js';
+export type {
+  TsMorphEntity,
+  TsMorphRelationship,
+} from './ts-morph-parser.js';

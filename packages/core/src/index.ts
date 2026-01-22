@@ -14,6 +14,14 @@ export {
   getSupportedLanguages,
   detectLanguage,
   getLanguageConfig,
+  parseProject,
+  extractEntities,
+  extractRelationships,
+  extractImportMap,
+  extractVueScript,
+  extractJsDocContent,
+  buildEntityLookupMap,
+  findBestMatch,
 } from './parser/index.js';
 export type {
   ParseResult,
@@ -23,6 +31,10 @@ export type {
   DirectoryParseOptions,
   DirectoryParseResult,
   FileParseResult,
+  ProjectParseOptions,
+  ProjectParseResult,
+  TsMorphEntity,
+  TsMorphRelationship,
 } from './parser/index.js';
 
 // Database exports
