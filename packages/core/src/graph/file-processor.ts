@@ -31,13 +31,13 @@ type PendingRelationship = Omit<NewRelationship, 'sourceId' | 'targetId'> & {
 function toPendingRelationship(rel: {
   sourceName: string;
   targetName: string;
-  type: string;
+  type: PendingRelationship['type'];
   metadata?: Record<string, unknown>;
 }): PendingRelationship {
   return {
     sourceName: rel.sourceName,
     targetName: rel.targetName,
-    type: rel.type as PendingRelationship['type'],
+    type: rel.type,
     ...(rel.metadata && { metadata: rel.metadata }),
   };
 }
@@ -338,7 +338,7 @@ export class FileProcessor {
     const relationships: PendingRelationship[] = [];
 
     if (language === 'typescript' || language === 'javascript') {
-      this.extractTypeScriptRelationships(node, relationships);
+      this.extractTypeScriptRelationships(tree, sourceCode, filePath, relationships);
     } else if (language === 'ruby') {
       this.extractRubyRelationships(node, relationships);
     } else if (language === 'vue') {
@@ -352,15 +352,17 @@ export class FileProcessor {
    * Extract TypeScript/JavaScript relationships using dedicated extractor.
    */
   private extractTypeScriptRelationships(
-    node: SyntaxNode,
+    tree: Tree,
+    sourceCode: string,
+    filePath: string,
     relationships: PendingRelationship[]
   ): void {
     const extractor = new TypeScriptRelationshipExtractor();
     const parseResult = {
-      tree: { rootNode: node } as Tree,
-      filePath: '',
+      tree,
+      filePath,
       language: 'typescript' as const,
-      sourceCode: node.text,
+      sourceCode,
     };
 
     const extracted = extractor.extract(parseResult);

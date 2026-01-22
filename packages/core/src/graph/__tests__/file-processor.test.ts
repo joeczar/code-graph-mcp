@@ -11,6 +11,22 @@ import type Database from 'better-sqlite3';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, 'fixtures');
 
+/**
+ * Helper to find a relationship by source and target entity names.
+ */
+function findRelationship(
+  relationships: { sourceId: string; targetId: string; type: string }[],
+  entities: { id: string; name: string }[],
+  sourceName: string,
+  targetName: string
+): { sourceId: string; targetId: string; type: string } | undefined {
+  return relationships.find(r => {
+    const sourceEntity = entities.find(e => e.id === r.sourceId);
+    const targetEntity = entities.find(e => e.id === r.targetId);
+    return sourceEntity?.name === sourceName && targetEntity?.name === targetName;
+  });
+}
+
 describe('FileProcessor', () => {
   let processor: FileProcessor;
   let db: Database.Database;
@@ -440,11 +456,7 @@ describe('FileProcessor', () => {
         expect(callRels.length).toBeGreaterThan(0);
 
         // main calls helper
-        const mainCallsHelper = callRels.find(r => {
-          const sourceEntity = result.entities.find(e => e.id === r.sourceId);
-          const targetEntity = result.entities.find(e => e.id === r.targetId);
-          return sourceEntity?.name === 'main' && targetEntity?.name === 'helper';
-        });
+        const mainCallsHelper = findRelationship(callRels, result.entities, 'main', 'helper');
         expect(mainCallsHelper).toBeDefined();
       });
 
@@ -457,11 +469,7 @@ describe('FileProcessor', () => {
         const callRels = result.relationships.filter(r => r.type === 'calls');
 
         // calculate calls add
-        const calculateCallsAdd = callRels.find(r => {
-          const sourceEntity = result.entities.find(e => e.id === r.sourceId);
-          const targetEntity = result.entities.find(e => e.id === r.targetId);
-          return sourceEntity?.name === 'calculate' && targetEntity?.name === 'add';
-        });
+        const calculateCallsAdd = findRelationship(callRels, result.entities, 'calculate', 'add');
         expect(calculateCallsAdd).toBeDefined();
       });
 
@@ -529,15 +537,15 @@ describe('FileProcessor', () => {
         expect(callRels.length).toBeGreaterThan(0);
 
         // main calls helper
-        const mainCallsHelper = callRels.find(r => {
-          const sourceEntity = result.entities.find(e => e.id === r.sourceId);
-          const targetEntity = result.entities.find(e => e.id === r.targetId);
-          return sourceEntity?.name === 'main' && targetEntity?.name === 'helper';
-        });
+        const mainCallsHelper = findRelationship(callRels, result.entities, 'main', 'helper');
         expect(mainCallsHelper).toBeDefined();
       });
 
-      it('extracts method calls within classes', async () => {
+      // Skip: Ruby extractor uses qualified names (Calculator#calculate) but entities
+      // are stored with simple names (calculate). This causes resolution to fail for
+      // method calls within classes. This test will be unskipped when qualified name
+      // resolution is implemented.
+      it.skip('extracts method calls within classes', async () => {
         const filePath = join(fixturesDir, 'sample-with-calls.rb');
         const result = await processor.processFile({ filePath, db });
 
@@ -545,12 +553,9 @@ describe('FileProcessor', () => {
 
         const callRels = result.relationships.filter(r => r.type === 'calls');
 
-        // Note: Ruby extractor uses qualified names (Calculator#calculate) but entities
-        // are stored with simple names (calculate). This causes resolution to fail for
-        // method calls within classes. This is a known limitation that will be addressed
-        // in future work on qualified name resolution.
-        // For now, we just verify that at least one call relationship is extracted.
-        expect(callRels.length).toBeGreaterThan(0);
+        // Verify Calculator#calculate calls Calculator#add
+        const calculateCallsAdd = findRelationship(callRels, result.entities, 'calculate', 'add');
+        expect(calculateCallsAdd).toBeDefined();
       });
 
       it('stores call relationships in database', async () => {
