@@ -21,17 +21,95 @@ import {
   logAction,
   logCommit,
   getWorkflowSummary,
+  createMilestoneRun,
+  getMilestoneRun,
+  findMilestoneRunByName,
+  listMilestoneRuns,
+  setMilestoneRunWave,
+  incrementMilestoneRunCompleted,
+  setMilestoneRunStatus,
+  addMilestoneRunForceResolved,
+  deleteMilestoneRun,
   type WorkflowPhase,
   type WorkflowStatus,
   type PrState,
+  type MilestoneRunStatus,
 } from '@code-graph/core/checkpoint';
 
-// Default database path - in .claude directory (gitignored)
+// ============================================================================
+// Constants
+// ============================================================================
+
 const DEFAULT_DB_PATH = join(process.cwd(), '.claude', 'execution-state.db');
+
+const WORKFLOW_STATUSES: WorkflowStatus[] = ['running', 'paused', 'completed', 'failed'];
+const WORKFLOW_PHASES: WorkflowPhase[] = ['setup', 'research', 'implement', 'review', 'finalize', 'merge'];
+const PR_STATES: PrState[] = ['open', 'merged', 'closed'];
+const MILESTONE_STATUSES: MilestoneRunStatus[] = ['running', 'paused', 'completed', 'failed', 'deadlocked'];
+const ACTION_STATUSES = ['success', 'failed', 'skipped'] as const;
+
+// ============================================================================
+// Helpers
+// ============================================================================
 
 function getDb(): ReturnType<typeof getCheckpointDb> {
   const envPath = process.env['CHECKPOINT_DB_PATH'];
   return getCheckpointDb(envPath ?? DEFAULT_DB_PATH);
+}
+
+function parseIntRequired(value: string | undefined, name: string): number {
+  if (!value) {
+    throw new Error(`${name} is required`);
+  }
+  const num = parseInt(value, 10);
+  if (isNaN(num)) {
+    throw new Error(`${name} must be a number`);
+  }
+  return num;
+}
+
+function validateEnum<T extends string>(value: string, validValues: readonly T[], name: string): T {
+  if (!validValues.includes(value as T)) {
+    throw new Error(`Invalid ${name}: ${value}\nValid values: ${validValues.join(', ')}`);
+  }
+  return value as T;
+}
+
+function parseListOptions<T extends string>(
+  args: string[],
+  validStatuses: readonly T[]
+): { status?: T; limit?: number } {
+  const statusArg = args.find((a) => a.startsWith('--status='));
+  const statusValue = statusArg?.split('=')[1];
+
+  const limitArg = args.find((a) => a.startsWith('--limit='));
+  const limitValue = limitArg?.split('=')[1];
+
+  const options: { status?: T; limit?: number } = {};
+  if (statusValue && validStatuses.includes(statusValue as T)) {
+    options.status = statusValue as T;
+  }
+  if (limitValue) {
+    const limit = parseInt(limitValue, 10);
+    if (!isNaN(limit) && limit > 0) {
+      options.limit = limit;
+    }
+  }
+  return options;
+}
+
+function updateAndLog(
+  id: string,
+  updateFn: () => boolean,
+  getFn: () => unknown,
+  entityName: string
+): void {
+  if (updateFn()) {
+    const entity = getFn();
+    console.log(JSON.stringify(entity, null, 2));
+  } else {
+    throw new Error(`${entityName} not found: ${id}`);
+  }
 }
 
 export function runCheckpointCommand(args: string[]): void {
@@ -42,40 +120,31 @@ export function runCheckpointCommand(args: string[]): void {
     return;
   }
 
-  if (subcommand !== 'workflow') {
-    throw new Error(`Unknown checkpoint subcommand: ${subcommand}\nUse: checkpoint workflow <action>`);
+  if (subcommand !== 'workflow' && subcommand !== 'milestone') {
+    throw new Error(`Unknown checkpoint subcommand: ${subcommand}\nUse: checkpoint workflow <action> or checkpoint milestone <action>`);
   }
 
   const action = args[1];
   if (!action) {
     printCheckpointHelp();
-    throw new Error('Usage: checkpoint workflow <action>');
+    throw new Error(`Usage: checkpoint ${subcommand} <action>`);
   }
   const actionArgs = args.slice(2);
 
   try {
-    handleWorkflowAction(action, actionArgs);
+    if (subcommand === 'workflow') {
+      handleWorkflowAction(action, actionArgs);
+    } else {
+      handleMilestoneAction(action, actionArgs);
+    }
   } finally {
     closeCheckpointDb();
   }
 }
 
-/**
- * Helper to update a workflow and log the result.
- * Reduces duplication across set-* commands.
- */
-function updateWorkflowAndLog(
-  db: ReturnType<typeof getCheckpointDb>,
-  workflowId: string,
-  updateFn: () => boolean
-): void {
-  if (updateFn()) {
-    const workflow = getWorkflow(db, workflowId);
-    console.log(JSON.stringify(workflow, null, 2));
-  } else {
-    throw new Error(`Workflow not found: ${workflowId}`);
-  }
-}
+// ============================================================================
+// Workflow Actions
+// ============================================================================
 
 function handleWorkflowAction(action: string, args: string[]): void {
   const db = getDb();
@@ -83,15 +152,11 @@ function handleWorkflowAction(action: string, args: string[]): void {
   switch (action) {
     case 'create': {
       const [issueNumberStr, branchName] = args;
-      if (!issueNumberStr || !branchName) {
+      if (!branchName) {
         throw new Error('Usage: checkpoint workflow create <issue_number> <branch_name>');
       }
-      const issueNumber = parseInt(issueNumberStr, 10);
-      if (isNaN(issueNumber)) {
-        throw new Error('issue_number must be a number');
-      }
+      const issueNumber = parseIntRequired(issueNumberStr, 'issue_number');
 
-      // Check if workflow already exists
       const existing = findWorkflowByIssue(db, issueNumber);
       if (existing) {
         console.log(JSON.stringify(existing, null, 2));
@@ -104,21 +169,9 @@ function handleWorkflowAction(action: string, args: string[]): void {
     }
 
     case 'find': {
-      const [issueNumberStr] = args;
-      if (!issueNumberStr) {
-        throw new Error('Usage: checkpoint workflow find <issue_number>');
-      }
-      const issueNumber = parseInt(issueNumberStr, 10);
-      if (isNaN(issueNumber)) {
-        throw new Error('issue_number must be a number');
-      }
-
+      const issueNumber = parseIntRequired(args[0], 'issue_number');
       const workflow = findWorkflowByIssue(db, issueNumber);
-      if (workflow) {
-        console.log(JSON.stringify(workflow, null, 2));
-      } else {
-        console.log('null');
-      }
+      console.log(workflow ? JSON.stringify(workflow, null, 2) : 'null');
       break;
     }
 
@@ -127,32 +180,13 @@ function handleWorkflowAction(action: string, args: string[]): void {
       if (!workflowId) {
         throw new Error('Usage: checkpoint workflow get <workflow_id>');
       }
-
       const summary = getWorkflowSummary(db, workflowId);
-      if (summary) {
-        console.log(JSON.stringify(summary, null, 2));
-      } else {
-        console.log('null');
-      }
+      console.log(summary ? JSON.stringify(summary, null, 2) : 'null');
       break;
     }
 
     case 'list': {
-      const statusArg = args.find((a) => a.startsWith('--status='));
-      const statusValue = statusArg?.split('=')[1];
-      const validStatuses: WorkflowStatus[] = ['running', 'paused', 'completed', 'failed'];
-      const status = statusValue && validStatuses.includes(statusValue as WorkflowStatus)
-        ? (statusValue as WorkflowStatus)
-        : undefined;
-
-      const limitArg = args.find((a) => a.startsWith('--limit='));
-      const limitValue = limitArg?.split('=')[1];
-      const limit = limitValue ? parseInt(limitValue, 10) : undefined;
-
-      const options: { status?: WorkflowStatus; limit?: number } = {};
-      if (status) options.status = status;
-      if (limit) options.limit = limit;
-
+      const options = parseListOptions(args, WORKFLOW_STATUSES);
       const workflows = listWorkflows(db, options);
       console.log(JSON.stringify(workflows, null, 2));
       break;
@@ -161,45 +195,45 @@ function handleWorkflowAction(action: string, args: string[]): void {
     case 'set-phase': {
       const [workflowId, phase] = args;
       if (!workflowId || !phase) {
-        throw new Error('Usage: checkpoint workflow set-phase <workflow_id> <phase>\nPhases: setup, research, implement, review, finalize, merge');
+        throw new Error(`Usage: checkpoint workflow set-phase <workflow_id> <phase>\nPhases: ${WORKFLOW_PHASES.join(', ')}`);
       }
-
-      const validPhases: WorkflowPhase[] = ['setup', 'research', 'implement', 'review', 'finalize', 'merge'];
-      if (!validPhases.includes(phase as WorkflowPhase)) {
-        throw new Error(`Invalid phase: ${phase}\nValid phases: ${validPhases.join(', ')}`);
-      }
-
-      updateWorkflowAndLog(db, workflowId, () => setWorkflowPhase(db, workflowId, phase as WorkflowPhase));
+      const validPhase = validateEnum(phase, WORKFLOW_PHASES, 'phase');
+      updateAndLog(
+        workflowId,
+        () => setWorkflowPhase(db, workflowId, validPhase),
+        () => getWorkflow(db, workflowId),
+        'Workflow'
+      );
       break;
     }
 
     case 'set-status': {
       const [workflowId, status] = args;
       if (!workflowId || !status) {
-        throw new Error('Usage: checkpoint workflow set-status <workflow_id> <status>\nStatuses: running, paused, completed, failed');
+        throw new Error(`Usage: checkpoint workflow set-status <workflow_id> <status>\nStatuses: ${WORKFLOW_STATUSES.join(', ')}`);
       }
-
-      const validStatuses: WorkflowStatus[] = ['running', 'paused', 'completed', 'failed'];
-      if (!validStatuses.includes(status as WorkflowStatus)) {
-        throw new Error(`Invalid status: ${status}\nValid statuses: ${validStatuses.join(', ')}`);
-      }
-
-      updateWorkflowAndLog(db, workflowId, () => setWorkflowStatus(db, workflowId, status as WorkflowStatus));
+      const validStatus = validateEnum(status, WORKFLOW_STATUSES, 'status');
+      updateAndLog(
+        workflowId,
+        () => setWorkflowStatus(db, workflowId, validStatus),
+        () => getWorkflow(db, workflowId),
+        'Workflow'
+      );
       break;
     }
 
     case 'set-pr': {
       const [workflowId, prNumberStr] = args;
-      if (!workflowId || !prNumberStr) {
+      if (!workflowId) {
         throw new Error('Usage: checkpoint workflow set-pr <workflow_id> <pr_number>');
       }
-
-      const prNumber = parseInt(prNumberStr, 10);
-      if (isNaN(prNumber)) {
-        throw new Error('pr_number must be a number');
-      }
-
-      updateWorkflowAndLog(db, workflowId, () => setWorkflowPr(db, workflowId, prNumber));
+      const prNumber = parseIntRequired(prNumberStr, 'pr_number');
+      updateAndLog(
+        workflowId,
+        () => setWorkflowPr(db, workflowId, prNumber),
+        () => getWorkflow(db, workflowId),
+        'Workflow'
+      );
       break;
     }
 
@@ -208,45 +242,38 @@ function handleWorkflowAction(action: string, args: string[]): void {
       if (!workflowId || !mergedSha) {
         throw new Error('Usage: checkpoint workflow set-merged <workflow_id> <merged_sha>');
       }
-
-      updateWorkflowAndLog(db, workflowId, () => setWorkflowMerged(db, workflowId, mergedSha));
+      updateAndLog(
+        workflowId,
+        () => setWorkflowMerged(db, workflowId, mergedSha),
+        () => getWorkflow(db, workflowId),
+        'Workflow'
+      );
       break;
     }
 
     case 'set-pr-state': {
       const [workflowId, prState] = args;
       if (!workflowId || !prState) {
-        throw new Error('Usage: checkpoint workflow set-pr-state <workflow_id> <pr_state>\nPR states: open, merged, closed');
+        throw new Error(`Usage: checkpoint workflow set-pr-state <workflow_id> <pr_state>\nPR states: ${PR_STATES.join(', ')}`);
       }
-
-      const validPrStates: PrState[] = ['open', 'merged', 'closed'];
-      if (!validPrStates.includes(prState as PrState)) {
-        throw new Error(`Invalid PR state: ${prState}\nValid states: ${validPrStates.join(', ')}`);
-      }
-
-      updateWorkflowAndLog(db, workflowId, () => setWorkflowPrState(db, workflowId, prState as PrState));
+      const validPrState = validateEnum(prState, PR_STATES, 'PR state');
+      updateAndLog(
+        workflowId,
+        () => setWorkflowPrState(db, workflowId, validPrState),
+        () => getWorkflow(db, workflowId),
+        'Workflow'
+      );
       break;
     }
 
     case 'log-action': {
       const [workflowId, actionType, status, ...detailsParts] = args;
       if (!workflowId || !actionType || !status) {
-        throw new Error('Usage: checkpoint workflow log-action <workflow_id> <action_type> <status> [details]\nStatus: success, failed, skipped');
+        throw new Error(`Usage: checkpoint workflow log-action <workflow_id> <action_type> <status> [details]\nStatus: ${ACTION_STATUSES.join(', ')}`);
       }
-
-      const validStatuses = ['success', 'failed', 'skipped'];
-      if (!validStatuses.includes(status)) {
-        throw new Error(`Invalid status: ${status}\nValid statuses: ${validStatuses.join(', ')}`);
-      }
-
+      const validStatus = validateEnum(status, ACTION_STATUSES, 'status');
       const details = detailsParts.length > 0 ? detailsParts.join(' ') : undefined;
-      const loggedAction = logAction(
-        db,
-        workflowId,
-        actionType,
-        status as 'success' | 'failed' | 'skipped',
-        details
-      );
+      const loggedAction = logAction(db, workflowId, actionType, validStatus, details);
       console.log(JSON.stringify(loggedAction, null, 2));
       break;
     }
@@ -284,14 +311,183 @@ function handleWorkflowAction(action: string, args: string[]): void {
   }
 }
 
+// ============================================================================
+// Milestone Actions
+// ============================================================================
+
+function handleMilestoneAction(action: string, args: string[]): void {
+  const db = getDb();
+
+  switch (action) {
+    case 'create': {
+      const [milestoneName, ...rest] = args;
+      if (!milestoneName) {
+        throw new Error('Usage: checkpoint milestone create "<name>" --waves \'<json>\' [--parallel N]');
+      }
+
+      // Parse --waves argument
+      const wavesIdx = rest.indexOf('--waves');
+      const wavesJson = wavesIdx !== -1 ? rest[wavesIdx + 1] : undefined;
+      if (!wavesJson) {
+        throw new Error('Missing --waves argument. Usage: checkpoint milestone create "<name>" --waves \'{"1": [12], "2": [13]}\'');
+      }
+      let waveIssues: Record<string, number[]>;
+      try {
+        waveIssues = JSON.parse(wavesJson) as Record<string, number[]>;
+      } catch {
+        throw new Error(`Invalid JSON for --waves: ${wavesJson}`);
+      }
+
+      // Parse --parallel argument (optional)
+      const parallelIdx = rest.indexOf('--parallel');
+      const parallelArg = parallelIdx !== -1 ? rest[parallelIdx + 1] : undefined;
+      let parallelSetting = 1;
+      if (parallelArg) {
+        parallelSetting = parseInt(parallelArg, 10);
+        if (isNaN(parallelSetting) || parallelSetting < 1) {
+          throw new Error('--parallel must be a positive number');
+        }
+      }
+
+      // Calculate totals
+      const numericWaveIssues: Record<number, number[]> = {};
+      let totalIssues = 0;
+      let totalWaves = 0;
+      for (const [waveStr, issues] of Object.entries(waveIssues)) {
+        const waveNum = parseInt(waveStr, 10);
+        numericWaveIssues[waveNum] = issues;
+        totalIssues += issues.length;
+        if (waveNum > totalWaves) totalWaves = waveNum;
+      }
+
+      const run = createMilestoneRun(db, {
+        milestone_name: milestoneName,
+        total_issues: totalIssues,
+        total_waves: totalWaves,
+        wave_issues: numericWaveIssues,
+        parallel_setting: parallelSetting,
+      });
+      console.log(JSON.stringify(run, null, 2));
+      break;
+    }
+
+    case 'find': {
+      const [milestoneName] = args;
+      if (!milestoneName) {
+        throw new Error('Usage: checkpoint milestone find "<name>"');
+      }
+      const run = findMilestoneRunByName(db, milestoneName);
+      console.log(run ? JSON.stringify(run, null, 2) : 'null');
+      break;
+    }
+
+    case 'get': {
+      const [runId] = args;
+      if (!runId) {
+        throw new Error('Usage: checkpoint milestone get <run_id>');
+      }
+      const run = getMilestoneRun(db, runId);
+      console.log(run ? JSON.stringify(run, null, 2) : 'null');
+      break;
+    }
+
+    case 'list': {
+      const options = parseListOptions(args, MILESTONE_STATUSES);
+      const runs = listMilestoneRuns(db, options);
+      console.log(JSON.stringify(runs, null, 2));
+      break;
+    }
+
+    case 'set-wave': {
+      const [runId, waveStr] = args;
+      if (!runId) {
+        throw new Error('Usage: checkpoint milestone set-wave <run_id> <wave>');
+      }
+      const wave = parseIntRequired(waveStr, 'wave');
+      updateAndLog(
+        runId,
+        () => setMilestoneRunWave(db, runId, wave),
+        () => getMilestoneRun(db, runId),
+        'Milestone run'
+      );
+      break;
+    }
+
+    case 'complete-issue': {
+      const [runId] = args;
+      if (!runId) {
+        throw new Error('Usage: checkpoint milestone complete-issue <run_id>');
+      }
+      updateAndLog(
+        runId,
+        () => incrementMilestoneRunCompleted(db, runId),
+        () => getMilestoneRun(db, runId),
+        'Milestone run'
+      );
+      break;
+    }
+
+    case 'set-status': {
+      const [runId, status] = args;
+      if (!runId || !status) {
+        throw new Error(`Usage: checkpoint milestone set-status <run_id> <status>\nStatuses: ${MILESTONE_STATUSES.join(', ')}`);
+      }
+      const validStatus = validateEnum(status, MILESTONE_STATUSES, 'status');
+      updateAndLog(
+        runId,
+        () => setMilestoneRunStatus(db, runId, validStatus),
+        () => getMilestoneRun(db, runId),
+        'Milestone run'
+      );
+      break;
+    }
+
+    case 'add-force-resolved': {
+      const [runId, issueNumberStr] = args;
+      if (!runId) {
+        throw new Error('Usage: checkpoint milestone add-force-resolved <run_id> <issue_number>');
+      }
+      const issueNumber = parseIntRequired(issueNumberStr, 'issue_number');
+      updateAndLog(
+        runId,
+        () => addMilestoneRunForceResolved(db, runId, issueNumber),
+        () => getMilestoneRun(db, runId),
+        'Milestone run'
+      );
+      break;
+    }
+
+    case 'delete': {
+      const [runId] = args;
+      if (!runId) {
+        throw new Error('Usage: checkpoint milestone delete <run_id>');
+      }
+
+      const success = deleteMilestoneRun(db, runId);
+      if (success) {
+        console.log(`Deleted milestone run: ${runId}`);
+      } else {
+        throw new Error(`Milestone run not found: ${runId}`);
+      }
+      break;
+    }
+
+    default:
+      printCheckpointHelp();
+      throw new Error(`Unknown milestone action: ${action}`);
+  }
+}
+
 function printCheckpointHelp(): void {
   console.log(`
-checkpoint - Manage workflow state
+checkpoint - Manage workflow and milestone state
 
 USAGE:
   code-graph checkpoint workflow <action> [args]
+  code-graph checkpoint milestone <action> [args]
 
-ACTIONS:
+=== WORKFLOW ACTIONS ===
+
   create <issue_number> <branch_name>
     Create a new workflow for an issue.
     Returns the created workflow with its ID.
@@ -337,7 +533,41 @@ ACTIONS:
   delete <workflow_id>
     Delete a workflow and all its actions/commits.
 
-EXAMPLES:
+=== MILESTONE ACTIONS ===
+
+  create "<name>" --waves '<json>' [--parallel N]
+    Create a new milestone run.
+    Waves JSON format: {"1": [12, 15], "2": [13], "3": [14]}
+
+  find "<name>"
+    Find active milestone run by name (running, paused, or deadlocked).
+    Returns the milestone run or null.
+
+  get <run_id>
+    Get milestone run details by ID.
+
+  list [--status=<status>] [--limit=<n>]
+    List milestone runs. Optionally filter by status.
+    Statuses: running, paused, completed, failed, deadlocked
+
+  set-wave <run_id> <wave>
+    Update the current wave number.
+
+  complete-issue <run_id>
+    Increment the completed issues count.
+
+  set-status <run_id> <status>
+    Update milestone run status.
+    Statuses: running, paused, completed, failed, deadlocked
+
+  add-force-resolved <run_id> <issue_number>
+    Mark an issue as force-resolved (unblocked manually).
+
+  delete <run_id>
+    Delete a milestone run.
+
+=== WORKFLOW EXAMPLES ===
+
   # Start working on issue #12
   code-graph checkpoint workflow create 12 "feat/12-add-parser"
 
@@ -358,5 +588,25 @@ EXAMPLES:
 
   # Mark workflow complete
   code-graph checkpoint workflow set-status abc-123 completed
+
+=== MILESTONE EXAMPLES ===
+
+  # Create a milestone run with wave structure
+  code-graph checkpoint milestone create "M3: Code Graph" --waves '{"1": [12, 15], "2": [13], "3": [14]}' --parallel 2
+
+  # Find an active milestone run
+  code-graph checkpoint milestone find "M3: Code Graph"
+
+  # Advance to the next wave
+  code-graph checkpoint milestone set-wave abc-123 2
+
+  # Mark an issue as completed
+  code-graph checkpoint milestone complete-issue abc-123
+
+  # Force-unblock a deadlocked issue
+  code-graph checkpoint milestone add-force-resolved abc-123 99
+
+  # Mark milestone as completed
+  code-graph checkpoint milestone set-status abc-123 completed
 `);
 }

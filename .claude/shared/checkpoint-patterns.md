@@ -162,3 +162,136 @@ Resume capability may be limited.
 ```
 
 Don't let checkpoint failures block the actual work.
+
+---
+
+## Milestone Run Patterns
+
+Milestone runs track orchestration-level state for `/auto-milestone`:
+
+### Creating a Milestone Run
+
+After the milestone-planner produces wave JSON:
+
+```bash
+pnpm checkpoint milestone create "{milestone_name}" --waves '{"1": [12, 15], "2": [13]}' --parallel 2
+```
+
+This creates a run with:
+- `current_wave = 1`
+- `completed_issues = 0`
+- `status = running`
+
+### Wave Progression
+
+**After each issue completes (PR merged):**
+```bash
+pnpm checkpoint milestone complete-issue "{run_id}"
+```
+
+**After all issues in a wave complete:**
+```bash
+pnpm checkpoint milestone set-wave "{run_id}" {next_wave}
+```
+
+**Important:** Always update the wave AFTER completing all issues in the current wave.
+
+### Resuming a Milestone
+
+When using `--continue`:
+
+```bash
+# 1. Find existing run
+pnpm checkpoint milestone find "{milestone_name}"
+# Returns: { id, current_wave, completed_issues, wave_issues, status }
+
+# 2. Parse wave_issues JSON to get issues per wave
+# 3. Skip waves before current_wave
+# 4. Resume processing from current_wave
+```
+
+### Deadlock Handling
+
+When blocked issues are force-resolved:
+
+```bash
+# Record the force resolution
+pnpm checkpoint milestone add-force-resolved "{run_id}" {issue_number}
+```
+
+This allows resume to know which blockers were manually resolved.
+
+### Status Values
+
+| Status | Meaning |
+|--------|---------|
+| `running` | Active execution |
+| `paused` | User paused (can resume) |
+| `completed` | All issues merged |
+| `failed` | Unrecoverable error |
+| `deadlocked` | Blocked with no resolution |
+
+### Completion
+
+When all issues are merged:
+
+```bash
+pnpm checkpoint milestone set-status "{run_id}" completed
+```
+
+### Example: Full Milestone Flow
+
+```bash
+# 1. Create run after planning
+pnpm checkpoint milestone create "M3: Code Graph" --waves '{"1": [12], "2": [13, 15], "3": [14]}' --parallel 1
+# → { id: "abc-123", current_wave: 1, ... }
+
+# 2. Process wave 1
+# ... /auto-issue 12 → /auto-merge → merged
+pnpm checkpoint milestone complete-issue "abc-123"
+pnpm checkpoint milestone set-wave "abc-123" 2
+
+# 3. Process wave 2
+# ... /auto-issue 13 → /auto-merge → merged
+pnpm checkpoint milestone complete-issue "abc-123"
+# ... /auto-issue 15 → /auto-merge → merged
+pnpm checkpoint milestone complete-issue "abc-123"
+pnpm checkpoint milestone set-wave "abc-123" 3
+
+# 4. Process wave 3
+# ... /auto-issue 14 → /auto-merge → merged
+pnpm checkpoint milestone complete-issue "abc-123"
+
+# 5. Complete
+pnpm checkpoint milestone set-status "abc-123" completed
+```
+
+### Example: Resume After Interruption
+
+```bash
+# Find where we left off
+pnpm checkpoint milestone find "M3: Code Graph"
+# → { current_wave: 2, completed_issues: 1, wave_issues: {"1": [12], "2": [13, 15], "3": [14]} }
+
+# Wave 1 complete (skip)
+# Wave 2 in progress - check each issue:
+pnpm checkpoint workflow find 13  # → pr_state: merged (skip)
+pnpm checkpoint workflow find 15  # → pr_state: open, pr_number: 105
+
+# Resume: merge #15's PR
+/auto-merge 105
+pnpm checkpoint milestone complete-issue "abc-123"
+pnpm checkpoint milestone set-wave "abc-123" 3
+
+# Continue to wave 3...
+```
+
+### Example: Force-Resolve Deadlock
+
+```bash
+# Deadlock detected - issue #13 blocked by #99 (external, open)
+pnpm checkpoint milestone add-force-resolved "abc-123" 99
+
+# Now #13 can be processed (its blocker is in force_resolved list)
+/auto-issue 13
+```

@@ -95,10 +95,35 @@ Create a directed graph:
 
 Check for issues:
 
-1. **Circular dependencies**: A → B → C → A
-2. **Missing issues**: Depends on #X but #X not in milestone
-3. **External dependencies**: Depends on issue in different milestone
-4. **Orphan issues**: No dependencies and nothing depends on them (warn only)
+1. **Circular dependencies**: A → B → C → A (error - requires manual resolution)
+2. **Missing issues**: Issue #X doesn't exist (error - invalid reference)
+3. **Orphan issues**: No dependencies and nothing depends on them (warn only)
+
+**External dependency classification:**
+
+| Type | Description | Auto-Resolution |
+|------|-------------|-----------------|
+| `external-closed` | Issue in different milestone, state=closed | ✅ Treat as resolved |
+| `external-merged` | Issue has label "milestone-complete" | ✅ Treat as resolved |
+| `external-open` | Issue in different milestone, state=open | ❌ Requires decision |
+| `missing` | Issue number doesn't exist | ❌ Error |
+
+**To check external issue state:**
+
+```bash
+# Get issue state and labels
+gh issue view <number> --json state,labels,milestone -q '{state: .state, labels: [.labels[].name], milestone: .milestone.title}'
+```
+
+**Auto-resolution logic:**
+
+```
+For each external dependency:
+  1. Fetch issue: gh issue view <number> --json state,labels
+  2. If state == "CLOSED" → auto-resolve
+  3. If labels contains "milestone-complete" → auto-resolve
+  4. Otherwise → add to external_blockers list
+```
 
 ### Phase 5: Identify Free Issues
 
@@ -122,6 +147,82 @@ Group issues into waves that can run in parallel:
 }
 ```
 
+### Phase 7: Deadlock Analysis
+
+If no issues are free but open issues remain, analyze the deadlock:
+
+**Blocker categories:**
+
+| Category | Description | Resolution Path |
+|----------|-------------|-----------------|
+| `external-closed` | Depends on closed issue outside milestone | Auto-resolve |
+| `external-open` | Depends on open issue outside milestone | Wait/force/skip |
+| `failed` | Depends on issue with failed workflow | Retry or skip |
+| `circular` | Part of a dependency cycle | Manual resolution required |
+| `missing` | Depends on non-existent issue | Error - fix issue body |
+
+**Deadlock detection:**
+
+```bash
+# Check workflow state for blocking issues
+pnpm checkpoint workflow find <blocker_issue_number>
+```
+
+**Output when deadlocked:**
+
+```json
+{
+  "deadlock_analysis": {
+    "blocked_issues": [
+      {
+        "issue": 13,
+        "blockers": [
+          {"issue": 99, "type": "external-open", "milestone": "M4: Future"},
+          {"issue": 12, "type": "failed", "workflow_status": "failed"}
+        ]
+      }
+    ],
+    "resolution_options": [
+      {"action": "force-resolve", "issue": 13, "reason": "Unblock by treating #99 as resolved"},
+      {"action": "retry", "issue": 12, "reason": "Retry failed workflow"},
+      {"action": "skip", "issues": [13], "reason": "Skip blocked issues"}
+    ]
+  }
+}
+```
+
+### Phase 8: Parallelization Analysis
+
+Calculate safe parallel execution limit:
+
+```
+max_independent = size of largest wave (all issues can run simultaneously)
+recommended_parallel = min(max_independent, 2)  # Conservative default
+```
+
+**Smart default logic:**
+
+```
+If --parallel not specified:
+  If all issues independent (single wave):
+    recommend: parallel = 2
+  If waves exist:
+    recommend: parallel = min(largest_wave_size, 2)
+  Always output recommendation with explanation
+```
+
+**Output:**
+
+```json
+{
+  "parallelization": {
+    "largest_wave_size": 3,
+    "recommended_parallel": 2,
+    "rationale": "Wave 2 has 3 independent issues. Using 2 for safety."
+  }
+}
+```
+
 ## Output Format
 
 Return a structured summary:
@@ -131,6 +232,7 @@ Return a structured summary:
 
 **Total Issues:** X (Y open, Z closed)
 **Progress:** [████░░░░░░] 40%
+**Recommended Parallel:** 2 (largest wave has 3 issues)
 
 ### Dependency Tracks Detected
 
@@ -151,12 +253,37 @@ Return a structured summary:
 | 2 | #13, #16 | Yes (after wave 1) |
 | 3 | #14, #17 | Yes (after wave 2) |
 
+### External Dependencies
+
+| Issue | Blocker | Type | Resolution |
+|-------|---------|------|------------|
+| #13 | #99 (M4) | external-closed | ✅ Auto-resolved |
+| #14 | #100 (M5) | external-open | ⚠️ Requires decision |
+
 ### Validation
 
 - Circular deps: None
 - Missing deps: None
-- External deps: None
+- External deps: 1 auto-resolved, 1 pending
 - Orphans: #20 (warning only)
+
+### Deadlock Analysis (if applicable)
+
+⚠️ DEADLOCK DETECTED
+
+**Blocked Issues:**
+- #13: blocked by #99 (external-open, M4: Future)
+
+**Resolution Options:**
+1. Force-resolve #13 (treat #99 as complete)
+2. Skip #13 (continue with other issues)
+3. Wait for #99 to close
+
+### Wave JSON (for checkpoint)
+
+\`\`\`json
+{"1": [12, 15], "2": [13, 16], "3": [14, 17]}
+\`\`\`
 ```
 
 ## Decision Logic

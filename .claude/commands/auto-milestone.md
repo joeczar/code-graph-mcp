@@ -17,16 +17,53 @@ Analyze and optionally execute a milestone's issues in dependency order.
 | Milestone name | Analyze all issues in the milestone |
 | Issue numbers | Analyze specific issues (space-separated) |
 | `--execute` | Actually run /auto-issue for each (default: analyze only) |
-| `--parallel N` | Max concurrent issues (default: 1) |
+| `--parallel N` | Max concurrent issues (default: smart, see below) |
 | `--continue` | Resume from interruption (reads state from checkpoint DB) |
+| `--force-resolve N` | Force-unblock issue #N (treat blockers as resolved) |
+
+### Smart Parallel Default
+
+When `--parallel` is not specified, the planner recommends a value:
+
+```
+If largest wave has 1 issue → parallel = 1 (sequential)
+If largest wave has 2+ issues → parallel = min(largest_wave_size, 2)
+```
+
+This balances speed with safety. Override with `--parallel N` if needed.
 
 ---
 
 ## State Tracking
 
-The orchestrator uses the checkpoint system (`.claude/execution-state.db`) to track milestone progress. Each issue gets its own workflow entry.
+The orchestrator uses the checkpoint system (`.claude/execution-state.db`) to track milestone progress at two levels:
 
-### Checkpoint Commands
+1. **Milestone level** - Overall progress, current wave, parallel setting
+2. **Issue level** - Individual workflow state for each issue
+
+### Milestone Checkpoint Commands
+
+```bash
+# Check for existing milestone run
+pnpm checkpoint milestone find "{milestone_name}"
+
+# Create a new milestone run (with wave JSON from planner)
+pnpm checkpoint milestone create "{milestone_name}" --waves '{"1": [12, 15], "2": [13]}' --parallel 2
+
+# Advance to next wave
+pnpm checkpoint milestone set-wave "{run_id}" {wave_number}
+
+# Mark an issue as completed (increments counter)
+pnpm checkpoint milestone complete-issue "{run_id}"
+
+# Force-unblock an issue
+pnpm checkpoint milestone add-force-resolved "{run_id}" {issue_number}
+
+# Set status (running, paused, completed, failed, deadlocked)
+pnpm checkpoint milestone set-status "{run_id}" {status}
+```
+
+### Issue Checkpoint Commands
 
 ```bash
 # Check existing workflow for an issue
@@ -71,11 +108,43 @@ See `.claude/shared/checkpoint-patterns.md` for detailed patterns.
 ## Workflow
 
 ```
+Phase 0: Init     → check for existing run, resume or create new
 Phase 1: Plan     → milestone-planner → GATE (if dependencies unclear)
 Phase 2: Execute  → spawn /auto-issue for each free issue
-Phase 3: Monitor  → track progress, handle completion
+Phase 3: Monitor  → track progress, handle completion, deadlock detection
 Phase 4: Report   → summary of results
 ```
+
+---
+
+## Phase 0: Initialize
+
+**Before planning, check for existing milestone run:**
+
+```bash
+# Check for existing run
+pnpm checkpoint milestone find "{milestone_name}"
+```
+
+**If run exists with status=running/paused:**
+
+```
+Found existing milestone run:
+- ID: {run_id}
+- Current wave: {current_wave}/{total_waves}
+- Completed: {completed_issues}/{total_issues}
+- Status: {status}
+
+Resume from wave {current_wave}? [y/N]
+```
+
+**If resuming:**
+- Skip to Phase 2 with `current_wave` from checkpoint
+- Issues in completed waves are skipped automatically
+
+**If not resuming (or no existing run):**
+- Proceed to Phase 1 (Plan)
+- Create milestone run after planning is complete
 
 ---
 
@@ -86,7 +155,7 @@ Phase 4: Report   → summary of results
 ```
 Task(milestone-planner):
   Input:  { mode: "milestone" | "issues", milestone_name | issue_numbers }
-  Output: { planning_status, free_issues[], dependency_graph, execution_waves[] }
+  Output: { planning_status, free_issues[], dependency_graph, execution_waves[], recommended_parallel, wave_json }
 ```
 
 The milestone-planner will:
@@ -94,8 +163,18 @@ The milestone-planner will:
 1. Fetch all issues in milestone (or specified issues)
 2. Parse dependency markers from issue bodies
 3. Build dependency graph
-4. Identify free (unblocked) issues
-5. Return waves for execution
+4. Classify external dependencies (auto-resolve closed ones)
+5. Identify free (unblocked) issues
+6. Calculate execution waves
+7. Analyze for deadlocks (if no free issues)
+8. Recommend parallel setting
+
+**After planning completes (if --execute):**
+
+```bash
+# Create milestone run checkpoint
+pnpm checkpoint milestone create "{milestone_name}" --waves '{wave_json}' --parallel {parallel}
+```
 
 ### Output
 
@@ -210,8 +289,14 @@ Sequential merge ensures:
 
 After all PRs in the wave are merged:
 1. Pull latest main: `git pull origin main`
-2. Check which blocked issues are now free
-3. Proceed to next wave
+2. Update milestone checkpoint:
+   ```bash
+   # Mark issues complete and advance wave
+   pnpm checkpoint milestone complete-issue "{run_id}"  # For each merged issue
+   pnpm checkpoint milestone set-wave "{run_id}" {next_wave}
+   ```
+3. Check which blocked issues are now free
+4. Proceed to next wave
 
 **Only start the next wave after ALL PRs from current wave are merged.**
 
@@ -219,10 +304,61 @@ After all PRs in the wave are merged:
 
 ## Phase 3: Monitor
 
+### Wave Checkpoint Updates
+
+After each issue completes:
+```bash
+pnpm checkpoint milestone complete-issue "{run_id}"
+```
+
+After each wave completes:
+```bash
+pnpm checkpoint milestone set-wave "{run_id}" {next_wave}
+```
+
+### Deadlock Handling
+
+If a wave has no processable issues (all blocked):
+
+```
+⚠️ DEADLOCK DETECTED
+
+All issues in wave {wave} are blocked:
+- #13: blocked by #99 (external-open, M4: Future)
+- #14: blocked by #12 (failed workflow)
+
+Resolution Options:
+[1] Force-resolve #13 (treat #99 as complete)
+[2] Force-resolve #14 (treat #12 as complete)
+[3] Retry failed workflow for #12
+[4] Skip blocked issues and continue
+[5] Pause milestone (status=deadlocked)
+[6] Exit and resolve manually
+
+Select option [1-6]:
+```
+
+**When force-resolving:**
+```bash
+# Record force resolution
+pnpm checkpoint milestone add-force-resolved "{run_id}" {issue_number}
+# Continue processing
+```
+
+**When pausing:**
+```bash
+pnpm checkpoint milestone set-status "{run_id}" deadlocked
+```
+
+### Progress Tracking
+
 Track progress in real-time:
 
 ```markdown
 ## Progress: M3: Code Graph
+
+Milestone Run: {run_id}
+Progress: {completed_issues}/{total_issues}
 
 Wave 1: ✅ Complete
 - #12: ✅ PR #30 merged
@@ -239,6 +375,11 @@ Wave 3: ⏳ Waiting
 ---
 
 ## Phase 4: Report
+
+**Mark milestone as complete:**
+```bash
+pnpm checkpoint milestone set-status "{run_id}" completed
+```
 
 Final summary:
 
@@ -271,10 +412,18 @@ Final summary:
 | Error | Behavior |
 |-------|----------|
 | Milestone not found | Show available milestones, exit |
-| Issue not found | Skip issue, continue with others |
-| Circular dependency | Report cycle, ask for resolution |
-| /auto-issue failure | Log error, mark as failed, continue |
-| All issues blocked | Report deadlock, exit |
+| Issue not found | Skip issue, log warning, continue |
+| Circular dependency | Report cycle, set status=deadlocked, ask for resolution |
+| /auto-issue failure | Mark workflow as failed, offer retry/skip options |
+| External blocker (closed) | Auto-resolve, continue |
+| External blocker (open) | Add to deadlock analysis |
+| All issues blocked | Trigger deadlock handling flow |
+
+**On failure, always update checkpoint:**
+```bash
+pnpm checkpoint workflow set-status "{workflow_id}" failed
+pnpm checkpoint workflow log-action "{workflow_id}" "error" failed "{error_message}"
+```
 
 ---
 
@@ -282,52 +431,75 @@ Final summary:
 
 When `--continue` is passed:
 
-### Step 1: Query Checkpoint State
+### Step 1: Query Milestone Checkpoint
 
-For each issue in the milestone, check its workflow state:
+```bash
+# Find existing milestone run
+pnpm checkpoint milestone find "{milestone_name}"
+```
+
+**If milestone run found:**
+- Use `current_wave` to know where to resume
+- Use `wave_issues` to get issue list per wave
+- Use `completed_issues` to show progress
+- Use `force_resolved` to know which blockers were manually resolved
+
+### Step 2: Query Issue States
+
+For each issue starting from `current_wave`:
 
 ```bash
 pnpm checkpoint workflow find {issue_number}
 ```
 
-### Step 2: Determine Resume Point
+### Step 3: Determine Resume Point
 
-| Workflow State | Resume Action |
-|----------------|---------------|
-| No workflow found | Run /auto-issue (fresh start) |
-| phase in (setup, research, implement, review) | Run /auto-issue (will detect existing branch) |
-| phase = finalize, pr_state = open | Run /auto-merge {pr_number} |
-| phase = merge, pr_state = open | Run /auto-merge {pr_number} (retry) |
-| pr_state = merged | Skip issue (already complete) |
-| status = failed | Report failure, ask whether to retry or skip |
+| Milestone State | Issue Workflow State | Resume Action |
+|-----------------|---------------------|---------------|
+| Wave N | No workflow found | Run /auto-issue (fresh start) |
+| Wave N | phase in (setup, research, implement, review) | Run /auto-issue (will detect existing branch) |
+| Wave N | phase = finalize, pr_state = open | Run /auto-merge {pr_number} |
+| Wave N | phase = merge, pr_state = open | Run /auto-merge {pr_number} (retry) |
+| Wave N | pr_state = merged | Skip issue (already complete) |
+| Wave N | status = failed | Report failure, ask whether to retry or skip |
+| Wave < N | Any | Skip wave (already complete) |
 
-### Step 3: Resume Execution
+### Step 4: Resume Execution
 
 ```bash
-# 1. Ensure clean state
+# 1. Get milestone run state
+pnpm checkpoint milestone find "{milestone_name}"
+# → current_wave: 2, wave_issues: {"1": [12], "2": [13, 15], "3": [14]}
+
+# 2. Ensure clean state
 git checkout main && git pull
 
-# 2. For each issue, check checkpoint
-pnpm checkpoint workflow find {issue}
+# 3. Skip waves 1..current_wave-1 (already done)
+# 4. For current wave, check each issue:
+pnpm checkpoint workflow find 13  → pr_state: open, PR #105 → /auto-merge 105
+pnpm checkpoint workflow find 15  → pr_state: merged       → SKIP
 
-# 3. Based on state, either:
-#    - Skip (already merged)
-#    - Run /auto-merge (PR exists)
-#    - Run /auto-issue (no PR yet)
+# 5. Continue from current_wave forward
 ```
 
 ### Example Resume Flow
 
 ```bash
-# Query each issue's workflow
-pnpm checkpoint workflow find 90  → pr_state: merged    → SKIP
-pnpm checkpoint workflow find 92  → pr_state: open, PR #105 → /auto-merge 105
-pnpm checkpoint workflow find 93  → no workflow         → /auto-issue 93
+# Milestone run state
+pnpm checkpoint milestone find "M3: Code Graph"
+# → { current_wave: 2, completed_issues: 3, total_issues: 6 }
 
-# Resume executes:
-/auto-merge 105        → merges, sets pr_state=merged
-/auto-issue 93         → creates PR #106, sets phase=finalize
-/auto-merge 106        → merges, sets pr_state=merged
+# Issues in wave 2
+wave_issues["2"] = [13, 15]
+
+# Query each issue's workflow
+pnpm checkpoint workflow find 13  → pr_state: open, PR #105 → /auto-merge 105
+pnpm checkpoint workflow find 15  → pr_state: merged       → SKIP
+
+# After wave 2 completes:
+pnpm checkpoint milestone set-wave "{run_id}" 3
+
+# Continue to wave 3...
 ```
 
 ---
