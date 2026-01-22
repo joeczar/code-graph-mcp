@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { unlinkSync, mkdirSync, existsSync } from 'node:fs';
+import { unlinkSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   getCheckpointDb,
@@ -7,7 +7,6 @@ import {
   createWorkflow,
   deleteWorkflow,
   createWorktree,
-  getWorktree,
   findWorktreeByIssue,
   listWorktrees,
   setWorktreeStatus,
@@ -29,7 +28,7 @@ describe('Worktree Operations', () => {
       if (existsSync(`${testDbPath}-wal`)) {
         unlinkSync(`${testDbPath}-wal`);
       }
-    } catch (e) {
+    } catch {
       // Ignore errors
     }
   });
@@ -46,7 +45,7 @@ describe('Worktree Operations', () => {
       if (existsSync(`${testDbPath}-wal`)) {
         unlinkSync(`${testDbPath}-wal`);
       }
-    } catch (e) {
+    } catch {
       // Ignore errors
     }
   });
