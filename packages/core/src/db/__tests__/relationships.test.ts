@@ -227,11 +227,12 @@ describe('RelationshipStore', () => {
     it('finds an existing relationship', () => {
       const created = store.create(createSampleRelationship());
       expect(created).not.toBeNull();
+      if (!created) return;
 
-      const found = store.findById(created!.id);
+      const found = store.findById(created.id);
 
       expect(found).not.toBeNull();
-      expect(found?.id).toBe(created!.id);
+      expect(found?.id).toBe(created.id);
     });
 
     it('returns null for non-existent id', () => {
@@ -319,11 +320,12 @@ describe('RelationshipStore', () => {
     it('deletes an existing relationship', () => {
       const created = store.create(createSampleRelationship());
       expect(created).not.toBeNull();
+      if (!created) return;
 
-      const deleted = store.delete(created!.id);
+      const deleted = store.delete(created.id);
 
       expect(deleted).toBe(true);
-      expect(store.findById(created!.id)).toBeNull();
+      expect(store.findById(created.id)).toBeNull();
     });
 
     it('returns false for non-existent relationship', () => {
