@@ -19,6 +19,22 @@ import {
   type TsMorphRelationship,
 } from './ts-morph-parser.js';
 
+/**
+ * Progress callback for reporting parsing progress.
+ * Called at each phase of parsing to allow callers to track progress.
+ *
+ * @param phase - Current phase: 'scan', 'load', 'entities', 'relationships'
+ * @param current - Current item number (0-indexed during phase, or count at end)
+ * @param total - Total items in this phase
+ * @param message - Human-readable progress message
+ */
+export type ProgressCallback = (
+  phase: 'scan' | 'load' | 'entities' | 'relationships',
+  current: number,
+  total: number,
+  message: string
+) => void;
+
 export interface ProjectParseOptions {
   /**
    * Root directory to parse (absolute path)
@@ -30,6 +46,12 @@ export interface ProjectParseOptions {
    * Defaults to common exclusions
    */
   exclude?: string[];
+
+  /**
+   * Optional progress callback for reporting parsing progress.
+   * Called at each phase: scan, load, entities, relationships.
+   */
+  onProgress?: ProgressCallback;
 }
 
 export interface ProjectParseResult {
@@ -118,7 +140,10 @@ function findSourceFiles(dir: string, exclude: string[]): string[] {
 export function parseProject(
   options: ProjectParseOptions,
 ): ProjectParseResult {
-  const { projectPath, exclude = DEFAULT_EXCLUDE_PATTERNS } = options;
+  const { projectPath, exclude = DEFAULT_EXCLUDE_PATTERNS, onProgress } = options;
+
+  // Phase 1: Scan - report scanning start
+  onProgress?.('scan', 0, 0, 'Scanning for source files...');
 
   // Create ts-morph Project for cross-file analysis
   const project = new Project({
@@ -128,12 +153,22 @@ export function parseProject(
   // Find all source files
   const sourceFiles = findSourceFiles(projectPath, exclude);
 
+  // Report scan complete
+  onProgress?.('scan', sourceFiles.length, sourceFiles.length, `Found ${String(sourceFiles.length)} source files`);
+
   // Track Vue file mappings (virtual path -> original relative path)
   const vueFileMapping = new Map<string, string>();
   let vueFilesProcessed = 0;
 
-  // Add files to the project
-  for (const file of sourceFiles) {
+  // Phase 2: Load - add files to the project
+  const totalFiles = sourceFiles.length;
+  for (let i = 0; i < sourceFiles.length; i++) {
+    const file = sourceFiles[i];
+    if (!file) continue;
+
+    const relativePath = relative(projectPath, file);
+    onProgress?.('load', i + 1, totalFiles, `Loading ${relativePath}`);
+
     try {
       if (file.endsWith('.vue')) {
         const vueScript = extractVueScript(file);
@@ -141,7 +176,7 @@ export function parseProject(
           // Create virtual TypeScript file for ts-morph
           const virtualPath = `${file}.ts`;
           project.createSourceFile(virtualPath, vueScript.content);
-          vueFileMapping.set(virtualPath, relative(projectPath, file));
+          vueFileMapping.set(virtualPath, relativePath);
           vueFilesProcessed++;
         }
       } else {
@@ -152,12 +187,20 @@ export function parseProject(
     }
   }
 
-  // First pass: Extract all entities
+  // Phase 3: Extract entities
   const allEntities: TsMorphEntity[] = [];
+  const projectSourceFiles = project.getSourceFiles();
+  const totalSourceFiles = projectSourceFiles.length;
 
-  for (const sourceFile of project.getSourceFiles()) {
+  for (let i = 0; i < projectSourceFiles.length; i++) {
+    const sourceFile = projectSourceFiles[i];
+    if (!sourceFile) continue;
+
     const sourceFilePath = sourceFile.getFilePath();
     const originalVuePath = vueFileMapping.get(sourceFilePath);
+    const displayPath = originalVuePath ?? relative(projectPath, sourceFilePath);
+
+    onProgress?.('entities', i + 1, totalSourceFiles, `Extracting entities from ${displayPath}`);
 
     const entities = extractEntities(
       sourceFile,
@@ -170,12 +213,18 @@ export function parseProject(
   // Build entity lookup map for call resolution
   const entityLookupMap = buildEntityLookupMap(allEntities);
 
-  // Second pass: Extract relationships with cross-file resolution
+  // Phase 4: Extract relationships with cross-file resolution
   const allRelationships: TsMorphRelationship[] = [];
 
-  for (const sourceFile of project.getSourceFiles()) {
+  for (let i = 0; i < projectSourceFiles.length; i++) {
+    const sourceFile = projectSourceFiles[i];
+    if (!sourceFile) continue;
+
     const sourceFilePath = sourceFile.getFilePath();
     const originalVuePath = vueFileMapping.get(sourceFilePath);
+    const displayPath = originalVuePath ?? relative(projectPath, sourceFilePath);
+
+    onProgress?.('relationships', i + 1, totalSourceFiles, `Extracting relationships from ${displayPath}`);
 
     const relationships = extractRelationships(
       sourceFile,

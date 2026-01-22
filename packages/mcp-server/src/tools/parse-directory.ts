@@ -24,6 +24,7 @@ import {
   DirectoryParser,
   type Entity,
   type Relationship,
+  type ProgressCallback,
 } from '@code-graph/core';
 import { type ToolDefinition, type McpExtra, createSuccessResponse, createErrorResponse } from './types.js';
 import { ResourceNotFoundError, ToolExecutionError } from './errors.js';
@@ -249,12 +250,36 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
 
       const tsMorphProcessor = new TsMorphFileProcessor();
 
+      // Track progress state for async progress updates
+      let lastProgressUpdate = Date.now();
+      const PROGRESS_THROTTLE_MS = 100; // Throttle progress updates to avoid flooding
+
       try {
         // Process entire project at once for cross-file relationship resolution
         const tsResult = tsMorphProcessor.processProject({
           projectPath: resolvedPath,
           db,
           // Use default exclusions from ts-morph-project-parser
+          onProgress: ((phase, current, total, message) => {
+            // Throttle progress updates to avoid flooding the client
+            const now = Date.now();
+            if (now - lastProgressUpdate < PROGRESS_THROTTLE_MS && current < total) {
+              return;
+            }
+            lastProgressUpdate = now;
+
+            // Map ts-morph phases to user-friendly messages
+            const phaseLabels: Record<string, string> = {
+              scan: 'Scanning',
+              load: 'Loading',
+              entities: 'Extracting entities',
+              relationships: 'Extracting relationships',
+            };
+            const phaseLabel = phaseLabels[phase] ?? phase;
+
+            // Fire and forget - don't await in sync callback
+            void sendProgress(extra, current, total, `[ts-morph] ${phaseLabel}: ${message}`);
+          }) satisfies ProgressCallback,
         });
 
         if (tsResult.success) {

@@ -33,6 +33,7 @@ export type {
   FileParseResult,
   ProjectParseOptions,
   ProjectParseResult,
+  ProgressCallback,
   TsMorphEntity,
   TsMorphRelationship,
 } from './parser/index.js';
