@@ -46,6 +46,14 @@ export {
   listWorktrees,
   setWorktreeStatus,
   deleteWorktree,
+
+  // Parse task operations
+  createParseTask,
+  getParseTask,
+  listParseTasks,
+  setParseTaskStatus,
+  updateParseTaskProgress,
+  deleteParseTask,
 } from './db.js';
 
 export type {
@@ -63,4 +71,7 @@ export type {
   WorktreeStatus,
   Worktree,
   NewWorktree,
+  ParseTaskStatus,
+  ParseTask,
+  NewParseTask,
 } from './db.js';

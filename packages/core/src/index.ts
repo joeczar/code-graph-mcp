@@ -104,6 +104,13 @@ export {
   setWorkflowPr,
   setWorkflowMerged,
   setWorkflowPrState,
+  // Parse task operations
+  createParseTask,
+  getParseTask,
+  listParseTasks,
+  setParseTaskStatus,
+  updateParseTaskProgress,
+  deleteParseTask,
 } from './checkpoint/index.js';
 export type {
   WorkflowStatus,
@@ -114,7 +121,22 @@ export type {
   WorkflowCommit,
   NewWorkflow,
   WorkflowSummary,
+  ParseTaskStatus,
+  ParseTask,
+  NewParseTask,
 } from './checkpoint/index.js';
+
+// Task exports
+export {
+  createProgressLogger,
+  getDefaultLogDir,
+  getLogPath,
+} from './tasks/index.js';
+export type {
+  ProgressLogger,
+  ParsePhase,
+  ParseWorkerConfig,
+} from './tasks/index.js';
 
 // Query exports
 export {
