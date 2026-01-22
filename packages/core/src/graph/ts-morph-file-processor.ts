@@ -169,32 +169,40 @@ export class TsMorphFileProcessor {
         return pending;
       });
 
-    // Step 4: Store in database
+    // Step 4: Store in database using batch operations for performance
     const entityStore = createEntityStore(db);
     const relationshipStore = createRelationshipStore(db);
 
-    const storedEntities: Entity[] = [];
-    const storedRelationships: Relationship[] = [];
-
-    // Build file->name->id mapping for cross-file relationship resolution
-    const fileNameToId = new Map<string, Map<string, string>>();
-
-    // Track name collisions within files for diagnostics
-    const nameCollisions: string[] = [];
+    let storedEntities: Entity[] = [];
+    let storedRelationships: Relationship[] = [];
 
     try {
       // Wrap database operations in a transaction for atomicity
       const transaction = db.transaction(() => {
-        // Store all entities and build lookup map
-        for (const entity of entities) {
-          const stored = entityStore.create(entity);
-          storedEntities.push(stored);
-
-          // Build file->name->id mapping
-          let nameMap = fileNameToId.get(entity.filePath);
+        // Pre-load existing entities into cache for O(1) cross-file lookups
+        // This avoids expensive individual DB queries during relationship resolution
+        const entityCache = new Map<string, Map<string, string>>();
+        const existingEntities = entityStore.getAll();
+        for (const entity of existingEntities) {
+          let nameMap = entityCache.get(entity.filePath);
           if (!nameMap) {
             nameMap = new Map<string, string>();
-            fileNameToId.set(entity.filePath, nameMap);
+            entityCache.set(entity.filePath, nameMap);
+          }
+          nameMap.set(entity.name, entity.id);
+        }
+
+        // Batch insert all entities
+        storedEntities = entityStore.createBatch(entities);
+
+        // Build file->name->id mapping for newly inserted entities
+        // and add them to the cache for relationship resolution
+        const nameCollisions: string[] = [];
+        for (const entity of storedEntities) {
+          let nameMap = entityCache.get(entity.filePath);
+          if (!nameMap) {
+            nameMap = new Map<string, string>();
+            entityCache.set(entity.filePath, nameMap);
           }
 
           // Check for name collisions within the same file
@@ -202,7 +210,7 @@ export class TsMorphFileProcessor {
             nameCollisions.push(`${entity.filePath}:${entity.name}`);
           }
 
-          nameMap.set(entity.name, stored.id);
+          nameMap.set(entity.name, entity.id);
         }
 
         // Log warning for name collisions (indicates potential data quality issues)
@@ -213,39 +221,20 @@ export class TsMorphFileProcessor {
           );
         }
 
-        // Store relationships with cross-file resolution
-        // Two-phase resolution: local lookup first, then database fallback
-        // Track seen relationships to prevent duplicates (same source, target, type)
-        const seenRelationships = new Set<string>();
+        // Resolve relationships using in-memory cache only
+        // All lookups are O(1) - no DB queries needed
+        const resolvedRelationships: NewRelationship[] = [];
 
         for (const rel of relationships) {
           let sourceId: string | undefined;
           let targetId: string | undefined;
 
-          // Phase 1: Try local lookup first (O(1) - fast path)
-          // Most relationships are within the same file or just parsed
+          // Look up source and target IDs from cache
           if (rel.sourceFilePath) {
-            sourceId = fileNameToId.get(rel.sourceFilePath)?.get(rel.sourceName);
+            sourceId = entityCache.get(rel.sourceFilePath)?.get(rel.sourceName);
           }
           if (rel.targetFilePath) {
-            targetId = fileNameToId.get(rel.targetFilePath)?.get(rel.targetName);
-          }
-
-          // Phase 2: Database fallback for cross-file resolution
-          // This enables relationships where target is in a different file
-          // that was previously parsed and stored in the database.
-          if (!targetId && rel.targetFilePath) {
-            const targetEntity = entityStore.findByNameAndFile(rel.targetName, rel.targetFilePath);
-            if (targetEntity) {
-              targetId = targetEntity.id;
-            }
-          }
-
-          if (!sourceId && rel.sourceFilePath) {
-            const sourceEntity = entityStore.findByNameAndFile(rel.sourceName, rel.sourceFilePath);
-            if (sourceEntity) {
-              sourceId = sourceEntity.id;
-            }
+            targetId = entityCache.get(rel.targetFilePath)?.get(rel.targetName);
           }
 
           // Skip relationships where we can't resolve both entities.
@@ -253,27 +242,21 @@ export class TsMorphFileProcessor {
           // - Calls to external functions/methods (e.g., console.log, Array.map)
           // - Imports from external modules (e.g., 'node:fs', 'react')
           // - References to undefined entities
-          // - Cross-file references where target file hasn't been parsed yet
           if (!sourceId || !targetId) {
             continue;
           }
 
-          // Deduplicate relationships (same source, target, type)
-          // This prevents UNIQUE constraint violations in the database
-          const relationshipKey = `${sourceId}:${targetId}:${rel.type}`;
-          if (seenRelationships.has(relationshipKey)) {
-            continue;
-          }
-          seenRelationships.add(relationshipKey);
-
-          const stored = relationshipStore.create({
+          resolvedRelationships.push({
             sourceId,
             targetId,
             type: rel.type,
             ...(rel.metadata && { metadata: rel.metadata }),
           });
-          storedRelationships.push(stored);
         }
+
+        // Batch insert relationships with INSERT OR IGNORE
+        // SQLite handles duplicate prevention - no need for manual dedup Set
+        storedRelationships = relationshipStore.createBatch(resolvedRelationships);
       });
 
       transaction();
