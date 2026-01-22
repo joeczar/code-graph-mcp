@@ -7,6 +7,7 @@
  */
 
 import { runCheckpointCommand } from './commands/checkpoint.js';
+import { runMetricsCommand } from './commands/metrics.js';
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -20,6 +21,10 @@ function main(): void {
   switch (command) {
     case 'checkpoint':
       runCheckpointCommand(args.slice(1));
+      break;
+
+    case 'metrics':
+      runMetricsCommand(args.slice(1));
       break;
 
     case 'help':
@@ -49,6 +54,7 @@ USAGE:
 
 COMMANDS:
   checkpoint    Manage workflow checkpoints
+  metrics       Display metrics summary
   help          Show this help message
   version       Show version
 
@@ -63,11 +69,16 @@ CHECKPOINT SUBCOMMANDS:
   checkpoint workflow log-commit <workflow_id> <sha> <message>
   checkpoint workflow delete <workflow_id>
 
+METRICS SUBCOMMANDS:
+  metrics summary [--project=<id>] [--tool=<name>] [--json]
+
 EXAMPLES:
   code-graph checkpoint workflow create 12 "feat/12-add-parser"
   code-graph checkpoint workflow find 12
   code-graph checkpoint workflow set-phase abc123 implement
   code-graph checkpoint workflow log-commit abc123 a1b2c3d "feat: add parser"
+  code-graph metrics summary --project my-project
+  code-graph metrics summary --tool parse_file --json
 `);
 }
 
