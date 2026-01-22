@@ -27,7 +27,7 @@ export interface GetExportsResult {
  * Get all exported entities from a file.
  *
  * Queries the entity store for all entities in the specified file that have
- * isExported metadata set to true. Returns them with their export type
+ * exported metadata set to true. Returns them with their export type
  * and optional signature.
  *
  * @param filePath - Absolute path to the file to query
@@ -43,7 +43,7 @@ export function getExports(
 
   // Filter to only exported entities
   const exportedEntities = allEntities.filter(entity => {
-    return entity.metadata?.['isExported'] === true;
+    return entity.metadata?.['exported'] === true;
   });
 
   // Map to ExportedEntity format

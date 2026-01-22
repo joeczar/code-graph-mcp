@@ -32,7 +32,7 @@ describe('getExports', () => {
 
   describe('file with no exports', () => {
     it('returns empty exports array for file with no exported entities', () => {
-      // Create entities without isExported metadata
+      // Create entities without exported metadata
       store.create(baseEntity);
       store.create({ ...baseEntity, name: 'helper', startLine: 20, endLine: 25 });
 
@@ -57,14 +57,14 @@ describe('getExports', () => {
       store.create({
         ...baseEntity,
         name: 'greet',
-        metadata: { isExported: true, exportType: 'named' },
+        metadata: { exported: true, exportType: 'named' },
       });
       store.create({
         ...baseEntity,
         name: 'helper',
         startLine: 20,
         endLine: 25,
-        metadata: { isExported: true, exportType: 'named' },
+        metadata: { exported: true, exportType: 'named' },
       });
       // Non-exported entity
       store.create({
@@ -94,7 +94,7 @@ describe('getExports', () => {
         ...baseEntity,
         name: 'greet',
         metadata: {
-          isExported: true,
+          exported: true,
           exportType: 'named',
           signature: '(name: string) => string',
         },
@@ -113,7 +113,7 @@ describe('getExports', () => {
         ...baseEntity,
         name: 'Calculator',
         type: 'class',
-        metadata: { isExported: true, exportType: 'default' },
+        metadata: { exported: true, exportType: 'default' },
       });
 
       const result = getExports('/src/utils.ts', store);
@@ -128,7 +128,7 @@ describe('getExports', () => {
         ...baseEntity,
         name: 'default',
         metadata: {
-          isExported: true,
+          exported: true,
           exportType: 'default',
           signature: '(config: Config) => App',
         },
@@ -149,7 +149,7 @@ describe('getExports', () => {
         ...baseEntity,
         name: 'Calculator',
         type: 'class',
-        metadata: { isExported: true, exportType: 'default' },
+        metadata: { exported: true, exportType: 'default' },
       });
 
       // Named exports
@@ -158,14 +158,14 @@ describe('getExports', () => {
         name: 'add',
         startLine: 20,
         endLine: 22,
-        metadata: { isExported: true, exportType: 'named' },
+        metadata: { exported: true, exportType: 'named' },
       });
       store.create({
         ...baseEntity,
         name: 'subtract',
         startLine: 24,
         endLine: 26,
-        metadata: { isExported: true, exportType: 'named' },
+        metadata: { exported: true, exportType: 'named' },
       });
 
       const result = getExports('/src/utils.ts', store);
@@ -185,11 +185,11 @@ describe('getExports', () => {
     });
   });
 
-  describe('entity without isExported metadata', () => {
-    it('does not include entities with isExported = false', () => {
+  describe('entity without exported metadata', () => {
+    it('does not include entities with exported = false', () => {
       store.create({
         ...baseEntity,
-        metadata: { isExported: false },
+        metadata: { exported: false },
       });
 
       const result = getExports('/src/utils.ts', store);
@@ -208,7 +208,7 @@ describe('getExports', () => {
     it('defaults exportType to "named" when not specified', () => {
       store.create({
         ...baseEntity,
-        metadata: { isExported: true },
+        metadata: { exported: true },
       });
 
       const result = getExports('/src/utils.ts', store);
@@ -225,7 +225,7 @@ describe('getExports', () => {
         ...baseEntity,
         filePath: '/src/utils.ts',
         name: 'greet',
-        metadata: { isExported: true },
+        metadata: { exported: true },
       });
 
       // File 2
@@ -233,7 +233,7 @@ describe('getExports', () => {
         ...baseEntity,
         filePath: '/src/helpers.ts',
         name: 'helper',
-        metadata: { isExported: true },
+        metadata: { exported: true },
       });
 
       const result1 = getExports('/src/utils.ts', store);
