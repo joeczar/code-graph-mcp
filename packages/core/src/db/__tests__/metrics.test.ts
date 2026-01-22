@@ -205,9 +205,11 @@ describe('MetricsStore', () => {
       const summary = metricsStore.getToolCallSummary();
       const parseFileSummary = summary.find((s) => s.toolName === 'parse_file');
 
-      expect(parseFileSummary?.p50LatencyMs).toBeDefined();
-      expect(parseFileSummary?.p95LatencyMs).toBeDefined();
-      expect(parseFileSummary?.p99LatencyMs).toBeDefined();
+      // parse_file latencies are [100, 150, 200, 300], sorted
+      expect(parseFileSummary).toBeDefined();
+      expect(parseFileSummary?.p50LatencyMs).toBeCloseTo(175, 0);
+      expect(parseFileSummary?.p95LatencyMs).toBeCloseTo(285, 0);
+      expect(parseFileSummary?.p99LatencyMs).toBeCloseTo(297, 0);
     });
 
     it('filters by project', () => {

@@ -116,18 +116,18 @@ describe('runMetricsCommand', () => {
       const db = getDatabase();
       const metricsStore = createMetricsStore(db);
 
-      metricsStore.insertToolCall('project-a', 'parse_file', 100, true);
-      metricsStore.insertToolCall('project-b', 'parse_file', 200, true);
+      metricsStore.insertToolCall('project-a', 'tool-a', 100, true);
+      metricsStore.insertToolCall('project-b', 'tool-b', 200, true);
 
-      vi.spyOn(console, 'log').mockImplementation(() => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {
         // Mock implementation
       });
 
       runMetricsCommand(['summary', '--project', 'project-a']);
 
-      // Get the summary to verify filtering
-      const summary = metricsStore.getToolCallSummary('project-a');
-      expect(summary[0]?.callCount).toBe(1);
+      const output = consoleSpy.mock.calls.map((call) => String(call[0])).join('\n');
+      expect(output).toContain('tool-a');
+      expect(output).not.toContain('tool-b');
     });
 
     it('filters by tool name', () => {
@@ -137,16 +137,21 @@ describe('runMetricsCommand', () => {
       metricsStore.insertToolCall('test-project', 'parse_file', 100, true);
       metricsStore.insertToolCall('test-project', 'find_entity', 50, true);
 
-      vi.spyOn(console, 'log').mockImplementation(() => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {
         // Mock implementation
       });
 
       runMetricsCommand(['summary', '--tool', 'parse_file']);
 
-      // Get the summary to verify filtering
-      const summary = metricsStore.getToolCallSummary(undefined, 'parse_file');
-      expect(summary).toHaveLength(1);
-      expect(summary[0]?.toolName).toBe('parse_file');
+      const output = consoleSpy.mock.calls.map((call) => String(call[0])).join('\n');
+      expect(output).toContain('parse_file');
+      expect(output).not.toContain('find_entity');
+    });
+
+    it('throws error for unknown options', () => {
+      expect(() => {
+        runMetricsCommand(['summary', '--unknown']);
+      }).toThrow('Unknown option: --unknown');
     });
 
     it('outputs JSON format', () => {

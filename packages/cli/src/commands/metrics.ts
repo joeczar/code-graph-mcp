@@ -47,6 +47,8 @@ function handleSummary(args: string[]): void {
     } else if (arg === '--help') {
       printSummaryHelp();
       return;
+    } else if (arg?.startsWith('--')) {
+      throw new Error(`Unknown option: ${arg}\nUse: metrics summary --help`);
     }
   }
 
