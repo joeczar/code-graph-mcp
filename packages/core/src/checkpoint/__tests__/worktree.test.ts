@@ -206,11 +206,11 @@ describe('Worktree Operations', () => {
 
     const running = listWorktrees(db, { status: 'running' });
     expect(running).toHaveLength(1);
-    expect(running[0].issue_number).toBe(145);
+    expect(running[0]?.issue_number).toBe(145);
 
     const created = listWorktrees(db, { status: 'created' });
     expect(created).toHaveLength(1);
-    expect(created[0].issue_number).toBe(146);
+    expect(created[0]?.issue_number).toBe(146);
   });
 
   it('should delete worktree', () => {
