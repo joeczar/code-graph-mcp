@@ -133,24 +133,37 @@ export class RubyLSPParser {
   /**
    * Check if Ruby LSP is available on this system.
    *
+   * Tests availability by attempting to load ruby-lsp gem via subprocess.
+   *
    * @returns true if ruby-lsp gem is installed and functional
    */
   async isAvailable(): Promise<boolean> {
     try {
-      await this.parse([]);
+      // Test availability by running the script with --check flag
+      await spawnAndParseJSON<{ available: boolean }>({
+        command: this.rubyPath,
+        args: [this.scriptPath, '--check'],
+        timeout: this.timeout,
+      });
       return true;
     } catch (error) {
-      if (error instanceof RubyLSPNotAvailableError) {
-        return false;
+      if (error instanceof SubprocessError) {
+        // Exit code 2 means ruby-lsp gem not installed
+        if (error.exitCode === 2) {
+          return false;
+        }
       }
-      // Other errors might be temporary, so assume available
-      return true;
+      // Log unexpected errors but return false to be safe
+      console.warn(
+        `[RubyLSPParser] Unexpected error checking availability: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return false;
     }
   }
 
   private convertEntity(entity: RubyIndexerEntity): NewEntity {
     return {
-      type: entity.type === 'method' ? 'method' : entity.type,
+      type: entity.type,
       name: entity.name,
       filePath: entity.filePath,
       startLine: entity.startLine,

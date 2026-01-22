@@ -392,8 +392,8 @@ export class FileProcessor {
         relationships.push(...lspResult.relationships.map(toPendingRelationship));
       } catch (error) {
         if (error instanceof RubyLSPNotAvailableError) {
-          // Silently fall back to tree-sitter only
-          console.debug('[FileProcessor] Ruby LSP not available, using tree-sitter only');
+          // Fall back to tree-sitter only - warn since user explicitly enabled this feature
+          console.warn('[FileProcessor] Ruby LSP not available, falling back to tree-sitter only. Install gem: gem install ruby-lsp');
         } else {
           // Log other errors but continue processing
           console.warn(

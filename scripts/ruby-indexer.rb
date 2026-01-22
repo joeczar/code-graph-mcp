@@ -215,8 +215,26 @@ end
 
 # Main execution
 if __FILE__ == $PROGRAM_NAME
+  # Handle --check flag for availability testing
+  if ARGV.first == '--check'
+    begin
+      # Just verify we can load the gem and create an index
+      index = RubyIndexer::Index.new
+      puts JSON.generate({ available: true })
+      exit 0
+    rescue LoadError => e
+      warn "Error: ruby-lsp gem not installed. Run: gem install ruby-lsp"
+      warn "Details: #{e.message}"
+      exit 2
+    rescue => e
+      warn "Error initializing index: #{e.message}"
+      exit 3
+    end
+  end
+
   if ARGV.empty?
     warn "Usage: #{$PROGRAM_NAME} <file_path> [<file_path> ...]"
+    warn "       #{$PROGRAM_NAME} --check  # Check if ruby-lsp is available"
     exit 1
   end
 
