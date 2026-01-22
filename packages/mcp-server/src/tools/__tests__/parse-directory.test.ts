@@ -236,18 +236,30 @@ describe('parseDirectoryTool', () => {
 
     describe('idempotency', () => {
       it('should handle re-parsing the same directory', async () => {
-        // Parse twice
-        const response1 = await parseDirectoryTool.handler({ path: FIXTURES_DIR });
+        // Parse twice (use force=true for first to ensure clean state in parallel tests)
+        const response1 = await parseDirectoryTool.handler({ path: FIXTURES_DIR, force: true });
         const response2 = await parseDirectoryTool.handler({ path: FIXTURES_DIR });
 
         expect(response1.isError).toBeUndefined();
         expect(response2.isError).toBeUndefined();
 
-        // Both should succeed (idempotent operation)
+        // First parse should succeed, second should return cached results (incremental update)
         const text1 = response1.content[0]?.text ?? '';
         const text2 = response2.content[0]?.text ?? '';
         expect(text1).toContain('Directory Parsed Successfully');
-        expect(text2).toContain('Directory Parsed Successfully');
+        // Second call returns cached results since files haven't changed
+        expect(text2).toContain('Directory Already Indexed');
+      });
+
+      it('should reparse when force=true is used', async () => {
+        // First parse
+        await parseDirectoryTool.handler({ path: FIXTURES_DIR });
+        // Force reparse
+        const response = await parseDirectoryTool.handler({ path: FIXTURES_DIR, force: true });
+
+        expect(response.isError).toBeUndefined();
+        const text = response.content[0]?.text ?? '';
+        expect(text).toContain('Directory Parsed Successfully');
       });
     });
 
