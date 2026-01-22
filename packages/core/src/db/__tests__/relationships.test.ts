@@ -76,10 +76,15 @@ describe('RelationshipStore', () => {
       expect(rel.createdAt).toBeDefined();
     });
 
-    it('enforces unique constraint on source, target, type', () => {
-      store.create(createSampleRelationship());
+    it('silently ignores duplicate relationships', () => {
+      const first = store.create(createSampleRelationship());
+      expect(first).not.toBeNull();
 
-      expect(() => store.create(createSampleRelationship())).toThrow();
+      const duplicate = store.create(createSampleRelationship());
+      expect(duplicate).toBeNull();
+
+      // Verify only one relationship exists
+      expect(store.count()).toBe(1);
     });
 
     it('throws error when source entity does not exist', () => {
