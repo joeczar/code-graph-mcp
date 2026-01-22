@@ -85,11 +85,11 @@ export async function spawnSubprocess(
       }, timeout);
     }
 
-    proc.stdout.on('data', (data) => {
+    proc.stdout.on('data', (data: Buffer) => {
       stdout += data.toString();
     });
 
-    proc.stderr.on('data', (data) => {
+    proc.stderr.on('data', (data: Buffer) => {
       stderr += data.toString();
     });
 
@@ -105,13 +105,13 @@ export async function spawnSubprocess(
       );
     });
 
-    proc.on('close', (code, signal) => {
+    proc.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
       if (timeoutId) clearTimeout(timeoutId);
 
       if (timedOut) {
         reject(
           new SubprocessError(
-            `Process timed out after ${timeout}ms`,
+            `Process timed out after ${String(timeout)}ms`,
             code,
             signal,
             stderr
@@ -120,7 +120,7 @@ export async function spawnSubprocess(
         return;
       }
 
-      if (signal) {
+      if (signal !== null) {
         reject(
           new SubprocessError(
             `Process killed with signal ${signal}`,
@@ -132,10 +132,10 @@ export async function spawnSubprocess(
         return;
       }
 
-      if (code !== 0) {
+      if (code !== null && code !== 0) {
         reject(
           new SubprocessError(
-            `Process exited with code ${code}`,
+            `Process exited with code ${String(code)}`,
             code,
             signal,
             stderr

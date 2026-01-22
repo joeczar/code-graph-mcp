@@ -109,8 +109,8 @@ export class RubyLSPParser {
       });
 
       return {
-        entities: output.entities.map(this.convertEntity),
-        relationships: output.relationships.map(this.convertRelationship),
+        entities: output.entities.map((e) => this.convertEntity(e)),
+        relationships: output.relationships.map((r) => this.convertRelationship(r)),
       };
     } catch (error) {
       if (error instanceof SubprocessError) {

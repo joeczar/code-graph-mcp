@@ -11,6 +11,8 @@ import {
 import { TypeScriptRelationshipExtractor } from '../parser/extractors/typescript-relationships.js';
 import { RubyRelationshipExtractor } from '../parser/extractors/ruby-relationships.js';
 import { VueRelationshipExtractor } from '../parser/extractors/vue-relationships.js';
+import { RubyExtractor } from '../parser/extractors/ruby.js';
+import { RubyLSPParser, RubyLSPNotAvailableError } from '../parser/ruby-lsp-parser.js';
 
 type SyntaxNode = Tree['rootNode'];
 
@@ -90,6 +92,11 @@ export interface ProcessFileResult {
   error?: string;
 }
 
+export interface FileProcessorOptions {
+  /** Enable Ruby LSP integration for cross-file method resolution (optional) */
+  useRubyLSP?: boolean;
+}
+
 /**
  * FileProcessor orchestrates parsing a file and storing the results in the database.
  *
@@ -98,9 +105,16 @@ export interface ProcessFileResult {
  */
 export class FileProcessor {
   private parser: CodeParser;
+  private rubyLSPParser: RubyLSPParser | null = null;
+  private useRubyLSP: boolean;
 
-  constructor() {
+  constructor(options: FileProcessorOptions = {}) {
     this.parser = new CodeParser();
+    this.useRubyLSP = options.useRubyLSP ?? false;
+
+    if (this.useRubyLSP) {
+      this.rubyLSPParser = new RubyLSPParser();
+    }
   }
 
   /**
@@ -299,7 +313,7 @@ export class FileProcessor {
   }
 
   /**
-   * Extract Ruby entities from AST.
+   * Extract Ruby entities from AST using dedicated RubyExtractor.
    */
   private extractRubyEntities(
     node: SyntaxNode,
@@ -307,21 +321,9 @@ export class FileProcessor {
     language: string,
     entities: NewEntity[]
   ): void {
-    const nodeTypeToEntityType: Record<string, EntityType> = {
-      method: 'method',
-      class: 'class',
-      module: 'module',
-    };
-
-    const entityType = nodeTypeToEntityType[node.type];
-    if (entityType) {
-      const entity = createEntityFromNode(node, entityType, filePath, language);
-      if (entity) entities.push(entity);
-    }
-
-    forEachChild(node, child => {
-      this.extractRubyEntities(child, filePath, language, entities);
-    });
+    const extractor = new RubyExtractor({ filePath });
+    const extracted = extractor.extract(node);
+    entities.push(...extracted);
   }
 
   /**
@@ -340,7 +342,7 @@ export class FileProcessor {
     if (language === 'typescript' || language === 'javascript') {
       this.extractTypeScriptRelationships(tree, sourceCode, filePath, relationships);
     } else if (language === 'ruby') {
-      this.extractRubyRelationships(node, relationships);
+      await this.extractRubyRelationships(node, filePath, relationships);
     } else if (language === 'vue') {
       await this.extractVueRelationships(tree, sourceCode, filePath, relationships);
     }
@@ -371,14 +373,35 @@ export class FileProcessor {
 
   /**
    * Extract Ruby relationships using dedicated extractor.
+   * Optionally enhances with Ruby LSP data for cross-file resolution.
    */
-  private extractRubyRelationships(
+  private async extractRubyRelationships(
     node: SyntaxNode,
+    filePath: string,
     relationships: PendingRelationship[]
-  ): void {
+  ): Promise<void> {
+    // Always extract tree-sitter relationships
     const extractor = new RubyRelationshipExtractor();
     const extracted = extractor.extract(node);
     relationships.push(...extracted.map(toPendingRelationship));
+
+    // Optionally enhance with Ruby LSP relationships (cross-file method resolution)
+    if (this.useRubyLSP && this.rubyLSPParser) {
+      try {
+        const lspResult = await this.rubyLSPParser.parse([filePath]);
+        relationships.push(...lspResult.relationships.map(toPendingRelationship));
+      } catch (error) {
+        if (error instanceof RubyLSPNotAvailableError) {
+          // Silently fall back to tree-sitter only
+          console.debug('[FileProcessor] Ruby LSP not available, using tree-sitter only');
+        } else {
+          // Log other errors but continue processing
+          console.warn(
+            `[FileProcessor] Ruby LSP failed for ${filePath}: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
+    }
   }
 
   /**
