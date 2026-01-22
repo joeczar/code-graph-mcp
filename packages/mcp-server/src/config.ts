@@ -39,7 +39,7 @@ function detectProjectIdFromGit(): string | null {
     // HTTPS no .git: https://github.com/owner/repo
 
     // Remove .git suffix if present
-    let url = output.endsWith('.git') ? output.slice(0, -4) : output;
+    const url = output.endsWith('.git') ? output.slice(0, -4) : output;
 
     // Extract the last path component (repo name)
     // For SSH format (contains :), split on : and take the last part
@@ -54,7 +54,7 @@ function detectProjectIdFromGit(): string | null {
     // Handle owner/repo format by taking just the repo
     const repoName = repoPath.includes('/') ? repoPath.split('/').pop() : repoPath;
 
-    return repoName || null;
+    return repoName ?? null;
   } catch {
     // Git command failed (not a git repo, no remote, etc.)
     return null;
@@ -86,7 +86,8 @@ function detectProjectIdFromPackageJson(): string | null {
 
     // Strip @scope/ prefix for scoped packages
     // @myorg/my-package → my-package
-    const scopeMatch = name.match(/^@[^/]+\/(.+)$/);
+    const scopeRegex = /^@[^/]+\/(.+)$/;
+    const scopeMatch = scopeRegex.exec(name);
     return scopeMatch?.[1] ?? name;
   } catch {
     // File doesn't exist, invalid JSON, or no name field
@@ -95,23 +96,43 @@ function detectProjectIdFromPackageJson(): string | null {
 }
 
 /**
- * Get the project ID from environment variables
+ * Get the project ID with automatic detection
  *
- * Reads PROJECT_ID from process.env and falls back to 'unknown' if not set.
+ * Attempts to identify the project using multiple methods in order:
+ * 1. PROJECT_ID environment variable (explicit configuration)
+ * 2. Git remote origin URL (extracts repository name)
+ * 3. package.json name field (strips @scope/ prefix)
+ * 4. Fallback to 'unknown' if all methods fail
+ *
  * Useful for multi-tenant scenarios or distinguishing between different
  * codebases using the same MCP server instance.
  *
  * @returns Project ID string, defaults to 'unknown'
  */
 export function getProjectId(): string {
-  const projectId = process.env['PROJECT_ID']?.trim();
-  // Empty string or undefined should fall back to 'unknown'
-  if (!projectId) {
-    logger.warn(
-      'PROJECT_ID environment variable not set, defaulting to "unknown". ' +
-        'Set PROJECT_ID to identify this project in metrics.'
-    );
-    return 'unknown';
+  // 1. Check environment variable (explicit configuration takes precedence)
+  const envProjectId = process.env['PROJECT_ID']?.trim();
+  if (envProjectId) {
+    return envProjectId;
   }
-  return projectId;
+
+  // 2. Try git remote origin URL
+  const gitProjectId = detectProjectIdFromGit();
+  if (gitProjectId) {
+    logger.info(`Auto-detected project ID from git: ${gitProjectId}`);
+    return gitProjectId;
+  }
+
+  // 3. Try package.json name field
+  const packageJsonProjectId = detectProjectIdFromPackageJson();
+  if (packageJsonProjectId) {
+    logger.info(`Auto-detected project ID from package.json: ${packageJsonProjectId}`);
+    return packageJsonProjectId;
+  }
+
+  // 4. Fallback to 'unknown' if all methods fail
+  logger.warn(
+    'Could not detect project ID. Set PROJECT_ID environment variable to identify this project in metrics.'
+  );
+  return 'unknown';
 }
