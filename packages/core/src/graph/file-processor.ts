@@ -26,6 +26,23 @@ type PendingRelationship = Omit<NewRelationship, 'sourceId' | 'targetId'> & {
 };
 
 /**
+ * Converts an extracted relationship to a pending relationship.
+ */
+function toPendingRelationship(rel: {
+  sourceName: string;
+  targetName: string;
+  type: string;
+  metadata?: Record<string, unknown>;
+}): PendingRelationship {
+  return {
+    sourceName: rel.sourceName,
+    targetName: rel.targetName,
+    type: rel.type as PendingRelationship['type'],
+    ...(rel.metadata && { metadata: rel.metadata }),
+  };
+}
+
+/**
  * Creates an entity from an AST node if it has a name field.
  */
 function createEntityFromNode(
@@ -339,26 +356,15 @@ export class FileProcessor {
     relationships: PendingRelationship[]
   ): void {
     const extractor = new TypeScriptRelationshipExtractor();
-
-    // Create a ParseResult-like object for the extractor
     const parseResult = {
       tree: { rootNode: node } as Tree,
-      filePath: '', // File path not needed for relationship extraction
+      filePath: '',
       language: 'typescript' as const,
       sourceCode: node.text,
     };
 
-    const extractedRelationships = extractor.extract(parseResult);
-
-    // Convert ExtractedRelationship to PendingRelationship format
-    for (const rel of extractedRelationships) {
-      relationships.push({
-        sourceName: rel.sourceName,
-        targetName: rel.targetName,
-        type: rel.type,
-        ...(rel.metadata && { metadata: rel.metadata }),
-      });
-    }
+    const extracted = extractor.extract(parseResult);
+    relationships.push(...extracted.map(toPendingRelationship));
   }
 
   /**
@@ -369,17 +375,8 @@ export class FileProcessor {
     relationships: PendingRelationship[]
   ): void {
     const extractor = new RubyRelationshipExtractor();
-    const extractedRelationships = extractor.extract(node);
-
-    // Convert ExtractedRelationship to PendingRelationship format
-    for (const rel of extractedRelationships) {
-      relationships.push({
-        sourceName: rel.sourceName,
-        targetName: rel.targetName,
-        type: rel.type,
-        ...(rel.metadata && { metadata: rel.metadata }),
-      });
-    }
+    const extracted = extractor.extract(node);
+    relationships.push(...extracted.map(toPendingRelationship));
   }
 
   /**
@@ -392,8 +389,6 @@ export class FileProcessor {
     relationships: PendingRelationship[]
   ): Promise<void> {
     const extractor = new VueRelationshipExtractor();
-
-    // Create ParseResult for extractor
     const parseResult = {
       tree,
       filePath,
@@ -401,16 +396,7 @@ export class FileProcessor {
       sourceCode,
     };
 
-    const extractedRelationships = await extractor.extract(parseResult);
-
-    // Convert ExtractedRelationship to PendingRelationship format
-    for (const rel of extractedRelationships) {
-      relationships.push({
-        sourceName: rel.sourceName,
-        targetName: rel.targetName,
-        type: rel.type,
-        ...(rel.metadata && { metadata: rel.metadata }),
-      });
-    }
+    const extracted = await extractor.extract(parseResult);
+    relationships.push(...extracted.map(toPendingRelationship));
   }
 }
