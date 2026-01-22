@@ -54,6 +54,16 @@ export interface ProjectParseOptions {
   onProgress?: ProgressCallback;
 }
 
+/**
+ * Information about a file that failed to load or parse
+ */
+export interface FailedFile {
+  /** Relative path to the file */
+  filePath: string;
+  /** Error message describing why the file failed */
+  error: string;
+}
+
 export interface ProjectParseResult {
   /**
    * Project root path
@@ -71,10 +81,16 @@ export interface ProjectParseResult {
   relationships: TsMorphRelationship[];
 
   /**
+   * Files that failed to load or parse
+   */
+  failedFiles: FailedFile[];
+
+  /**
    * Statistics about the parse operation
    */
   stats: {
     filesScanned: number;
+    filesLoaded: number;
     vueFilesProcessed: number;
     entitiesByType: Record<string, number>;
     relationshipsByType: Record<string, number>;
@@ -160,6 +176,9 @@ export function parseProject(
   const vueFileMapping = new Map<string, string>();
   let vueFilesProcessed = 0;
 
+  // Track files that failed to load
+  const failedFiles: FailedFile[] = [];
+
   // Phase 2: Load - add files to the project
   const totalFiles = sourceFiles.length;
   for (let i = 0; i < sourceFiles.length; i++) {
@@ -179,11 +198,14 @@ export function parseProject(
           vueFileMapping.set(virtualPath, relativePath);
           vueFilesProcessed++;
         }
+        // Note: vueScript returns null for files with no TypeScript content (not an error)
       } else {
         project.addSourceFileAtPath(file);
       }
     } catch (error) {
-      console.warn(`[TsMorphProjectParser] Failed to add ${file}:`, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      failedFiles.push({ filePath: relativePath, error: errorMessage });
+      console.warn(`[TsMorphProjectParser] Failed to add ${relativePath}: ${errorMessage}`);
     }
   }
 
@@ -250,8 +272,10 @@ export function parseProject(
     projectPath,
     entities: allEntities,
     relationships: allRelationships,
+    failedFiles,
     stats: {
       filesScanned: sourceFiles.length,
+      filesLoaded: projectSourceFiles.length,
       vueFilesProcessed,
       entitiesByType,
       relationshipsByType,

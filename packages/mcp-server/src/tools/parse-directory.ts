@@ -38,6 +38,16 @@ import { getRubyLSPConfig } from '../config.js';
 const TS_JS_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'];
 
 /**
+ * Human-readable labels for ts-morph parsing phases
+ */
+const PHASE_LABELS: Record<string, string> = {
+  scan: 'Scanning',
+  load: 'Loading',
+  entities: 'Extracting entities',
+  relationships: 'Extracting relationships',
+};
+
+/**
  * Check if a file should be processed with ts-morph (TypeScript/JavaScript)
  */
 function isTsJsFile(filePath: string): boolean {
@@ -87,7 +97,13 @@ async function sendProgress(
       });
     } catch (err) {
       // Don't fail the operation if progress notification fails
-      logger.warn('Failed to send progress notification', { error: err });
+      logger.warn('Failed to send progress notification', {
+        error: err,
+        progressToken: String(progressToken),
+        current,
+        total,
+        message,
+      });
     }
   }
 }
@@ -268,22 +284,26 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
             }
             lastProgressUpdate = now;
 
-            // Map ts-morph phases to user-friendly messages
-            const phaseLabels: Record<string, string> = {
-              scan: 'Scanning',
-              load: 'Loading',
-              entities: 'Extracting entities',
-              relationships: 'Extracting relationships',
-            };
-            const phaseLabel = phaseLabels[phase] ?? phase;
-
+            const phaseLabel = PHASE_LABELS[phase] ?? phase;
             // Fire and forget - don't await in sync callback
-            void sendProgress(extra, current, total, `[ts-morph] ${phaseLabel}: ${message}`);
+            sendProgress(extra, current, total, `[ts-morph] ${phaseLabel}: ${message}`)
+              .catch((err: unknown) => logger.warn('Progress callback error', { error: err }));
           }) satisfies ProgressCallback,
         });
 
         if (tsResult.success) {
-          successCount += tsResult.stats?.filesScanned ?? tsJsFiles.length;
+          // Count files that were successfully loaded (not just scanned)
+          const filesLoaded = tsResult.stats?.filesLoaded ?? tsJsFiles.length;
+          successCount += filesLoaded;
+
+          // Track failed files
+          if (tsResult.failedFiles && tsResult.failedFiles.length > 0) {
+            errorCount += tsResult.failedFiles.length;
+            for (const failed of tsResult.failedFiles) {
+              errors.push(`${failed.filePath}: ${failed.error}`);
+            }
+          }
+
           // Collect entities (excluding file entities) and relationships
           allEntities.push(...tsResult.entities.filter(e => e.type !== 'file'));
           allRelationships.push(...tsResult.relationships);
@@ -291,6 +311,8 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
           logger.info('TypeScript/JavaScript files processed with ts-morph', {
             directory: resolvedPath,
             filesScanned: tsResult.stats?.filesScanned,
+            filesLoaded,
+            failedFiles: tsResult.failedFiles?.length ?? 0,
             entitiesFound: tsResult.entities.length,
             relationshipsFound: tsResult.relationships.length,
           });

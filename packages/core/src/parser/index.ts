@@ -40,6 +40,7 @@ export type {
   ProjectParseOptions,
   ProjectParseResult,
   ProgressCallback,
+  FailedFile,
 } from './ts-morph-project-parser.js';
 export {
   extractEntities,

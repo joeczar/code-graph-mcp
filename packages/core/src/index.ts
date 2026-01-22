@@ -34,6 +34,7 @@ export type {
   ProjectParseOptions,
   ProjectParseResult,
   ProgressCallback,
+  FailedFile,
   TsMorphEntity,
   TsMorphRelationship,
 } from './parser/index.js';
