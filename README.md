@@ -82,7 +82,7 @@ The server automatically identifies your project using the following detection m
 
 2. **Git Remote Origin URL** (automatic detection)
    - Extracts repository name from `git config --get remote.origin.url`
-   - Supports SSH and HTTPS formats: `git@github.com:owner/repo.git` → `repo`
+   - Supports SSH and HTTPS formats (e.g., `git@github.com:owner/repo.git` and `https://github.com/owner/repo` both result in `repo`)
 
 3. **package.json Name** (automatic detection)
    - Reads the `name` field from `package.json` in the current directory

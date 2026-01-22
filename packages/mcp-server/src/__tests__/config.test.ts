@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest';
-import { getProjectId } from '../config.js';
+import { getProjectId, resetProjectIdCache } from '../config.js';
 
 // Mock modules
 vi.mock('node:child_process', () => ({
@@ -26,8 +26,9 @@ describe('config', () => {
   const originalEnv = process.env['PROJECT_ID'];
 
   beforeEach(() => {
-    // Clear all mocks before each test
+    // Clear all mocks and reset cache before each test
     vi.clearAllMocks();
+    resetProjectIdCache();
   });
 
   afterEach(() => {

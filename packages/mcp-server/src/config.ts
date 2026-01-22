@@ -7,6 +7,7 @@
 
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { logger } from './tools/logger.js';
 
 /**
@@ -61,7 +62,7 @@ function detectProjectIdFromGit(): string | null {
  */
 function detectProjectIdFromPackageJson(): string | null {
   try {
-    const packageJsonPath = `${process.cwd()}/package.json`;
+    const packageJsonPath = join(process.cwd(), 'package.json');
     const content = readFileSync(packageJsonPath, 'utf-8');
     const packageJson = JSON.parse(content) as { name?: string };
 
@@ -75,11 +76,22 @@ function detectProjectIdFromPackageJson(): string | null {
   } catch (error) {
     // File doesn't exist, invalid JSON, or no name field
     logger.debug('package.json project ID detection failed', {
-      path: `${process.cwd()}/package.json`,
+      path: join(process.cwd(), 'package.json'),
       error: error instanceof Error ? error.message : String(error),
     });
     return null;
   }
+}
+
+// Cache for project ID to avoid repeated I/O operations
+let cachedProjectId: string | undefined;
+
+/**
+ * Reset the project ID cache (for testing only)
+ * @internal
+ */
+export function resetProjectIdCache(): void {
+  cachedProjectId = undefined;
 }
 
 /**
@@ -91,35 +103,45 @@ function detectProjectIdFromPackageJson(): string | null {
  * 3. package.json name field (strips @scope/ prefix)
  * 4. Fallback to 'unknown' if all methods fail
  *
+ * Results are cached after the first call to avoid repeated I/O operations.
+ *
  * Useful for multi-tenant scenarios or distinguishing between different
  * codebases using the same MCP server instance.
  *
  * @returns Project ID string, defaults to 'unknown'
  */
 export function getProjectId(): string {
+  if (cachedProjectId !== undefined) {
+    return cachedProjectId;
+  }
+
   // 1. Check environment variable (explicit configuration takes precedence)
   const envProjectId = process.env['PROJECT_ID']?.trim();
   if (envProjectId) {
-    return envProjectId;
+    cachedProjectId = envProjectId;
+    return cachedProjectId;
   }
 
   // 2. Try git remote origin URL
   const gitProjectId = detectProjectIdFromGit();
   if (gitProjectId) {
     logger.info(`Auto-detected project ID from git: ${gitProjectId}`);
-    return gitProjectId;
+    cachedProjectId = gitProjectId;
+    return cachedProjectId;
   }
 
   // 3. Try package.json name field
   const packageJsonProjectId = detectProjectIdFromPackageJson();
   if (packageJsonProjectId) {
     logger.info(`Auto-detected project ID from package.json: ${packageJsonProjectId}`);
-    return packageJsonProjectId;
+    cachedProjectId = packageJsonProjectId;
+    return cachedProjectId;
   }
 
   // 4. Fallback to 'unknown' if all methods fail
   logger.warn(
     'Could not detect project ID. Set PROJECT_ID environment variable to identify this project in metrics.'
   );
-  return 'unknown';
+  cachedProjectId = 'unknown';
+  return cachedProjectId;
 }
