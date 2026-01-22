@@ -124,9 +124,8 @@ describe('echo tool integration', () => {
     const { z } = await import('zod');
 
     // Create a validation error - should trigger warning log
-    interface ZodIssue { code: 'invalid_type'; expected: string; received: string; path: (string | number)[]; message: string }
     const zodError = new z.ZodError([
-      { code: 'invalid_type', expected: 'string', received: 'number', path: ['message'], message: 'Expected string' } as ZodIssue,
+      { code: 'invalid_type', expected: 'string' as const, received: 'number', path: ['message'], message: 'Expected string' },
     ]);
     const validationResponse = createErrorResponse(zodError);
     expect(validationResponse.isError).toBe(true);
