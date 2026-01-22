@@ -38,6 +38,14 @@ export {
   setMilestoneRunStatus,
   addMilestoneRunForceResolved,
   deleteMilestoneRun,
+
+  // Worktree operations
+  createWorktree,
+  getWorktree,
+  findWorktreeByIssue,
+  listWorktrees,
+  setWorktreeStatus,
+  deleteWorktree,
 } from './db.js';
 
 export type {
@@ -52,4 +60,7 @@ export type {
   MilestoneRunStatus,
   MilestoneRun,
   NewMilestoneRun,
+  WorktreeStatus,
+  Worktree,
+  NewWorktree,
 } from './db.js';

@@ -11,6 +11,7 @@ export type WorkflowStatus = 'running' | 'paused' | 'completed' | 'failed';
 export type WorkflowPhase = 'setup' | 'research' | 'implement' | 'review' | 'finalize' | 'merge';
 export type PrState = 'open' | 'merged' | 'closed';
 export type MilestoneRunStatus = 'running' | 'paused' | 'completed' | 'failed' | 'deadlocked';
+export type WorktreeStatus = 'created' | 'running' | 'pr-created' | 'merged' | 'failed';
 
 export interface Workflow {
   id: string;
@@ -23,6 +24,25 @@ export interface Workflow {
   merged_sha: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface Worktree {
+  id: string;
+  workflow_id: string;
+  issue_number: number;
+  branch_name: string;
+  worktree_path: string;
+  status: WorktreeStatus;
+  pr_number: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NewWorktree {
+  workflow_id: string;
+  issue_number: number;
+  branch_name: string;
+  worktree_path: string;
 }
 
 export interface WorkflowAction {
@@ -129,6 +149,21 @@ CREATE TABLE IF NOT EXISTS milestone_runs (
 )
 `;
 
+const WORKTREES_TABLE = `
+CREATE TABLE IF NOT EXISTS worktrees (
+  id TEXT PRIMARY KEY,
+  workflow_id TEXT NOT NULL,
+  issue_number INTEGER NOT NULL UNIQUE,
+  branch_name TEXT NOT NULL,
+  worktree_path TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'created',
+  pr_number INTEGER,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE
+)
+`;
+
 const INDEXES = [
   'CREATE INDEX IF NOT EXISTS idx_workflows_issue ON workflows(issue_number)',
   'CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status)',
@@ -138,6 +173,9 @@ const INDEXES = [
   'CREATE INDEX IF NOT EXISTS idx_commits_sha ON workflow_commits(sha)',
   'CREATE INDEX IF NOT EXISTS idx_milestone_runs_name ON milestone_runs(milestone_name)',
   'CREATE INDEX IF NOT EXISTS idx_milestone_runs_status ON milestone_runs(status)',
+  'CREATE INDEX IF NOT EXISTS idx_worktrees_workflow ON worktrees(workflow_id)',
+  'CREATE INDEX IF NOT EXISTS idx_worktrees_issue ON worktrees(issue_number)',
+  'CREATE INDEX IF NOT EXISTS idx_worktrees_status ON worktrees(status)',
 ];
 
 // Columns to add via migration (for existing databases)
@@ -189,6 +227,7 @@ function initializeCheckpointSchema(db: Database.Database): void {
   db.exec(WORKFLOW_ACTIONS_TABLE);
   db.exec(WORKFLOW_COMMITS_TABLE);
   db.exec(MILESTONE_RUNS_TABLE);
+  db.exec(WORKTREES_TABLE);
 
   for (const index of INDEXES) {
     db.exec(index);
@@ -625,5 +664,99 @@ export function addMilestoneRunForceResolved(
 export function deleteMilestoneRun(db: Database.Database, id: string): boolean {
   const stmt = db.prepare('DELETE FROM milestone_runs WHERE id = ?');
   const result = stmt.run(id);
+  return result.changes > 0;
+}
+
+// ============================================================================
+// Worktree Operations
+// ============================================================================
+
+export function createWorktree(db: Database.Database, data: NewWorktree): Worktree {
+  const id = randomUUID();
+  const now = new Date().toISOString();
+
+  const stmt = db.prepare(`
+    INSERT INTO worktrees (id, workflow_id, issue_number, branch_name, worktree_path, status, pr_number, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, 'created', NULL, ?, ?)
+  `);
+
+  stmt.run(id, data.workflow_id, data.issue_number, data.branch_name, data.worktree_path, now, now);
+
+  return {
+    id,
+    workflow_id: data.workflow_id,
+    issue_number: data.issue_number,
+    branch_name: data.branch_name,
+    worktree_path: data.worktree_path,
+    status: 'created',
+    pr_number: null,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+export function getWorktree(db: Database.Database, id: string): Worktree | null {
+  const stmt = db.prepare('SELECT * FROM worktrees WHERE id = ?');
+  const row = stmt.get(id) as Worktree | undefined;
+  return row ?? null;
+}
+
+export function findWorktreeByIssue(db: Database.Database, issueNumber: number): Worktree | null {
+  const stmt = db.prepare('SELECT * FROM worktrees WHERE issue_number = ?');
+  const row = stmt.get(issueNumber) as Worktree | undefined;
+  return row ?? null;
+}
+
+export function listWorktrees(
+  db: Database.Database,
+  options?: { status?: WorktreeStatus; limit?: number }
+): Worktree[] {
+  let query = 'SELECT * FROM worktrees';
+  const params: (string | number)[] = [];
+
+  if (options?.status) {
+    query += ' WHERE status = ?';
+    params.push(options.status);
+  }
+
+  query += ' ORDER BY updated_at DESC';
+
+  if (options?.limit) {
+    query += ' LIMIT ?';
+    params.push(options.limit);
+  }
+
+  const stmt = db.prepare(query);
+  return stmt.all(...params) as Worktree[];
+}
+
+export function setWorktreeStatus(
+  db: Database.Database,
+  issueNumber: number,
+  status: WorktreeStatus,
+  prNumber?: number
+): boolean {
+  const now = new Date().toISOString();
+  let stmt;
+  let result;
+
+  if (prNumber !== undefined) {
+    stmt = db.prepare(`
+      UPDATE worktrees SET status = ?, pr_number = ?, updated_at = ? WHERE issue_number = ?
+    `);
+    result = stmt.run(status, prNumber, now, issueNumber);
+  } else {
+    stmt = db.prepare(`
+      UPDATE worktrees SET status = ?, updated_at = ? WHERE issue_number = ?
+    `);
+    result = stmt.run(status, now, issueNumber);
+  }
+
+  return result.changes > 0;
+}
+
+export function deleteWorktree(db: Database.Database, issueNumber: number): boolean {
+  const stmt = db.prepare('DELETE FROM worktrees WHERE issue_number = ?');
+  const result = stmt.run(issueNumber);
   return result.changes > 0;
 }
