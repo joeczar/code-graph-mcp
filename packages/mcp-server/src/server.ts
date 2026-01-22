@@ -56,10 +56,11 @@ function registerTool<T extends z.ZodObject<z.ZodRawShape>>(
   // Wrap handler with metrics instrumentation
   const toolHandler = instrumentHandler(toolName, tool.handler, metricsStore, projectId);
 
-  const callback: McpToolCallback<T> = async (args, _extra) => {
+  const callback: McpToolCallback<T> = async (args, extra) => {
     try {
       // SDK has already validated args against inputSchema
-      const result = await toolHandler(args);
+      // Pass extra context for progress notifications and other MCP features
+      const result = await toolHandler(args, extra);
       return {
         content: result.content.map(item => ({ type: 'text' as const, text: item.text })),
         isError: result.isError,

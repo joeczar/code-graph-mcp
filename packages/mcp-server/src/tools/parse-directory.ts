@@ -19,11 +19,45 @@ import {
   type Entity,
   type Relationship,
 } from '@code-graph/core';
-import { type ToolDefinition, createSuccessResponse, createErrorResponse } from './types.js';
+import { type ToolDefinition, type McpExtra, createSuccessResponse, createErrorResponse } from './types.js';
 import { ResourceNotFoundError, ToolExecutionError } from './errors.js';
 import { countByType } from './utils.js';
 import { logger } from './logger.js';
 import { getRubyLSPConfig } from '../config.js';
+
+/**
+ * Send a progress notification to the MCP client
+ * Logs progress to console and sends MCP notification if client supports it
+ */
+async function sendProgress(
+  extra: McpExtra | undefined,
+  current: number,
+  total: number,
+  message: string
+): Promise<void> {
+  // Always log to console for visibility
+  const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+  logger.info(`[parse_directory] Progress: ${current}/${total} (${percent}%) - ${message}`);
+
+  // Send MCP progress notification if client provided a progress token
+  const progressToken = extra?._meta?.progressToken;
+  if (progressToken && extra?.sendNotification) {
+    try {
+      await extra.sendNotification({
+        method: 'notifications/progress',
+        params: {
+          progressToken,
+          progress: current,
+          total,
+          message,
+        },
+      });
+    } catch (err) {
+      // Don't fail the operation if progress notification fails
+      logger.warn('Failed to send progress notification', { error: err });
+    }
+  }
+}
 
 const parseDirectoryInputSchema = z.object({
   path: z.string().describe('Path to directory to parse recursively (absolute or relative to working directory)'),
@@ -44,7 +78,7 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
     inputSchema: parseDirectoryInputSchema,
   },
 
-  handler: async (input) => {
+  handler: async (input, extra) => {
     const { path: inputPath, pattern } = input;
 
     // Resolve path (handle relative paths)
@@ -114,6 +148,9 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
     const rubyLSPConfig = getRubyLSPConfig();
     const processor = new FileProcessor(rubyLSPConfig);
 
+    // Send initial progress notification
+    await sendProgress(extra, 0, 0, 'Scanning directory for files...');
+
     // Parse directory using DirectoryParser (respects .gitignore)
     let parseResult;
     try {
@@ -159,6 +196,10 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
       files = files.filter(f => patternRegex.test(f.filePath));
     }
 
+    // Report how many files were found
+    const totalFiles = files.length;
+    await sendProgress(extra, 0, totalFiles, `Found ${totalFiles} files to process`);
+
     // Now store each successfully parsed file in the database
     let successCount = 0;
     let errorCount = 0;
@@ -166,10 +207,17 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
     const allRelationships: Relationship[] = [];
     const errors: string[] = [];
 
-    for (const fileResult of files) {
+    for (let i = 0; i < files.length; i++) {
+      const fileResult = files[i];
+      if (!fileResult) continue;
+
+      // Send progress notification for each file
+      const relativePath = path.relative(resolvedPath, fileResult.filePath);
+      await sendProgress(extra, i + 1, totalFiles, `Processing: ${relativePath}`);
+
+      // Original file processing logic follows
       if (!fileResult.success || !fileResult.result) {
         errorCount++;
-        const relativePath = path.relative(resolvedPath, fileResult.filePath);
         const errorMessage = fileResult.error ?? 'Unknown error';
         errors.push(`${relativePath}: ${errorMessage}`);
         // Log parsing failures for server-side visibility
@@ -195,7 +243,6 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
           allRelationships.push(...storeResult.relationships);
         } else {
           errorCount++;
-          const relativePath = path.relative(resolvedPath, fileResult.filePath);
           const errorMessage = storeResult.error ?? 'Unknown error';
           errors.push(`${relativePath}: ${errorMessage}`);
           // Log storage failures for server-side visibility
@@ -207,7 +254,6 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
         }
       } catch (err) {
         errorCount++;
-        const relativePath = path.relative(resolvedPath, fileResult.filePath);
         const errorMsg = err instanceof Error ? err.message : String(err);
         errors.push(`${relativePath}: ${errorMsg}`);
         // Log unexpected errors for server-side visibility
@@ -218,6 +264,14 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
         });
       }
     }
+
+    // Send completion notification
+    await sendProgress(
+      extra,
+      totalFiles,
+      totalFiles,
+      `Completed: ${successCount} successful, ${errorCount} errors`
+    );
 
     // Format success response
     const lines: string[] = [];

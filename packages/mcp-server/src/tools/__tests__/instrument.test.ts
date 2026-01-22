@@ -51,7 +51,8 @@ describe('instrumentHandler', () => {
       const result = await instrumented({ message: 'hello' });
 
       expect(result.content[0]?.text).toBe('success');
-      expect(handler).toHaveBeenCalledWith({ message: 'hello' });
+      // Handler is called with input and optional extra context (undefined in tests)
+      expect(handler).toHaveBeenCalledWith({ message: 'hello' }, undefined);
       expect(metricsStore.insertToolCall).toHaveBeenCalledWith(
         'test-project',
         'test-tool',

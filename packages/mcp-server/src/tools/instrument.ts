@@ -7,7 +7,7 @@
 
 import type { z } from 'zod';
 import type { MetricsStore } from '@code-graph/core';
-import type { ToolHandler, ToolResponse } from './types.js';
+import type { ToolHandler, ToolResponse, McpExtra } from './types.js';
 import { sanitizeInput } from './sanitize.js';
 import { classifyError } from './error-classifier.js';
 import { logger } from './logger.js';
@@ -31,15 +31,15 @@ export function instrumentHandler<TInput extends z.ZodType>(
   metricsStore: MetricsStore,
   projectId: string
 ): ToolHandler<TInput> {
-  return async (input: z.infer<TInput>): Promise<ToolResponse> => {
+  return async (input: z.infer<TInput>, extra?: McpExtra): Promise<ToolResponse> => {
     const startTime = performance.now();
     let success = false;
     let errorType: string | null = null;
     let result: ToolResponse | undefined;
 
     try {
-      // Execute the original handler
-      result = await handler(input);
+      // Execute the original handler, passing extra context for progress notifications
+      result = await handler(input, extra);
       success = true;
       return result;
     } catch (error) {

@@ -5,7 +5,15 @@
  */
 
 import { z } from 'zod';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { ServerRequest, ServerNotification } from '@modelcontextprotocol/sdk/types.js';
 import { ToolError } from './errors.js';
+
+/**
+ * MCP request handler extra context
+ * Provides access to progress notifications and other MCP features
+ */
+export type McpExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 
 /**
  * Tool metadata defining how to register a tool with the MCP server
@@ -21,9 +29,12 @@ export interface ToolMetadata<TInput extends z.ZodType> {
 
 /**
  * Tool handler function that processes validated input
+ * @param input - Validated input matching the tool's schema
+ * @param extra - Optional MCP context for progress notifications and other features
  */
 export type ToolHandler<TInput extends z.ZodType> = (
-  input: z.infer<TInput>
+  input: z.infer<TInput>,
+  extra?: McpExtra
 ) => Promise<ToolResponse> | ToolResponse;
 
 /**
