@@ -8,6 +8,7 @@ import {
   type NewRelationship,
   createRelationshipStore,
 } from '../db/relationships.js';
+import { TypeScriptRelationshipExtractor } from '../parser/extractors/typescript-relationships.js';
 
 type SyntaxNode = Tree['rootNode'];
 
@@ -328,36 +329,33 @@ export class FileProcessor {
   }
 
   /**
-   * Extract TypeScript/JavaScript class inheritance relationships.
+   * Extract TypeScript/JavaScript relationships using dedicated extractor.
    */
   private extractTypeScriptRelationships(
     node: SyntaxNode,
     relationships: PendingRelationship[]
   ): void {
-    if (node.type === 'class_declaration') {
-      const nameNode = node.childForFieldName('name');
-      const heritageNode = node.children.find(c => c.type === 'class_heritage');
+    const extractor = new TypeScriptRelationshipExtractor();
 
-      if (nameNode && heritageNode) {
-        const extendsClause = heritageNode.children.find(
-          c => c.type === 'extends_clause'
-        );
-        const identifier = extendsClause?.children.find(
-          c => c.type === 'identifier'
-        );
-        if (identifier) {
-          relationships.push({
-            sourceName: nameNode.text,
-            targetName: identifier.text,
-            type: 'extends',
-          });
-        }
-      }
+    // Create a ParseResult-like object for the extractor
+    const parseResult = {
+      tree: { rootNode: node } as Tree,
+      filePath: '', // File path not needed for relationship extraction
+      language: 'typescript' as const,
+      sourceCode: node.text,
+    };
+
+    const extractedRelationships = extractor.extract(parseResult);
+
+    // Convert ExtractedRelationship to PendingRelationship format
+    for (const rel of extractedRelationships) {
+      relationships.push({
+        sourceName: rel.sourceName,
+        targetName: rel.targetName,
+        type: rel.type,
+        ...(rel.metadata && { metadata: rel.metadata }),
+      });
     }
-
-    forEachChild(node, child => {
-      this.extractTypeScriptRelationships(child, relationships);
-    });
   }
 
   /**
