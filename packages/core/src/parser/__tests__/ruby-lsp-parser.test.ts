@@ -195,5 +195,34 @@ describe('RubyLSPParser', () => {
       );
       expect(extendsRelationships.length).toBeGreaterThan(0);
     });
+
+    it.skip('should populate targetFilePath for cross-file inheritance', async () => {
+      // This test is skipped by default since it requires ruby-lsp gem to be installed.
+      // Tests that when a class in one file extends a class in another file,
+      // the targetFilePath field is populated in the relationship.
+      const parser = new RubyLSPParser();
+      const baseClassPath = join(
+        import.meta.dirname,
+        'fixtures',
+        'ruby',
+        'base_class.rb'
+      );
+      const derivedClassPath = join(
+        import.meta.dirname,
+        'fixtures',
+        'ruby',
+        'derived_class.rb'
+      );
+
+      const result = await parser.parse([baseClassPath, derivedClassPath]);
+
+      // Find cross-file extends relationship
+      const crossFileExtends = result.relationships.find(
+        (r) => r.type === 'extends' && r.targetFilePath !== undefined
+      );
+
+      expect(crossFileExtends).toBeDefined();
+      expect(crossFileExtends?.targetFilePath).toBeDefined();
+    });
   });
 });
