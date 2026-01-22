@@ -2,8 +2,13 @@
  * Parse Directory tool - parses all files in a directory recursively
  *
  * Accepts a directory path and optional glob pattern, parses all supported
- * files with tree-sitter, extracts entities and relationships, and stores
- * them in the database. Respects .gitignore patterns.
+ * files with tree-sitter (Ruby) or ts-morph (TypeScript/JavaScript), extracts
+ * entities and relationships, and stores them in the database.
+ * Respects .gitignore patterns.
+ *
+ * TypeScript/JavaScript parsing uses ts-morph for cross-file relationship
+ * resolution, enabling accurate tracking of imports, function calls, and
+ * class relationships across file boundaries.
  *
  * Supports: TypeScript (.ts, .tsx), JavaScript (.js, .jsx), Ruby (.rb)
  */
@@ -13,6 +18,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   FileProcessor,
+  TsMorphFileProcessor,
   getDatabase,
   initializeSchema,
   DirectoryParser,
@@ -24,6 +30,32 @@ import { ResourceNotFoundError, ToolExecutionError } from './errors.js';
 import { countByType } from './utils.js';
 import { logger } from './logger.js';
 import { getRubyLSPConfig } from '../config.js';
+
+/**
+ * TypeScript/JavaScript file extensions that should be processed with ts-morph
+ */
+const TS_JS_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'];
+
+/**
+ * Check if a file should be processed with ts-morph (TypeScript/JavaScript)
+ */
+function isTsJsFile(filePath: string): boolean {
+  const ext = path.extname(filePath).toLowerCase();
+  return TS_JS_EXTENSIONS.includes(ext);
+}
+
+/**
+ * Ruby file extensions that should be processed with tree-sitter
+ */
+const RUBY_EXTENSIONS = ['.rb'];
+
+/**
+ * Check if a file should be processed with tree-sitter (Ruby)
+ */
+function isRubyFile(filePath: string): boolean {
+  const ext = path.extname(filePath).toLowerCase();
+  return RUBY_EXTENSIONS.includes(ext);
+}
 
 /**
  * Send a progress notification to the MCP client
@@ -196,72 +228,125 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
       files = files.filter(f => patternRegex.test(f.filePath));
     }
 
-    // Report how many files were found
-    const totalFiles = files.length;
-    await sendProgress(extra, 0, totalFiles, `Found ${String(totalFiles)} files to process`);
+    // Separate files by type: TS/JS files use ts-morph, Ruby files use tree-sitter
+    const tsJsFiles = files.filter(f => isTsJsFile(f.filePath));
+    const rubyFiles = files.filter(f => isRubyFile(f.filePath));
+    const totalFiles = tsJsFiles.length + rubyFiles.length;
 
-    // Now store each successfully parsed file in the database
+    await sendProgress(extra, 0, totalFiles, `Found ${String(totalFiles)} files to process (${String(tsJsFiles.length)} TS/JS, ${String(rubyFiles.length)} Ruby)`);
+
+    // Initialize result tracking
     let successCount = 0;
     let errorCount = 0;
     const allEntities: Entity[] = [];
     const allRelationships: Relationship[] = [];
     const errors: string[] = [];
 
-    for (let i = 0; i < files.length; i++) {
-      const fileResult = files[i];
-      if (!fileResult) continue;
+    // Phase 1: Process TypeScript/JavaScript files with ts-morph (for cross-file resolution)
+    // TsMorphFileProcessor processes all TS/JS files at once to resolve cross-file relationships
+    if (tsJsFiles.length > 0) {
+      await sendProgress(extra, 0, totalFiles, `Processing ${String(tsJsFiles.length)} TypeScript/JavaScript files with ts-morph...`);
 
-      // Send progress notification for each file
-      const relativePath = path.relative(resolvedPath, fileResult.filePath);
-      await sendProgress(extra, i + 1, totalFiles, `Processing: ${relativePath}`);
+      const tsMorphProcessor = new TsMorphFileProcessor();
 
-      // Original file processing logic follows
-      if (!fileResult.success || !fileResult.result) {
-        errorCount++;
-        const errorMessage = fileResult.error ?? 'Unknown error';
-        errors.push(`${relativePath}: ${errorMessage}`);
-        // Log parsing failures for server-side visibility
-        logger.warn('File parsing failed during directory parse', {
-          filePath: fileResult.filePath,
-          directory: resolvedPath,
-          error: errorMessage,
-        });
-        continue;
-      }
-
-      // Process file to store in database
       try {
-        const storeResult = await processor.processFile({
-          filePath: fileResult.filePath,
+        // Process entire project at once for cross-file relationship resolution
+        const tsResult = tsMorphProcessor.processProject({
+          projectPath: resolvedPath,
           db,
+          // Use default exclusions from ts-morph-project-parser
         });
 
-        if (storeResult.success) {
-          successCount++;
+        if (tsResult.success) {
+          successCount += tsResult.stats?.filesScanned ?? tsJsFiles.length;
           // Collect entities (excluding file entities) and relationships
-          allEntities.push(...storeResult.entities.filter(e => e.type !== 'file'));
-          allRelationships.push(...storeResult.relationships);
+          allEntities.push(...tsResult.entities.filter(e => e.type !== 'file'));
+          allRelationships.push(...tsResult.relationships);
+
+          logger.info('TypeScript/JavaScript files processed with ts-morph', {
+            directory: resolvedPath,
+            filesScanned: tsResult.stats?.filesScanned,
+            entitiesFound: tsResult.entities.length,
+            relationshipsFound: tsResult.relationships.length,
+          });
         } else {
-          errorCount++;
-          const errorMessage = storeResult.error ?? 'Unknown error';
-          errors.push(`${relativePath}: ${errorMessage}`);
-          // Log storage failures for server-side visibility
-          logger.warn('File storage failed during directory parse', {
-            filePath: fileResult.filePath,
+          // ts-morph processing failed - count all TS/JS files as errors
+          errorCount += tsJsFiles.length;
+          const errorMessage = tsResult.error ?? 'Unknown ts-morph error';
+          errors.push(`TypeScript/JavaScript processing: ${errorMessage}`);
+          logger.error('ts-morph processing failed', {
             directory: resolvedPath,
             error: errorMessage,
           });
         }
       } catch (err) {
-        errorCount++;
+        errorCount += tsJsFiles.length;
         const errorMsg = err instanceof Error ? err.message : String(err);
-        errors.push(`${relativePath}: ${errorMsg}`);
-        // Log unexpected errors for server-side visibility
-        logger.error('Unexpected error processing file during directory parse', {
-          filePath: fileResult.filePath,
+        errors.push(`TypeScript/JavaScript processing: ${errorMsg}`);
+        logger.error('Unexpected error during ts-morph processing', {
           directory: resolvedPath,
           error: errorMsg,
         });
+      }
+    }
+
+    // Phase 2: Process Ruby files with tree-sitter (file by file)
+    // Ruby files are processed individually since tree-sitter doesn't support cross-file resolution
+    if (rubyFiles.length > 0) {
+      await sendProgress(extra, tsJsFiles.length, totalFiles, `Processing ${String(rubyFiles.length)} Ruby files with tree-sitter...`);
+
+      for (let i = 0; i < rubyFiles.length; i++) {
+        const fileResult = rubyFiles[i];
+        if (!fileResult) continue;
+
+        const relativePath = path.relative(resolvedPath, fileResult.filePath);
+        const currentProgress = tsJsFiles.length + i + 1;
+        await sendProgress(extra, currentProgress, totalFiles, `Processing Ruby: ${relativePath}`);
+
+        // Skip files that failed to parse during directory scan
+        if (!fileResult.success || !fileResult.result) {
+          errorCount++;
+          const errorMessage = fileResult.error ?? 'Unknown error';
+          errors.push(`${relativePath}: ${errorMessage}`);
+          logger.warn('Ruby file parsing failed during directory parse', {
+            filePath: fileResult.filePath,
+            directory: resolvedPath,
+            error: errorMessage,
+          });
+          continue;
+        }
+
+        // Process Ruby file to store in database
+        try {
+          const storeResult = await processor.processFile({
+            filePath: fileResult.filePath,
+            db,
+          });
+
+          if (storeResult.success) {
+            successCount++;
+            allEntities.push(...storeResult.entities.filter(e => e.type !== 'file'));
+            allRelationships.push(...storeResult.relationships);
+          } else {
+            errorCount++;
+            const errorMessage = storeResult.error ?? 'Unknown error';
+            errors.push(`${relativePath}: ${errorMessage}`);
+            logger.warn('Ruby file storage failed during directory parse', {
+              filePath: fileResult.filePath,
+              directory: resolvedPath,
+              error: errorMessage,
+            });
+          }
+        } catch (err) {
+          errorCount++;
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          errors.push(`${relativePath}: ${errorMsg}`);
+          logger.error('Unexpected error processing Ruby file during directory parse', {
+            filePath: fileResult.filePath,
+            directory: resolvedPath,
+            error: errorMsg,
+          });
+        }
       }
     }
 
@@ -280,7 +365,9 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
     if (pattern) {
       lines.push(`Pattern: ${pattern}`);
     }
-    lines.push(`Total Files: ${String(files.length)}`);
+    lines.push(`Total Files: ${String(totalFiles)}`);
+    lines.push(`  TypeScript/JavaScript: ${String(tsJsFiles.length)} (ts-morph with cross-file resolution)`);
+    lines.push(`  Ruby: ${String(rubyFiles.length)} (tree-sitter)`);
     lines.push(`Successful: ${String(successCount)}`);
     lines.push(`Errors: ${String(errorCount)}`);
     lines.push('');

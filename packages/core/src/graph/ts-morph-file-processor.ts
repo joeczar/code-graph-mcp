@@ -206,6 +206,9 @@ export class TsMorphFileProcessor {
 
         // Store relationships with cross-file resolution
         // Two-phase resolution: local lookup first, then database fallback
+        // Track seen relationships to prevent duplicates (same source, target, type)
+        const seenRelationships = new Set<string>();
+
         for (const rel of relationships) {
           let sourceId: string | undefined;
           let targetId: string | undefined;
@@ -245,6 +248,14 @@ export class TsMorphFileProcessor {
           if (!sourceId || !targetId) {
             continue;
           }
+
+          // Deduplicate relationships (same source, target, type)
+          // This prevents UNIQUE constraint violations in the database
+          const relationshipKey = `${sourceId}:${targetId}:${rel.type}`;
+          if (seenRelationships.has(relationshipKey)) {
+            continue;
+          }
+          seenRelationships.add(relationshipKey);
 
           const stored = relationshipStore.create({
             sourceId,
