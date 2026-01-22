@@ -37,11 +37,11 @@ async function sendProgress(
 ): Promise<void> {
   // Always log to console for visibility
   const percent = total > 0 ? Math.round((current / total) * 100) : 0;
-  logger.info(`[parse_directory] Progress: ${current}/${total} (${percent}%) - ${message}`);
+  logger.info(`[parse_directory] Progress: ${String(current)}/${String(total)} (${String(percent)}%) - ${message}`);
 
   // Send MCP progress notification if client provided a progress token
   const progressToken = extra?._meta?.progressToken;
-  if (progressToken && extra?.sendNotification) {
+  if (extra?.sendNotification && progressToken) {
     try {
       await extra.sendNotification({
         method: 'notifications/progress',
@@ -198,7 +198,7 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
 
     // Report how many files were found
     const totalFiles = files.length;
-    await sendProgress(extra, 0, totalFiles, `Found ${totalFiles} files to process`);
+    await sendProgress(extra, 0, totalFiles, `Found ${String(totalFiles)} files to process`);
 
     // Now store each successfully parsed file in the database
     let successCount = 0;
@@ -270,7 +270,7 @@ export const parseDirectoryTool: ToolDefinition<typeof parseDirectoryInputSchema
       extra,
       totalFiles,
       totalFiles,
-      `Completed: ${successCount} successful, ${errorCount} errors`
+      `Completed: ${String(successCount)} successful, ${String(errorCount)} errors`
     );
 
     // Format success response
