@@ -441,8 +441,16 @@ function resolveCallTarget(
         }
       }
     }
-  } catch {
-    // Resolution failed - fall through to next pass
+  } catch (error) {
+    // Type resolution failed - fall through to next pass
+    // This is expected for dynamic calls, external libraries, etc.
+    // Log at debug level for troubleshooting resolution issues
+    if (process.env['DEBUG_CODE_GRAPH']) {
+      console.debug(
+        `[resolveCallTarget] Pass 1 failed for "${calledName}" in ${currentFilePath}:`,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
   }
 
   // PASS 2: Check import map for this symbol

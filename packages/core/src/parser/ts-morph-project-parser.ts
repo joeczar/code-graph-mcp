@@ -26,12 +26,6 @@ export interface ProjectParseOptions {
   projectPath: string;
 
   /**
-   * Optional glob patterns to include (e.g., ['src/**\/*.ts'])
-   * If not provided, all .ts, .tsx, .js, .jsx, .vue files are included
-   */
-  include?: string[];
-
-  /**
    * Glob patterns to exclude (e.g., ['**\/node_modules/**', '**\/__tests__/**'])
    * Defaults to common exclusions
    */
@@ -90,11 +84,24 @@ const DEFAULT_EXCLUDE_PATTERNS = [
  * @param exclude - Patterns to exclude
  * @returns Array of absolute file paths
  */
+/** Supported source file extensions */
+const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.vue']);
+
+/**
+ * Convert a glob pattern to a regex pattern.
+ * Properly escapes regex metacharacters before converting glob wildcards.
+ */
+function globToRegex(pattern: string): RegExp {
+  // First, escape regex metacharacters (except * which we handle specially)
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+  // Then convert glob patterns: ** matches anything, * matches non-slash characters
+  const regexPattern = escaped.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*');
+  return new RegExp(regexPattern);
+}
+
 function findSourceFiles(dir: string, exclude: string[]): string[] {
   const files: string[] = [];
-  const excludePatterns = exclude.map((pattern) =>
-    new RegExp(pattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*'))
-  );
+  const excludePatterns = exclude.map(globToRegex);
 
   function shouldExclude(path: string): boolean {
     return excludePatterns.some((pattern) => pattern.test(path));
@@ -116,20 +123,25 @@ function findSourceFiles(dir: string, exclude: string[]): string[] {
         let stat;
         try {
           stat = statSync(fullPath);
-        } catch {
-          continue; // Skip files we can't stat
+        } catch (error) {
+          // Skip files we can't stat (permissions, symlink loops, etc.)
+          if (process.env['DEBUG_CODE_GRAPH']) {
+            console.debug(
+              `[findSourceFiles] Skipping ${fullPath}:`,
+              error instanceof Error ? error.message : String(error)
+            );
+          }
+          continue;
         }
 
         if (stat.isDirectory()) {
           walk(fullPath);
-        } else if (
-          fullPath.endsWith('.ts') ||
-          fullPath.endsWith('.tsx') ||
-          fullPath.endsWith('.js') ||
-          fullPath.endsWith('.jsx') ||
-          fullPath.endsWith('.vue')
-        ) {
-          files.push(fullPath);
+        } else {
+          // Check if file has a supported source extension
+          const ext = fullPath.slice(fullPath.lastIndexOf('.'));
+          if (SOURCE_EXTENSIONS.has(ext)) {
+            files.push(fullPath);
+          }
         }
       }
     } catch (error) {
