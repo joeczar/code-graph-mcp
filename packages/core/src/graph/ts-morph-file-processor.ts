@@ -1,5 +1,4 @@
 import type Database from 'better-sqlite3';
-import { createHash } from 'node:crypto';
 import { type Entity, type NewEntity, createEntityStore } from '../db/entities.js';
 import {
   type Relationship,
