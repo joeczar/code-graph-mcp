@@ -26,12 +26,20 @@ export interface TsMorphEntity extends NewEntity {
 
 /**
  * Relationship between entities (by name, not ID).
+ *
+ * Optional file path fields enable cross-file relationship resolution:
+ * - When provided, allows database lookup for entities in other files
+ * - When absent, falls back to local-only resolution (current file)
  */
 export interface TsMorphRelationship {
   sourceName: string;
   targetName: string;
   type: 'calls' | 'imports' | 'exports' | 'extends' | 'implements';
   metadata?: Record<string, unknown>;
+  /** File path where the target entity is defined (for cross-file resolution) */
+  targetFilePath?: string;
+  /** File path where the source entity is defined (for cross-file resolution) */
+  sourceFilePath?: string;
 }
 
 /**

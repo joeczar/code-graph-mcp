@@ -21,26 +21,39 @@ type EntityType = NewEntity['type'];
 /**
  * Relationship with entity names instead of database IDs.
  * Names are resolved to IDs during storage.
+ *
+ * Optional file path fields enable cross-file relationship resolution:
+ * - When provided, allows database lookup for entities in other files
+ * - When absent, falls back to local-only resolution (current file)
  */
 type PendingRelationship = Omit<NewRelationship, 'sourceId' | 'targetId'> & {
   sourceName: string;
   targetName: string;
+  /** File path where the target entity is defined (for cross-file resolution) */
+  targetFilePath?: string;
+  /** File path where the source entity is defined (for cross-file resolution) */
+  sourceFilePath?: string;
 };
 
 /**
  * Converts an extracted relationship to a pending relationship.
+ * Preserves optional file path fields for cross-file resolution.
  */
 function toPendingRelationship(rel: {
   sourceName: string;
   targetName: string;
   type: PendingRelationship['type'];
   metadata?: Record<string, unknown>;
+  targetFilePath?: string;
+  sourceFilePath?: string;
 }): PendingRelationship {
   return {
     sourceName: rel.sourceName,
     targetName: rel.targetName,
     type: rel.type,
     ...(rel.metadata && { metadata: rel.metadata }),
+    ...(rel.targetFilePath && { targetFilePath: rel.targetFilePath }),
+    ...(rel.sourceFilePath && { sourceFilePath: rel.sourceFilePath }),
   };
 }
 
@@ -208,16 +221,35 @@ export class FileProcessor {
         }
 
         // Store code relationships (resolve names to IDs)
+        // Two-phase resolution: local lookup first, then database fallback for cross-file
         for (const rel of relationships) {
-          const sourceId = entityNameToId.get(rel.sourceName);
-          const targetId = entityNameToId.get(rel.targetName);
+          // Phase 1: Local lookup (fast path - O(1))
+          let sourceId = entityNameToId.get(rel.sourceName);
+          let targetId = entityNameToId.get(rel.targetName);
 
-          // Skip relationships where we can't resolve both entities within this file.
-          // This is acceptable for now since cross-file resolution is future work.
+          // Phase 2: Database fallback for cross-file resolution (when file path provided)
+          // This enables relationships where source or target is in a different file
+          // that was previously parsed and stored in the database.
+          if (!targetId && rel.targetFilePath) {
+            const targetEntity = entityStore.findByNameAndFile(rel.targetName, rel.targetFilePath);
+            if (targetEntity) {
+              targetId = targetEntity.id;
+            }
+          }
+
+          if (!sourceId && rel.sourceFilePath) {
+            const sourceEntity = entityStore.findByNameAndFile(rel.sourceName, rel.sourceFilePath);
+            if (sourceEntity) {
+              sourceId = sourceEntity.id;
+            }
+          }
+
+          // Skip relationships where we can't resolve both entities.
           // Common cases that are skipped:
           // - Calls to external functions/methods (e.g., console.log, Array.map)
           // - Imports from external modules (e.g., 'node:fs', './other-file')
-          // - References to undefined entities in the current file
+          // - References to undefined entities
+          // - Cross-file references where target file hasn't been parsed yet
           if (!sourceId || !targetId) {
             continue;
           }
