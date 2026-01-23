@@ -1,4 +1,4 @@
-import { resolve } from 'node:path';
+import { resolve, isAbsolute } from 'node:path';
 import type { EntityStore } from '../db/entities.js';
 import type { RelationshipStore, RelationshipType } from '../db/relationships.js';
 import type { AffectedEntity, BlastRadiusResult } from './types.js';
@@ -43,11 +43,32 @@ export function blastRadius(
   relationshipStore: RelationshipStore,
   maxDepth = 5
 ): BlastRadiusResult {
-  // Resolve relative path to absolute
-  const absolutePath = resolve(filePath);
+  // Try multiple path resolution strategies to find entities:
+  // 1. Try path as-is (works for relative paths stored in DB)
+  // 2. If not found and path is relative, try resolving to absolute
+  // 3. If still not found, try matching files that end with the given path
+  let sourceEntities = entityStore.findByFile(filePath);
 
-  // Find all entities in the target file
-  const sourceEntities = entityStore.findByFile(absolutePath);
+  if (sourceEntities.length === 0 && !isAbsolute(filePath)) {
+    // Try resolving to absolute path
+    const absolutePath = resolve(filePath);
+    sourceEntities = entityStore.findByFile(absolutePath);
+  }
+
+  if (sourceEntities.length === 0) {
+    // Try matching files that end with the given path (handles partial paths)
+    const allEntities = entityStore.getAll();
+    const matchingFiles = new Set<string>();
+    for (const entity of allEntities) {
+      if (entity.filePath.endsWith(filePath) || entity.filePath.endsWith('/' + filePath)) {
+        matchingFiles.add(entity.filePath);
+      }
+    }
+    if (matchingFiles.size === 1) {
+      // Unique match found
+      sourceEntities = entityStore.findByFile([...matchingFiles][0]!);
+    }
+  }
 
   if (sourceEntities.length === 0) {
     return {
