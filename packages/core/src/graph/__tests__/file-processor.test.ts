@@ -380,10 +380,10 @@ describe('FileProcessor', () => {
   });
 
   describe('Transaction rollback', () => {
-    it('returns error and empty results if transaction fails', async () => {
+    it('re-parsing same file cleans up and replaces data correctly', async () => {
       const filePath = join(fixturesDir, 'sample.ts');
 
-      // Create a constraint that will be violated during entity insertion
+      // Create a constraint that would fail if we didn't clean up first
       // Add a UNIQUE constraint on (name, file_path) combination
       db.exec('CREATE UNIQUE INDEX idx_unique_name_file ON entities(name, file_path)');
 
@@ -395,23 +395,21 @@ describe('FileProcessor', () => {
       const initialEntityCount = result1.entities.length;
       const initialRelationshipCount = result1.relationships.length;
 
-      // Second insert of same file should fail due to UNIQUE constraint
+      // Second insert of same file should succeed because we clean up first
       const result2 = await processor.processFile({ filePath, db });
 
-      expect(result2.success).toBe(false);
-      expect(result2.error).toBeDefined();
-      expect(result2.error).toContain('Database transaction failed');
-      expect(result2.entities).toEqual([]);
-      expect(result2.relationships).toEqual([]);
+      expect(result2.success).toBe(true);
+      expect(result2.entities.length).toBe(initialEntityCount);
+      expect(result2.relationships.length).toBe(initialRelationshipCount);
 
-      // Verify database still contains only the first set of data (no partial writes)
+      // Verify database contains exactly one set of data (not duplicates)
       const entityStore = createEntityStore(db);
       const relationshipStore = createRelationshipStore(db);
 
       const storedEntities = entityStore.findByFile(filePath);
       const totalRelationships = relationshipStore.count();
 
-      // Should still have exactly the original count, not double
+      // Should have exactly the same count, not double
       expect(storedEntities.length).toBe(initialEntityCount);
       expect(totalRelationships).toBe(initialRelationshipCount);
     });

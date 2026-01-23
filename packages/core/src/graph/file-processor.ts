@@ -189,6 +189,10 @@ export class FileProcessor {
     try {
       // Wrap database operations in a transaction for atomicity
       const transaction = db.transaction(() => {
+        // Clean up existing data for this file before re-parsing.
+        // Relationships are automatically deleted via ON DELETE CASCADE.
+        entityStore.deleteByFile(filePath);
+
         // Create File entity first
         const fileEntity: NewEntity = {
           type: 'file',
