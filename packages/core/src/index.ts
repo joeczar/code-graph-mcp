@@ -146,6 +146,7 @@ export {
   blastRadius,
   getExports,
   findDeadCode,
+  findCircularDependencies,
 } from './queries/index.js';
 export type {
   RelationDirection,
@@ -159,4 +160,6 @@ export type {
   DeadCodeSummary,
   DeadCodeResult,
   DeadCodeOptions,
+  DependencyCycle,
+  CircularDependencyResult,
 } from './queries/index.js';
