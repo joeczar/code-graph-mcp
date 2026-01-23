@@ -125,7 +125,8 @@ describe('findEntityTool', () => {
       expect(response.isError).toBeUndefined();
       const text = response.content[0]?.text ?? '';
 
-      expect(text).toContain('Found 1 entity:');
+      expect(text).toContain('Results:');
+      expect(text).toContain('Total: 1 entity found');
       expect(text).toContain('process (function)');
       expect(text).toContain('/main.ts:1-5');
       expect(text).not.toContain('processData');
@@ -170,7 +171,7 @@ describe('findEntityTool', () => {
       expect(response.isError).toBeUndefined();
       const text = response.content[0]?.text ?? '';
 
-      expect(text).toContain('Found 2 entities:');
+      expect(text).toContain('Total: 2 entities found');
       expect(text).toContain('processData');
       expect(text).toContain('processFoo');
       expect(text).not.toContain('handleProcess');
@@ -215,7 +216,7 @@ describe('findEntityTool', () => {
       expect(response.isError).toBeUndefined();
       const text = response.content[0]?.text ?? '';
 
-      expect(text).toContain('Found 2 entities:');
+      expect(text).toContain('Total: 2 entities found');
       expect(text).toContain('processData');
       expect(text).toContain('handleProcess');
       expect(text).not.toContain('render');
@@ -251,7 +252,7 @@ describe('findEntityTool', () => {
       expect(response.isError).toBeUndefined();
       const text = response.content[0]?.text ?? '';
 
-      expect(text).toContain('Found 1 entity:');
+      expect(text).toContain('Total: 1 entity found');
       expect(text).toContain('test (function)');
       expect(text).not.toContain('TestClass');
     });
@@ -286,7 +287,7 @@ describe('findEntityTool', () => {
       expect(response.isError).toBeUndefined();
       const text = response.content[0]?.text ?? '';
 
-      expect(text).toContain('Found 1 entity:');
+      expect(text).toContain('Total: 1 entity found');
       expect(text).toContain('fn1 (function)');
       expect(text).toContain('/utils.ts:1-10');
       expect(text).not.toContain('fn2');
@@ -323,7 +324,7 @@ describe('findEntityTool', () => {
       expect(response.isError).toBeUndefined();
       const text = response.content[0]?.text ?? '';
 
-      expect(text).toContain('Found 1 entity:');
+      expect(text).toContain('Total: 1 entity found');
       expect(text).toContain('processData (function)');
       expect(text).not.toContain('ProcessHandler');
     });
@@ -349,7 +350,7 @@ describe('findEntityTool', () => {
       expect(response.isError).toBeUndefined();
       const text = response.content[0]?.text ?? '';
 
-      expect(text).toContain('Found 1 entity:');
+      expect(text).toContain('Total: 1 entity found');
       expect(text).toContain('ProcessData');
     });
 
@@ -397,7 +398,7 @@ describe('findEntityTool', () => {
       expect(response.isError).toBeUndefined();
       const text = response.content[0]?.text ?? '';
 
-      expect(text).toContain('Found 2 entities:');
+      expect(text).toContain('Total: 2 entities found');
       expect(text).toContain('fn1 (function)');
       expect(text).toContain('Class1 (class)');
     });
@@ -433,6 +434,47 @@ describe('findEntityTool', () => {
 
       expect(text).toContain('1. fn');
       expect(text).toContain('2. fn');
+    });
+
+    it('should deduplicate entities with identical logical identity', async () => {
+      const db = getDatabase();
+      const entityStore = createEntityStore(db);
+
+      // Create first entity
+      entityStore.create({
+        type: 'function',
+        name: 'duplicateFunc',
+        filePath: '/test.ts',
+        startLine: 1,
+        endLine: 10,
+        language: 'typescript',
+      });
+
+      // Create duplicate entity (same name, file, line - different ID)
+      // This simulates what happens when a file is parsed multiple times
+      entityStore.create({
+        type: 'function',
+        name: 'duplicateFunc',
+        filePath: '/test.ts',
+        startLine: 1,
+        endLine: 10,
+        language: 'typescript',
+      });
+
+      const response = await findEntityTool.handler({
+        namePattern: 'duplicateFunc',
+        matchMode: 'exact',
+      });
+
+      expect(response.isError).toBeUndefined();
+      const text = response.content[0]?.text ?? '';
+
+      // Should deduplicate and show only one entity
+      expect(text).toContain('Total: 1 entity found');
+      expect(text).toContain('duplicateFunc (function)');
+      // Should have "1." but not "2."
+      expect(text).toContain('1. duplicateFunc');
+      expect(text).not.toContain('2. duplicateFunc');
     });
   });
 });

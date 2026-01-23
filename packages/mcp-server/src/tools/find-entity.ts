@@ -111,9 +111,9 @@ export const findEntityTool: ToolDefinition<typeof findEntityInputSchema> = {
 
     const queryStr = queryParts.length > 0 ? `Query: ${queryParts.join(', ')}\n\n` : '';
 
-    // Format output using shared helper
+    // Format output using shared helper (handles deduplication internally)
     const listOutput = formatEntityList(entities, {
-      title: `Found ${entities.length.toString()} ${entities.length === 1 ? 'entity' : 'entities'}:`,
+      title: 'Results:',
       emptyMessage: 'No entities found.',
       itemLabel: 'entity',
     });
