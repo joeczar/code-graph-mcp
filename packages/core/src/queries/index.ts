@@ -24,3 +24,8 @@ export type {
   DeadCodeResult,
   DeadCodeOptions,
 } from './deadCodeDetection.js';
+export { findCircularDependencies } from './circularDependencies.js';
+export type {
+  DependencyCycle,
+  CircularDependencyResult,
+} from './circularDependencies.js';

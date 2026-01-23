@@ -20,6 +20,7 @@ import { parseDirectoryTool } from './tools/parse-directory.js';
 import { parseDirectoryStartTool } from './tools/parse-directory-start.js';
 import { parseDirectoryStatusTool } from './tools/parse-directory-status.js';
 import { findDeadCodeTool } from './tools/find-dead-code.js';
+import { circularDependenciesTool } from './tools/circular-dependencies.js';
 import { createErrorResponse, type ToolDefinition } from './tools/types.js';
 import { logger } from './tools/logger.js';
 import { instrumentHandler } from './tools/instrument.js';
@@ -160,6 +161,7 @@ export function createServer(): McpServer {
   registerTool(server, parseDirectoryStartTool, metricsStore, projectId);
   registerTool(server, parseDirectoryStatusTool, metricsStore, projectId);
   registerTool(server, findDeadCodeTool, metricsStore, projectId);
+  registerTool(server, circularDependenciesTool, metricsStore, projectId);
 
   return server;
 }
