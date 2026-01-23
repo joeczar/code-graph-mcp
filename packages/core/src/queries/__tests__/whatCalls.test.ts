@@ -132,25 +132,25 @@ describe('whatCalls', () => {
     expect(result).toEqual([]);
   });
 
-  it('should filter to only "calls" relationships', () => {
-    // Create target class
+  it('should include extends relationships as dependencies', () => {
+    // Create target class (parent/base class)
     const targetClass = entityStore.create({
       type: 'class',
-      name: 'BaseService',
-      filePath: '/src/base.ts',
+      name: 'ApplicationController',
+      filePath: '/app/controllers/application_controller.rb',
       startLine: 1,
       endLine: 20,
-      language: 'typescript',
+      language: 'ruby',
     });
 
-    // Create extending class
+    // Create extending class (child class that depends on parent)
     const extendingClass = entityStore.create({
       type: 'class',
-      name: 'UserService',
-      filePath: '/src/users.ts',
+      name: 'UsersController',
+      filePath: '/app/controllers/users_controller.rb',
       startLine: 1,
       endLine: 30,
-      language: 'typescript',
+      language: 'ruby',
     });
 
     // Create calling function
@@ -163,25 +163,95 @@ describe('whatCalls', () => {
       language: 'typescript',
     });
 
-    // Create 'extends' relationship (should be excluded)
+    // Create 'extends' relationship (should be included - child depends on parent)
     relStore.create({
       sourceId: extendingClass.id,
       targetId: targetClass.id,
       type: 'extends',
     });
 
-    // Create 'calls' relationship (should be included)
+    // Create 'calls' relationship (should also be included)
     relStore.create({
       sourceId: callingFunction.id,
       targetId: targetClass.id,
       type: 'calls',
     });
 
-    // Query for callers - should only return the calling function
-    const result = whatCalls('BaseService', entityStore, relStore);
+    // Query for callers - should return BOTH extending class and calling function
+    const result = whatCalls('ApplicationController', entityStore, relStore);
+
+    expect(result).toHaveLength(2);
+    const names = result.map(e => e.name).sort();
+    expect(names).toEqual(['UsersController', 'initServices']);
+  });
+
+  it('should include implements relationships as dependencies', () => {
+    // Create target module
+    const targetModule = entityStore.create({
+      type: 'module',
+      name: 'Authentication',
+      filePath: '/app/concerns/authentication.rb',
+      startLine: 1,
+      endLine: 50,
+      language: 'ruby',
+    });
+
+    // Create including class (includes the module)
+    const includingClass = entityStore.create({
+      type: 'class',
+      name: 'UsersController',
+      filePath: '/app/controllers/users_controller.rb',
+      startLine: 1,
+      endLine: 30,
+      language: 'ruby',
+    });
+
+    // Create 'implements' relationship (class includes/extends module)
+    relStore.create({
+      sourceId: includingClass.id,
+      targetId: targetModule.id,
+      type: 'implements',
+    });
+
+    // Query for callers - should return the including class
+    const result = whatCalls('Authentication', entityStore, relStore);
 
     expect(result).toHaveLength(1);
-    expect(result[0]?.name).toBe('initServices');
+    expect(result[0]?.name).toBe('UsersController');
+  });
+
+  it('should exclude imports relationships from callers', () => {
+    // Create target module
+    const targetModule = entityStore.create({
+      type: 'module',
+      name: 'utils',
+      filePath: '/src/utils.ts',
+      startLine: 1,
+      endLine: 50,
+      language: 'typescript',
+    });
+
+    // Create importing file
+    const importingFile = entityStore.create({
+      type: 'file',
+      name: 'main',
+      filePath: '/src/main.ts',
+      startLine: 1,
+      endLine: 100,
+      language: 'typescript',
+    });
+
+    // Create 'imports' relationship (should NOT be included)
+    relStore.create({
+      sourceId: importingFile.id,
+      targetId: targetModule.id,
+      type: 'imports',
+    });
+
+    // Query for callers - should be empty since imports are not dependencies
+    const result = whatCalls('utils', entityStore, relStore);
+
+    expect(result).toHaveLength(0);
   });
 
   it('should handle multiple entities with the same name', () => {
