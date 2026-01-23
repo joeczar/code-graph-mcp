@@ -89,7 +89,6 @@ function forEachChild(node: SyntaxNode, callback: (child: SyntaxNode) => void): 
   }
 }
 
-
 export interface ProcessFileOptions {
   filePath: string;
   db: Database.Database;
@@ -260,7 +259,9 @@ export class FileProcessor {
             type: rel.type,
             ...(rel.metadata && { metadata: rel.metadata }),
           });
-          storedRelationships.push(stored);
+          if (stored) {
+            storedRelationships.push(stored);
+          }
         }
 
         // Create contains relationships from File to all code entities
@@ -271,7 +272,9 @@ export class FileProcessor {
             targetId: codeEntity.id,
             type: 'contains',
           });
-          storedRelationships.push(containsRel);
+          if (containsRel) {
+            storedRelationships.push(containsRel);
+          }
         }
       });
 

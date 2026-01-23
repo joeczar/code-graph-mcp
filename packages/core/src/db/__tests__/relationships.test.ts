@@ -56,10 +56,11 @@ describe('RelationshipStore', () => {
     it('creates a relationship with generated id', () => {
       const rel = store.create(createSampleRelationship());
 
-      expect(rel.id).toBeDefined();
-      expect(rel.sourceId).toBe(sourceId);
-      expect(rel.targetId).toBe(targetId);
-      expect(rel.type).toBe('calls');
+      expect(rel).not.toBeNull();
+      expect(rel?.id).toBeDefined();
+      expect(rel?.sourceId).toBe(sourceId);
+      expect(rel?.targetId).toBe(targetId);
+      expect(rel?.type).toBe('calls');
     });
 
     it('stores metadata as JSON', () => {
@@ -68,18 +69,25 @@ describe('RelationshipStore', () => {
         metadata: { isAsync: true, lineNumber: 42 },
       });
 
-      expect(rel.metadata).toEqual({ isAsync: true, lineNumber: 42 });
+      expect(rel).not.toBeNull();
+      expect(rel?.metadata).toEqual({ isAsync: true, lineNumber: 42 });
     });
 
     it('sets createdAt timestamp', () => {
       const rel = store.create(createSampleRelationship());
-      expect(rel.createdAt).toBeDefined();
+      expect(rel).not.toBeNull();
+      expect(rel?.createdAt).toBeDefined();
     });
 
-    it('enforces unique constraint on source, target, type', () => {
-      store.create(createSampleRelationship());
+    it('silently ignores duplicate relationships', () => {
+      const first = store.create(createSampleRelationship());
+      expect(first).not.toBeNull();
 
-      expect(() => store.create(createSampleRelationship())).toThrow();
+      const duplicate = store.create(createSampleRelationship());
+      expect(duplicate).toBeNull();
+
+      // Verify only one relationship exists
+      expect(store.count()).toBe(1);
     });
 
     it('throws error when source entity does not exist', () => {
@@ -218,6 +226,9 @@ describe('RelationshipStore', () => {
   describe('findById', () => {
     it('finds an existing relationship', () => {
       const created = store.create(createSampleRelationship());
+      expect(created).not.toBeNull();
+      if (!created) return;
+
       const found = store.findById(created.id);
 
       expect(found).not.toBeNull();
@@ -308,6 +319,9 @@ describe('RelationshipStore', () => {
   describe('delete', () => {
     it('deletes an existing relationship', () => {
       const created = store.create(createSampleRelationship());
+      expect(created).not.toBeNull();
+      if (!created) return;
+
       const deleted = store.delete(created.id);
 
       expect(deleted).toBe(true);

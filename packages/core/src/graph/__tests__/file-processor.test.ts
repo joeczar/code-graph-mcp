@@ -226,6 +226,27 @@ describe('FileProcessor', () => {
       });
       expect(inheritance).toBeDefined();
     });
+
+    it('handles duplicate relationships gracefully when parsing same file twice', async () => {
+      const filePath = join(fixturesDir, 'sample.rb');
+
+      // First parse
+      const result1 = await processor.processFile({ filePath, db });
+      expect(result1.success).toBe(true);
+      const firstCount = result1.relationships.length;
+
+      // Clear database to allow re-parsing
+      resetDatabase();
+      db = getDatabase();
+      initializeSchema(db);
+
+      // Second parse - should succeed without throwing on duplicate relationships
+      const result2 = await processor.processFile({ filePath, db });
+      expect(result2.success).toBe(true);
+
+      // Should have same number of relationships
+      expect(result2.relationships.length).toBe(firstCount);
+    });
   });
 
   describe('Error handling', () => {

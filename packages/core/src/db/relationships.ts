@@ -55,7 +55,12 @@ function rowToRelationship(row: RelationshipRow): Relationship {
 }
 
 export interface RelationshipStore {
-  create(rel: NewRelationship): Relationship;
+  /**
+   * Create a new relationship. Uses INSERT OR IGNORE to silently skip duplicates.
+   * Returns the created relationship, or null if it was a duplicate.
+   * Duplicates are identified by unique constraint on (source_id, target_id, type).
+   */
+  create(rel: NewRelationship): Relationship | null;
   /**
    * Batch insert multiple relationships at once using INSERT OR IGNORE.
    * Significantly faster than individual inserts for bulk operations.
@@ -75,12 +80,7 @@ export interface RelationshipStore {
 }
 
 export function createRelationshipStore(db: Database.Database): RelationshipStore {
-  const insertStmt = db.prepare(`
-    INSERT INTO relationships (id, source_id, target_id, type, metadata)
-    VALUES (?, ?, ?, ?, ?)
-  `);
-
-  // INSERT OR IGNORE for batch operations - silently skips duplicates
+  // INSERT OR IGNORE for both single and batch operations - silently skips duplicates
   const insertIgnoreStmt = db.prepare(`
     INSERT OR IGNORE INTO relationships (id, source_id, target_id, type, metadata)
     VALUES (?, ?, ?, ?, ?)
@@ -109,11 +109,16 @@ export function createRelationshipStore(db: Database.Database): RelationshipStor
   );
 
   return {
-    create(rel: NewRelationship): Relationship {
+    create(rel: NewRelationship): Relationship | null {
       const id = randomUUID();
       const metadata = rel.metadata ? JSON.stringify(rel.metadata) : null;
 
-      insertStmt.run(id, rel.sourceId, rel.targetId, rel.type, metadata);
+      const result = insertIgnoreStmt.run(id, rel.sourceId, rel.targetId, rel.type, metadata);
+
+      // If changes is 0, the relationship was a duplicate and was ignored
+      if (result.changes === 0) {
+        return null;
+      }
 
       const created = selectByIdStmt.get(id) as RelationshipRow;
       return rowToRelationship(created);
