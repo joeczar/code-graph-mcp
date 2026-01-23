@@ -253,6 +253,30 @@ export function findCircularDependencies(
     );
   }
 
+  // Deduplicate cycles by entity name+path (defense against duplicate entities with different IDs)
+  const seenLogicalCycles = new Set<string>();
+  resultCycles = resultCycles.filter((cycle) => {
+    // Create a canonical signature using entity names and paths
+    const entityKeys = cycle.entities.map((e) => `${e.filePath}:${e.name}`);
+    // Normalize by rotating to start with the smallest key
+    let minIndex = 0;
+    for (let i = 1; i < entityKeys.length; i++) {
+      const current = entityKeys[i];
+      const min = entityKeys[minIndex];
+      if (current !== undefined && min !== undefined && current < min) {
+        minIndex = i;
+      }
+    }
+    const rotated = [...entityKeys.slice(minIndex), ...entityKeys.slice(0, minIndex)];
+    const signature = rotated.join('->');
+
+    if (seenLogicalCycles.has(signature)) {
+      return false;
+    }
+    seenLogicalCycles.add(signature);
+    return true;
+  });
+
   // Calculate statistics
   const uniqueEntityIds = new Set<string>();
   let shortestCycle = 0;
