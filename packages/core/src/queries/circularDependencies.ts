@@ -123,6 +123,12 @@ function dfs(
 
     const targetId = rel.targetId;
 
+    // Skip self-referential relationships (A -> A)
+    // These are not meaningful cycles and are often false positives
+    if (targetId === entityId) {
+      continue;
+    }
+
     // Back edge found - we have a cycle!
     if (state.recursionStack.has(targetId)) {
       // Extract the cycle from currentPath
