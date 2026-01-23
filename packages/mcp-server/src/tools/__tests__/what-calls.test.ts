@@ -280,5 +280,70 @@ describe('whatCallsTool', () => {
       expect(text).toContain('caller2');
       expect(text).toContain('Total: 2 callers found');
     });
+
+    it('should deduplicate callers with identical logical identity', async () => {
+      const db = getDatabase();
+      const entityStore = createEntityStore(db);
+      const relationshipStore = createRelationshipStore(db);
+
+      // Create target entity
+      const target = entityStore.create({
+        type: 'function',
+        name: 'targetFunc',
+        filePath: '/target.ts',
+        startLine: 1,
+        endLine: 5,
+        language: 'typescript',
+      });
+
+      // Create a caller entity
+      const caller = entityStore.create({
+        type: 'function',
+        name: 'callerFunc',
+        filePath: '/caller.ts',
+        startLine: 10,
+        endLine: 20,
+        language: 'typescript',
+      });
+
+      // Create a duplicate caller entity (same name, file, line - different ID)
+      // This simulates what happens when a file is parsed multiple times
+      const duplicateCaller = entityStore.create({
+        type: 'function',
+        name: 'callerFunc',
+        filePath: '/caller.ts',
+        startLine: 10,
+        endLine: 20,
+        language: 'typescript',
+      });
+
+      // Create call relationships from both (simulating duplicate relationships)
+      relationshipStore.create({
+        sourceId: caller.id,
+        targetId: target.id,
+        type: 'calls',
+      });
+
+      // This might fail due to unique constraint, but the test is about deduplication
+      // of the entity results, not the relationship creation
+      try {
+        relationshipStore.create({
+          sourceId: duplicateCaller.id,
+          targetId: target.id,
+          type: 'calls',
+        });
+      } catch {
+        // Ignore if unique constraint fails - the duplicate entity still exists
+      }
+
+      const response = await whatCallsTool.handler({ name: 'targetFunc' });
+
+      expect(response.isError).toBeUndefined();
+      const text = response.content[0]?.text ?? '';
+
+      // Should deduplicate and show only one caller
+      expect(text).toContain('callerFunc');
+      expect(text).toContain('Total: 1 caller found');
+    });
   });
 });
