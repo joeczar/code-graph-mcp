@@ -49,3 +49,4 @@ export { parseFileTool } from './parse-file.js';
 export { parseDirectoryTool } from './parse-directory.js';
 export { parseDirectoryStartTool } from './parse-directory-start.js';
 export { parseDirectoryStatusTool } from './parse-directory-status.js';
+export { findDeadCodeTool } from './find-dead-code.js';
