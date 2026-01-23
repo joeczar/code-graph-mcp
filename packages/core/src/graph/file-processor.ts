@@ -12,6 +12,7 @@ import { TypeScriptRelationshipExtractor } from '../parser/extractors/typescript
 import { RubyRelationshipExtractor } from '../parser/extractors/ruby-relationships.js';
 import { VueRelationshipExtractor } from '../parser/extractors/vue-relationships.js';
 import { RubyExtractor } from '../parser/extractors/ruby.js';
+import { VueExtractor } from '../parser/extractors/vue.js';
 import { RubyLSPParser, RubyLSPNotAvailableError } from '../parser/ruby-lsp-parser.js';
 
 type SyntaxNode = Tree['rootNode'];
@@ -162,7 +163,7 @@ export class FileProcessor {
     const totalLines = sourceCode.split('\n').length;
 
     // Step 4: Extract entities and relationships
-    const entities = this.extractEntities(tree.rootNode, filePath, language);
+    const entities = await this.extractEntities(tree.rootNode, filePath, language);
     const relationships = await this.extractRelationships(
       tree.rootNode,
       language,
@@ -306,11 +307,11 @@ export class FileProcessor {
    *
    * Simplified implementation - will be replaced with dedicated extractors.
    */
-  private extractEntities(
+  private async extractEntities(
     node: SyntaxNode,
     filePath: string,
     language: string
-  ): NewEntity[] {
+  ): Promise<NewEntity[]> {
     const entities: NewEntity[] = [];
 
     // TypeScript/JavaScript extraction
@@ -320,6 +321,11 @@ export class FileProcessor {
     // Ruby extraction
     else if (language === 'ruby') {
       this.extractRubyEntities(node, filePath, language, entities);
+    }
+    // Vue extraction
+    else if (language === 'vue') {
+      const vueEntities = await this.extractVueEntities(node, filePath, language);
+      entities.push(...vueEntities);
     }
 
     return entities;
@@ -363,6 +369,19 @@ export class FileProcessor {
     const extractor = new RubyExtractor({ filePath });
     const extracted = extractor.extract(node);
     entities.push(...extracted);
+  }
+
+  /**
+   * Extract Vue entities from AST using dedicated VueExtractor.
+   */
+  private async extractVueEntities(
+    node: SyntaxNode,
+    filePath: string,
+    language: string
+  ): Promise<NewEntity[]> {
+    const extractor = new VueExtractor({ filePath });
+    const extracted = await extractor.extract(node);
+    return extracted;
   }
 
   /**
