@@ -65,8 +65,11 @@ export function blastRadius(
       }
     }
     if (matchingFiles.size === 1) {
-      // Unique match found
-      sourceEntities = entityStore.findByFile([...matchingFiles][0]!);
+      // Unique match found - get the single matching file path
+      for (const matchedPath of matchingFiles) {
+        sourceEntities = entityStore.findByFile(matchedPath);
+        break;
+      }
     }
   }
 
