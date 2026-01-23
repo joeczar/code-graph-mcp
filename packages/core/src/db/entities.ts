@@ -121,7 +121,10 @@ export function createEntityStore(db: Database.Database): EntityStore {
   `);
 
   const selectByIdStmt = db.prepare('SELECT * FROM entities WHERE id = ?');
-  const selectByNameStmt = db.prepare('SELECT * FROM entities WHERE name = ?');
+  // Search by both full name and shortName in metadata (for namespaced classes/modules)
+  const selectByNameStmt = db.prepare(
+    'SELECT * FROM entities WHERE name = ? OR json_extract(metadata, \'$.shortName\') = ?'
+  );
   const selectByFileStmt = db.prepare(
     'SELECT * FROM entities WHERE file_path = ?'
   );
@@ -215,7 +218,8 @@ export function createEntityStore(db: Database.Database): EntityStore {
     },
 
     findByName(name: string): Entity[] {
-      const rows = selectByNameStmt.all(name) as EntityRow[];
+      // Pass name twice to match both full name and shortName in metadata
+      const rows = selectByNameStmt.all(name, name) as EntityRow[];
       return rows.map(rowToEntity);
     },
 
@@ -334,19 +338,27 @@ export function createEntityStore(db: Database.Database): EntityStore {
       const params: unknown[] = [];
 
       // Handle name pattern matching
+      // Also search the 'shortName' field in metadata to support namespaced lookups
+      // (e.g., searching for "SchoolClass" should find "Tools::SchoolClass")
       if (query.namePattern !== undefined) {
         const matchMode = query.matchMode ?? 'contains';
 
         if (matchMode === 'exact') {
-          whereClauses.push('name = ?');
-          params.push(query.namePattern);
+          // Match either the full name OR the shortName in metadata
+          whereClauses.push('(name = ? OR json_extract(metadata, \'$.shortName\') = ?)');
+          params.push(query.namePattern, query.namePattern);
         } else if (matchMode === 'prefix') {
-          whereClauses.push('name LIKE ? || \'%\'');
-          params.push(query.namePattern);
+          // Match if name starts with pattern OR shortName starts with pattern
+          whereClauses.push(
+            '(name LIKE ? || \'%\' OR json_extract(metadata, \'$.shortName\') LIKE ? || \'%\')'
+          );
+          params.push(query.namePattern, query.namePattern);
         } else {
-          // contains
-          whereClauses.push('name LIKE \'%\' || ? || \'%\'');
-          params.push(query.namePattern);
+          // contains - match if name contains pattern OR shortName contains pattern
+          whereClauses.push(
+            '(name LIKE \'%\' || ? || \'%\' OR json_extract(metadata, \'$.shortName\') LIKE \'%\' || ? || \'%\')'
+          );
+          params.push(query.namePattern, query.namePattern);
         }
       }
 
