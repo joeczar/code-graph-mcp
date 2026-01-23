@@ -33,14 +33,7 @@ const findDeadCodeInputSchema = z.object({
  * Format confidence level for display.
  */
 function formatConfidence(confidence: DeadCodeConfidence): string {
-  switch (confidence) {
-    case 'high':
-      return 'HIGH';
-    case 'medium':
-      return 'MEDIUM';
-    case 'low':
-      return 'LOW';
-  }
+  return confidence.toUpperCase();
 }
 
 /**
