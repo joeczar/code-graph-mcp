@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import type { EntityStore } from '../db/entities.js';
 import type { RelationshipStore, RelationshipType } from '../db/relationships.js';
 import type { AffectedEntity, BlastRadiusResult } from './types.js';
@@ -42,8 +43,11 @@ export function blastRadius(
   relationshipStore: RelationshipStore,
   maxDepth = 5
 ): BlastRadiusResult {
+  // Resolve relative path to absolute
+  const absolutePath = resolve(filePath);
+
   // Find all entities in the target file
-  const sourceEntities = entityStore.findByFile(filePath);
+  const sourceEntities = entityStore.findByFile(absolutePath);
 
   if (sourceEntities.length === 0) {
     return {
