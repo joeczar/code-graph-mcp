@@ -1,4 +1,5 @@
 import type { Node } from 'web-tree-sitter';
+import { resolve, dirname } from 'node:path';
 import type { ParseResult } from '../parser.js';
 import { CodeParser } from '../parser.js';
 import {
@@ -60,7 +61,10 @@ export class VueRelationshipExtractor {
     relationships.push(...scriptRelationships);
 
     // Build component import map for cross-file resolution
-    const componentImportMap = this.buildComponentImportMap(scriptRelationships);
+    const componentImportMap = this.buildComponentImportMap(
+      scriptRelationships,
+      parseResult.filePath
+    );
 
     // Extract component relationships from template
     const componentRelationships = this.extractComponentRelationships(
@@ -120,10 +124,11 @@ export class VueRelationshipExtractor {
 
   /**
    * Build a map of component imports for cross-file resolution.
-   * Maps imported component names to their file paths.
+   * Maps imported component names to their absolute file paths.
    */
   private buildComponentImportMap(
-    scriptRelationships: ExtractedRelationship[]
+    scriptRelationships: ExtractedRelationship[],
+    currentFilePath: string | null
   ): Map<string, string> {
     const importMap = new Map<string, string>();
 
@@ -132,7 +137,13 @@ export class VueRelationshipExtractor {
         // Extract the imported component name (default import)
         const importedName = rel.metadata?.['default'] as string | undefined;
         if (importedName) {
-          importMap.set(importedName, rel.targetName);
+          // Resolve relative import path to absolute path
+          let absolutePath = rel.targetName;
+          if (currentFilePath && rel.targetName.startsWith('.')) {
+            const currentDir = dirname(currentFilePath);
+            absolutePath = resolve(currentDir, rel.targetName);
+          }
+          importMap.set(importedName, absolutePath);
         }
       }
     }
