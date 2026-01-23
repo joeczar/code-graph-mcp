@@ -145,6 +145,7 @@ export {
   whatDoesCall,
   blastRadius,
   getExports,
+  findDeadCode,
 } from './queries/index.js';
 export type {
   RelationDirection,
@@ -153,4 +154,9 @@ export type {
   ExportType,
   ExportedEntity,
   GetExportsResult,
+  DeadCodeConfidence,
+  UnusedEntity,
+  DeadCodeSummary,
+  DeadCodeResult,
+  DeadCodeOptions,
 } from './queries/index.js';

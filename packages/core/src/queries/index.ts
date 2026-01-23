@@ -16,3 +16,11 @@ export type {
   ExportedEntity,
   GetExportsResult,
 } from './getExports.js';
+export { findDeadCode } from './deadCodeDetection.js';
+export type {
+  DeadCodeConfidence,
+  UnusedEntity,
+  DeadCodeSummary,
+  DeadCodeResult,
+  DeadCodeOptions,
+} from './deadCodeDetection.js';
