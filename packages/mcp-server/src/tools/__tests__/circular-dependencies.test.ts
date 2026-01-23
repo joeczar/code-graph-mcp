@@ -84,6 +84,18 @@ describe('circularDependenciesTool', () => {
     });
 
     it('should return message when specified entity not found', async () => {
+      // Create some entities first so the graph isn't empty
+      const db = getDatabase();
+      const entityStore = createEntityStore(db);
+      entityStore.create({
+        type: 'function',
+        name: 'existingFunc',
+        filePath: '/exists.ts',
+        startLine: 1,
+        endLine: 5,
+        language: 'typescript',
+      });
+
       const response = await circularDependenciesTool.handler({
         entityName: 'NonExistent',
         maxCycles: 100,
