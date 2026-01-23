@@ -504,4 +504,81 @@ describe('EntityStore', () => {
       expect(results).toHaveLength(2);
     });
   });
+
+  describe('namespaced class lookups', () => {
+    beforeEach(() => {
+      // Create a namespaced class with shortName in metadata
+      store.create({
+        type: 'class',
+        name: 'Tools::SchoolClass',
+        filePath: '/app/models/tools/school_class.rb',
+        startLine: 1,
+        endLine: 50,
+        language: 'ruby',
+        metadata: {
+          shortName: 'SchoolClass',
+          namespace: 'Tools',
+        },
+      });
+
+      // Create a top-level class without namespace
+      store.create({
+        type: 'class',
+        name: 'User',
+        filePath: '/app/models/user.rb',
+        startLine: 1,
+        endLine: 30,
+        language: 'ruby',
+      });
+    });
+
+    it('findByName finds class by qualified name', () => {
+      const results = store.findByName('Tools::SchoolClass');
+
+      expect(results).toHaveLength(1);
+      expect(results[0]?.name).toBe('Tools::SchoolClass');
+    });
+
+    it('findByName finds class by short name', () => {
+      const results = store.findByName('SchoolClass');
+
+      expect(results).toHaveLength(1);
+      expect(results[0]?.name).toBe('Tools::SchoolClass');
+    });
+
+    it('findEntity with exact match finds by qualified name', () => {
+      const results = store.findEntity({ namePattern: 'Tools::SchoolClass', matchMode: 'exact' });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]?.name).toBe('Tools::SchoolClass');
+    });
+
+    it('findEntity with exact match finds by short name', () => {
+      const results = store.findEntity({ namePattern: 'SchoolClass', matchMode: 'exact' });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]?.name).toBe('Tools::SchoolClass');
+    });
+
+    it('findEntity with prefix match finds by short name prefix', () => {
+      const results = store.findEntity({ namePattern: 'School', matchMode: 'prefix' });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]?.name).toBe('Tools::SchoolClass');
+    });
+
+    it('findEntity with contains match finds by short name substring', () => {
+      const results = store.findEntity({ namePattern: 'Class', matchMode: 'contains' });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]?.name).toBe('Tools::SchoolClass');
+    });
+
+    it('top-level classes without shortName are still findable', () => {
+      const results = store.findByName('User');
+
+      expect(results).toHaveLength(1);
+      expect(results[0]?.name).toBe('User');
+    });
+  });
 });

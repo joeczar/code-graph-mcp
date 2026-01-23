@@ -340,7 +340,7 @@ describe('RubyExtractor', () => {
   });
 
   describe('nested structures', () => {
-    it('extracts class inside module', async () => {
+    it('extracts class inside module with qualified name', async () => {
       const code = `
         module Namespace
           class Calculator
@@ -360,7 +360,13 @@ describe('RubyExtractor', () => {
       expect(modules[0]?.name).toBe('Namespace');
 
       expect(classes).toHaveLength(1);
-      expect(classes[0]?.name).toBe('Calculator');
+      // Class name is now fully qualified
+      expect(classes[0]?.name).toBe('Namespace::Calculator');
+      // Short name is stored in metadata for searching
+      expect(classes[0]?.metadata).toEqual({
+        shortName: 'Calculator',
+        namespace: 'Namespace',
+      });
 
       expect(methods).toHaveLength(1);
       expect(methods[0]?.name).toBe('Namespace::Calculator#add');

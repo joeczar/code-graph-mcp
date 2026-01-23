@@ -78,11 +78,14 @@ export class RubyExtractor {
         break;
       }
       case 'class': {
+        // Get the short name from the node directly (before qualified name is built)
+        const nameNode = node.childForFieldName('name');
+        const shortName = nameNode?.text;
         const entity = this.extractClass(node);
-        if (entity) {
+        if (entity && shortName) {
           entities.push(entity);
-          // Push class name onto context stack
-          this.contextStack.push(entity.name);
+          // Push SHORT class name onto context stack (not qualified name)
+          this.contextStack.push(shortName);
           // Walk children with this context
           for (const child of node.children) {
             this.walkNode(child, entities);
@@ -94,11 +97,14 @@ export class RubyExtractor {
         break;
       }
       case 'module': {
+        // Get the short name from the node directly (before qualified name is built)
+        const nameNode = node.childForFieldName('name');
+        const shortName = nameNode?.text;
         const entity = this.extractModule(node);
-        if (entity) {
+        if (entity && shortName) {
           entities.push(entity);
-          // Push module name onto context stack
-          this.contextStack.push(entity.name);
+          // Push SHORT module name onto context stack (not qualified name)
+          this.contextStack.push(shortName);
           // Walk children with this context
           for (const child of node.children) {
             this.walkNode(child, entities);
@@ -164,27 +170,43 @@ export class RubyExtractor {
     const nameNode = node.childForFieldName('name');
     if (!nameNode) return null;
 
-    const name = nameNode.text;
+    const shortName = nameNode.text;
     const superclassNode = node.childForFieldName('superclass');
 
-    const entity: NewEntity = {
-      type: 'class',
-      name,
-      filePath: this.filePath,
-      startLine: node.startPosition.row + 1,
-      endLine: node.endPosition.row + 1,
-      language: 'ruby',
-    };
+    // Build fully qualified name using context stack (e.g., "Namespace::ClassName")
+    const qualifiedName = this.hasContext
+      ? `${this.contextPath}::${shortName}`
+      : shortName;
+
+    const metadata: Record<string, unknown> = {};
+
+    // Store short name for searching when inside a namespace
+    if (this.hasContext) {
+      metadata['shortName'] = shortName;
+      metadata['namespace'] = this.contextPath;
+    }
 
     if (superclassNode) {
       // Extract superclass name using AST traversal instead of string manipulation.
       // The superclass node contains a constant or scope_resolution child.
       const superclassName = this.extractSuperclassName(superclassNode);
       if (superclassName) {
-        entity.metadata = {
-          superclass: superclassName,
-        };
+        metadata['superclass'] = superclassName;
       }
+    }
+
+    const entity: NewEntity = {
+      type: 'class',
+      name: qualifiedName,
+      filePath: this.filePath,
+      startLine: node.startPosition.row + 1,
+      endLine: node.endPosition.row + 1,
+      language: 'ruby',
+    };
+
+    // Only add metadata if it has content
+    if (Object.keys(metadata).length > 0) {
+      entity.metadata = metadata;
     }
 
     return entity;
@@ -205,16 +227,31 @@ export class RubyExtractor {
     const nameNode = node.childForFieldName('name');
     if (!nameNode) return null;
 
-    const name = nameNode.text;
+    const shortName = nameNode.text;
 
-    return {
+    // Build fully qualified name using context stack (e.g., "Outer::Inner")
+    const qualifiedName = this.hasContext
+      ? `${this.contextPath}::${shortName}`
+      : shortName;
+
+    const entity: NewEntity = {
       type: 'module',
-      name,
+      name: qualifiedName,
       filePath: this.filePath,
       startLine: node.startPosition.row + 1,
       endLine: node.endPosition.row + 1,
       language: 'ruby',
     };
+
+    // Store short name for searching when inside a namespace
+    if (this.hasContext) {
+      entity.metadata = {
+        shortName,
+        namespace: this.contextPath,
+      };
+    }
+
+    return entity;
   }
 
   /**
