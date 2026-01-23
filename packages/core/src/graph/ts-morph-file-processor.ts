@@ -200,6 +200,14 @@ export class TsMorphFileProcessor {
     try {
       // Wrap database operations in a transaction for atomicity
       const transaction = db.transaction(() => {
+        // Clean up existing data for all files being processed before re-parsing.
+        // This prevents duplicate entities when re-parsing the same project.
+        // Relationships are automatically deleted via ON DELETE CASCADE.
+        const filesToProcess = [...new Set(tsMorphEntities.map(e => e.filePath))];
+        for (const filePath of filesToProcess) {
+          entityStore.deleteByFile(filePath);
+        }
+
         // Pre-load existing entities into cache for O(1) cross-file lookups
         const entityCache: EntityCache = new Map();
         for (const entity of entityStore.getAll()) {
