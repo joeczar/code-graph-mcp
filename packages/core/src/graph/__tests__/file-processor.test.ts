@@ -598,20 +598,88 @@ describe('FileProcessor', () => {
         const filePath = join(fixturesDir, 'sample-with-calls.vue');
         const result = await processor.processFile({ filePath, db });
 
-        // Vue file is processed successfully even though entity extraction
-        // for Vue is not yet implemented (future work).
+        // Vue file is processed successfully with entity extraction
         expect(result.success).toBe(true);
         expect(result.language).toBe('vue');
 
         // File entity is created
         const fileEntity = result.entities.find(e => e.type === 'file');
         expect(fileEntity).toBeDefined();
+      });
 
-        // Note: Call relationships from Vue script sections are extracted by the
-        // VueRelationshipExtractor, but they won't be stored because Vue entity
-        // extraction is not yet implemented. Once Vue entity extraction is added
-        // (tracking functions/methods in <script> sections), call relationships
-        // will be properly stored.
+      it('extracts Vue component entities', async () => {
+        const filePath = join(fixturesDir, 'ParentComponent.vue');
+        const result = await processor.processFile({ filePath, db });
+
+        expect(result.success).toBe(true);
+
+        // Should extract Vue component entity
+        const componentEntity = result.entities.find(e => e.type === 'class' && e.name === 'ParentComponent');
+        expect(componentEntity).toBeDefined();
+        expect(componentEntity?.language).toBe('vue');
+        expect(componentEntity?.metadata?.['exported']).toBe(true);
+      });
+
+      it('extracts template component usage as calls relationships', async () => {
+        // First process ChildComponent so it's in the database
+        const childPath = join(fixturesDir, 'ChildComponent.vue');
+        const childResult = await processor.processFile({ filePath: childPath, db });
+        expect(childResult.success).toBe(true);
+
+        // Then process ParentComponent which references ChildComponent
+        const parentPath = join(fixturesDir, 'ParentComponent.vue');
+        const parentResult = await processor.processFile({ filePath: parentPath, db });
+        expect(parentResult.success).toBe(true);
+
+        // Should extract ChildComponent usage in template as a calls relationship
+        const componentEntity = parentResult.entities.find(e => e.name === 'ParentComponent');
+        expect(componentEntity).toBeDefined();
+
+        if (componentEntity) {
+          const callRels = parentResult.relationships.filter(r =>
+            r.type === 'calls' && r.sourceId === componentEntity.id
+          );
+
+          // Should have a calls relationship to ChildComponent
+          const childComponentCall = callRels.find(r => {
+            const targetEntity = [...childResult.entities, ...parentResult.entities].find(
+              e => e.id === r.targetId
+            );
+            return targetEntity?.name === 'ChildComponent';
+          });
+
+          expect(childComponentCall).toBeDefined();
+          expect(childComponentCall?.metadata?.['usage']).toBe('template-component');
+        }
+      });
+
+      it('supports what_calls queries for Vue components', { timeout: 30000 }, async () => {
+        // Process child first so it's in the database for cross-file resolution
+        const childPath = join(fixturesDir, 'ChildComponent.vue');
+        const childResult = await processor.processFile({ filePath: childPath, db });
+        expect(childResult.success).toBe(true);
+
+        // Then process parent which references child
+        const parentPath = join(fixturesDir, 'ParentComponent.vue');
+        const parentResult = await processor.processFile({ filePath: parentPath, db });
+        expect(parentResult.success).toBe(true);
+
+        // Query what calls ChildComponent
+        const relationshipStore = createRelationshipStore(db);
+        const childEntity = childResult.entities.find(e => e.name === 'ChildComponent');
+        expect(childEntity).toBeDefined();
+
+        if (childEntity) {
+          const callers = relationshipStore.findByTarget(childEntity.id);
+          const callRelationships = callers.filter(r => r.type === 'calls');
+
+          expect(callRelationships.length).toBeGreaterThan(0);
+
+          // Verify ParentComponent is one of the callers
+          const parentEntity = parentResult.entities.find(e => e.name === 'ParentComponent');
+          const parentCalls = callRelationships.find(r => r.sourceId === parentEntity?.id);
+          expect(parentCalls).toBeDefined();
+        }
       });
     });
   });

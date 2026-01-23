@@ -8,6 +8,10 @@ export interface ExtractedRelationship {
   sourceName: string;
   sourceLocation?: { line: number; column: number };
   targetName: string;
+  /** File path where the target entity is defined (for cross-file resolution) */
+  targetFilePath?: string;
+  /** File path where the source entity is defined (for cross-file resolution) */
+  sourceFilePath?: string;
   metadata?: Record<string, unknown>;
 }
 
