@@ -387,6 +387,52 @@ export function publicHelper() {
     });
   });
 
+  describe('Transaction rollback', () => {
+    it('rolls back on database error during relationship creation', () => {
+      // First, parse the project successfully
+      const result1 = processor.processProject({
+        projectPath: fixturesDir,
+        db,
+      });
+      expect(result1.success).toBe(true);
+
+      const entityStore = createEntityStore(db);
+      const relationshipStore = createRelationshipStore(db);
+
+      const initialEntityCount = entityStore.count();
+      const initialRelationshipCount = relationshipStore.count();
+
+      // Add a CHECK constraint that will fail for new relationships
+      // This triggers a failure during the transaction after entities are deleted
+      db.exec(`
+        CREATE TRIGGER fail_relationship_insert
+        BEFORE INSERT ON relationships
+        BEGIN
+          SELECT RAISE(ABORT, 'Simulated database error');
+        END
+      `);
+
+      // This should fail and rollback
+      const result2 = processor.processProject({
+        projectPath: fixturesDir,
+        db,
+      });
+
+      expect(result2.success).toBe(false);
+      expect(result2.error).toBeDefined();
+      expect(result2.error).toContain('Database transaction failed');
+      expect(result2.entities).toEqual([]);
+      expect(result2.relationships).toEqual([]);
+
+      // Remove the trigger so we can check counts
+      db.exec('DROP TRIGGER fail_relationship_insert');
+
+      // Entities should still be there from the first parse (rollback worked)
+      expect(entityStore.count()).toBe(initialEntityCount);
+      expect(relationshipStore.count()).toBe(initialRelationshipCount);
+    });
+  });
+
   describe('Exclusion patterns', () => {
     it('respects exclusion patterns', () => {
       // Add a test file to exclude
