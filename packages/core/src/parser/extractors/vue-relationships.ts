@@ -59,10 +59,14 @@ export class VueRelationshipExtractor {
     );
     relationships.push(...scriptRelationships);
 
+    // Build component import map for cross-file resolution
+    const componentImportMap = this.buildComponentImportMap(scriptRelationships);
+
     // Extract component relationships from template
     const componentRelationships = this.extractComponentRelationships(
       parseResult.tree.rootNode,
-      componentName
+      componentName,
+      componentImportMap
     );
     relationships.push(...componentRelationships);
 
@@ -115,12 +119,35 @@ export class VueRelationshipExtractor {
   }
 
   /**
+   * Build a map of component imports for cross-file resolution.
+   * Maps imported component names to their file paths.
+   */
+  private buildComponentImportMap(
+    scriptRelationships: ExtractedRelationship[]
+  ): Map<string, string> {
+    const importMap = new Map<string, string>();
+
+    for (const rel of scriptRelationships) {
+      if (rel.type === 'imports' && rel.targetName.endsWith('.vue')) {
+        // Extract the imported component name (default import)
+        const importedName = rel.metadata?.['default'] as string | undefined;
+        if (importedName) {
+          importMap.set(importedName, rel.targetName);
+        }
+      }
+    }
+
+    return importMap;
+  }
+
+  /**
    * Extract component usage from template section.
    * Detects custom components used in the template and creates "calls" relationships.
    */
   private extractComponentRelationships(
     rootNode: Node,
-    componentName: string
+    componentName: string,
+    componentImportMap: Map<string, string>
   ): ExtractedRelationship[] {
     const relationships: ExtractedRelationship[] = [];
     const templateElement = rootNode.descendantsOfType('template_element')[0];
@@ -143,6 +170,9 @@ export class VueRelationshipExtractor {
 
       // Check if it's a custom component (PascalCase or kebab-case with dash)
       if (this.isCustomComponent(tagName)) {
+        // Look up the import path for this component
+        const targetFilePath = componentImportMap.get(tagName);
+
         relationships.push({
           type: 'calls',
           sourceName: componentName,
@@ -151,6 +181,7 @@ export class VueRelationshipExtractor {
             column: tag.startPosition.column + 1,
           },
           targetName: tagName,
+          ...(targetFilePath && { targetFilePath }),
           metadata: {
             usage: 'template-component',
           },

@@ -112,6 +112,35 @@ import CustomCard from './CustomCard.vue'
       expect(cardUsage).toBeDefined();
     });
 
+    it('adds targetFilePath for imported components', async () => {
+      const code = `
+<template>
+  <div>
+    <MyButton @click="handleClick" />
+  </div>
+</template>
+
+<script setup>
+import MyButton from './MyButton.vue'
+</script>
+      `;
+
+      const result = await parser.parse(code, 'vue');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new VueRelationshipExtractor();
+      const relationships = await extractor.extract(result.result);
+
+      // Should detect MyButton component usage with targetFilePath
+      const buttonUsage = relationships.find(
+        (r) => r.targetName === 'MyButton' && r.metadata?.['usage'] === 'template-component'
+      );
+      expect(buttonUsage).toBeDefined();
+      expect(buttonUsage?.targetFilePath).toBe('./MyButton.vue');
+    });
+
     it('ignores built-in HTML tags', async () => {
       const code = `
 <template>
