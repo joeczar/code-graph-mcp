@@ -299,4 +299,61 @@ describe('findCircularDependencies', () => {
       c.entities.some(e => e.name === 'TargetClass')
     )).toBe(true);
   });
+
+  it('should deduplicate cycles with same entities but different IDs', () => {
+    // Simulate duplicate entities (same name/path but different IDs)
+    // This tests the defense-in-depth deduplication
+    const entityA1 = entityStore.create({
+      type: 'function',
+      name: 'funcA',
+      filePath: '/src/a.ts',
+      startLine: 1,
+      endLine: 10,
+      language: 'typescript',
+    });
+
+    const entityB1 = entityStore.create({
+      type: 'function',
+      name: 'funcB',
+      filePath: '/src/b.ts',
+      startLine: 1,
+      endLine: 10,
+      language: 'typescript',
+    });
+
+    // Create duplicate entities (simulating the bug from #192)
+    const entityA2 = entityStore.create({
+      type: 'function',
+      name: 'funcA',
+      filePath: '/src/a.ts',
+      startLine: 1,
+      endLine: 10,
+      language: 'typescript',
+    });
+
+    const entityB2 = entityStore.create({
+      type: 'function',
+      name: 'funcB',
+      filePath: '/src/b.ts',
+      startLine: 1,
+      endLine: 10,
+      language: 'typescript',
+    });
+
+    // Create cycle with first set of entities: A1 -> B1 -> A1
+    relStore.create({ sourceId: entityA1.id, targetId: entityB1.id, type: 'calls' });
+    relStore.create({ sourceId: entityB1.id, targetId: entityA1.id, type: 'calls' });
+
+    // Create same logical cycle with duplicate entities: A2 -> B2 -> A2
+    relStore.create({ sourceId: entityA2.id, targetId: entityB2.id, type: 'calls' });
+    relStore.create({ sourceId: entityB2.id, targetId: entityA2.id, type: 'calls' });
+
+    const result = findCircularDependencies(entityStore, relStore);
+
+    // Should only report ONE cycle (funcA -> funcB -> funcA), not two
+    // Even though they have different entity IDs, they represent the same logical cycle
+    expect(result.hasCycles).toBe(true);
+    expect(result.cycles.length).toBe(1);
+    expect(result.summary.totalCycles).toBe(1);
+  });
 });
