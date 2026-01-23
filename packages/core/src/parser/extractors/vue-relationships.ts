@@ -49,6 +49,10 @@ export class VueRelationshipExtractor {
   async extract(parseResult: ParseResult): Promise<ExtractedRelationship[]> {
     const relationships: ExtractedRelationship[] = [];
 
+    // Extract component name from file path (or use default if no path)
+    const filename = parseResult.filePath?.split('/').pop() ?? 'Component.vue';
+    const componentName = filename.replace(/\.vue$/, '');
+
     // Extract imports and other relationships from script section
     const scriptRelationships = await this.extractScriptRelationships(
       parseResult.tree.rootNode
@@ -57,7 +61,8 @@ export class VueRelationshipExtractor {
 
     // Extract component relationships from template
     const componentRelationships = this.extractComponentRelationships(
-      parseResult.tree.rootNode
+      parseResult.tree.rootNode,
+      componentName
     );
     relationships.push(...componentRelationships);
 
@@ -111,9 +116,12 @@ export class VueRelationshipExtractor {
 
   /**
    * Extract component usage from template section.
-   * Detects custom components used in the template.
+   * Detects custom components used in the template and creates "calls" relationships.
    */
-  private extractComponentRelationships(rootNode: Node): ExtractedRelationship[] {
+  private extractComponentRelationships(
+    rootNode: Node,
+    componentName: string
+  ): ExtractedRelationship[] {
     const relationships: ExtractedRelationship[] = [];
     const templateElement = rootNode.descendantsOfType('template_element')[0];
 
@@ -136,8 +144,8 @@ export class VueRelationshipExtractor {
       // Check if it's a custom component (PascalCase or kebab-case with dash)
       if (this.isCustomComponent(tagName)) {
         relationships.push({
-          type: 'imports',
-          sourceName: '<template>',
+          type: 'calls',
+          sourceName: componentName,
           sourceLocation: {
             line: tag.startPosition.row + 1,
             column: tag.startPosition.column + 1,

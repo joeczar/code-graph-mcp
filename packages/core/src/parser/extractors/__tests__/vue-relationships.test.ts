@@ -102,7 +102,8 @@ import CustomCard from './CustomCard.vue'
         (r) => r.targetName === 'MyButton' && r.metadata?.['usage'] === 'template-component'
       );
       expect(buttonUsage).toBeDefined();
-      expect(buttonUsage?.sourceName).toBe('<template>');
+      expect(buttonUsage?.type).toBe('calls');
+      expect(buttonUsage?.sourceName).toBe('Component');
 
       // Should detect CustomCard component usage
       const cardUsage = relationships.find(
