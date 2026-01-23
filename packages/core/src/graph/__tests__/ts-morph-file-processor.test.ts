@@ -388,21 +388,31 @@ export function publicHelper() {
   });
 
   describe('Transaction rollback', () => {
-    it('rolls back on database error', () => {
-      // Create a constraint that will be violated
-      db.exec('CREATE UNIQUE INDEX idx_unique_name_file ON entities(name, file_path)');
-
-      // First insert should succeed
+    it('rolls back on database error during relationship creation', () => {
+      // First, parse the project successfully
       const result1 = processor.processProject({
         projectPath: fixturesDir,
         db,
       });
       expect(result1.success).toBe(true);
 
-      const initialEntityCount = result1.entities.length;
-      const initialRelationshipCount = result1.relationships.length;
+      const entityStore = createEntityStore(db);
+      const relationshipStore = createRelationshipStore(db);
 
-      // Second insert should fail due to UNIQUE constraint
+      const initialEntityCount = entityStore.count();
+      const initialRelationshipCount = relationshipStore.count();
+
+      // Add a CHECK constraint that will fail for new relationships
+      // This triggers a failure during the transaction after entities are deleted
+      db.exec(`
+        CREATE TRIGGER fail_relationship_insert
+        BEFORE INSERT ON relationships
+        BEGIN
+          SELECT RAISE(ABORT, 'Simulated database error');
+        END
+      `);
+
+      // This should fail and rollback
       const result2 = processor.processProject({
         projectPath: fixturesDir,
         db,
@@ -414,10 +424,10 @@ export function publicHelper() {
       expect(result2.entities).toEqual([]);
       expect(result2.relationships).toEqual([]);
 
-      // Verify database still contains only the first set of data
-      const entityStore = createEntityStore(db);
-      const relationshipStore = createRelationshipStore(db);
+      // Remove the trigger so we can check counts
+      db.exec('DROP TRIGGER fail_relationship_insert');
 
+      // Entities should still be there from the first parse (rollback worked)
       expect(entityStore.count()).toBe(initialEntityCount);
       expect(relationshipStore.count()).toBe(initialRelationshipCount);
     });
@@ -471,6 +481,46 @@ export function publicHelper() {
 
       const externalEntity = result.entities.find(e => e.name === 'external');
       expect(externalEntity).toBeUndefined();
+    });
+  });
+
+  describe('Re-parsing idempotence', () => {
+    it('re-parsing same project does not create duplicates', () => {
+      // Parse project first time
+      const result1 = processor.processProject({
+        projectPath: fixturesDir,
+        db,
+      });
+
+      expect(result1.success).toBe(true);
+
+      const entityStore = createEntityStore(db);
+      const relationshipStore = createRelationshipStore(db);
+
+      const entitiesAfterFirst = entityStore.count();
+      const relationshipsAfterFirst = relationshipStore.count();
+
+      // Parse same project second time
+      const result2 = processor.processProject({
+        projectPath: fixturesDir,
+        db,
+      });
+
+      expect(result2.success).toBe(true);
+
+      const entitiesAfterSecond = entityStore.count();
+      const relationshipsAfterSecond = relationshipStore.count();
+
+      // Entity and relationship counts should remain the same
+      expect(entitiesAfterSecond).toBe(entitiesAfterFirst);
+      expect(relationshipsAfterSecond).toBe(relationshipsAfterFirst);
+
+      // Verify specific entities don't have duplicates
+      const addFuncs = entityStore.findByName('add');
+      expect(addFuncs.length).toBe(1);
+
+      const calcClasses = entityStore.findByName('Calculator');
+      expect(calcClasses.length).toBe(1);
     });
   });
 });
