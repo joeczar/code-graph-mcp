@@ -89,7 +89,6 @@ function forEachChild(node: SyntaxNode, callback: (child: SyntaxNode) => void): 
   }
 }
 
-
 export interface ProcessFileOptions {
   filePath: string;
   db: Database.Database;
