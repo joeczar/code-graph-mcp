@@ -92,7 +92,8 @@ export class VueExtractor {
     const parseResult = await this.parser.parse(scriptContent, 'typescript');
     if (!parseResult.success) {
       console.warn(
-        `[VueExtractor] Failed to parse script in ${this.filePath}: ${parseResult.error.message}`
+        `[VueExtractor] Failed to parse script in ${this.filePath}: ${parseResult.error.message}. ` +
+          'Entity extraction will be incomplete for this file.'
       );
       return [];
     }
@@ -114,9 +115,10 @@ export class VueExtractor {
         endLine: entity.endLine + scriptStartLine,
       }));
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.warn(
-        `[VueExtractor] TypeScript extraction failed in ${this.filePath}:`,
-        error
+        `[VueExtractor] TypeScript extraction failed in ${this.filePath}: ${errorMessage}. ` +
+          'Entity extraction will be incomplete for this file.'
       );
       return [];
     }

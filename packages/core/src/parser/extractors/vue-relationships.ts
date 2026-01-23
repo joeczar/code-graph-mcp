@@ -56,7 +56,8 @@ export class VueRelationshipExtractor {
 
     // Extract imports and other relationships from script section
     const scriptRelationships = await this.extractScriptRelationships(
-      parseResult.tree.rootNode
+      parseResult.tree.rootNode,
+      parseResult.filePath
     );
     relationships.push(...scriptRelationships);
 
@@ -81,7 +82,8 @@ export class VueRelationshipExtractor {
    * Extract relationships from the script section using TypeScriptRelationshipExtractor.
    */
   private async extractScriptRelationships(
-    rootNode: Node
+    rootNode: Node,
+    filePath?: string | null
   ): Promise<ExtractedRelationship[]> {
     const scriptContent = getScriptContent(rootNode);
     if (!scriptContent) {
@@ -91,8 +93,10 @@ export class VueRelationshipExtractor {
     // Parse script content with TypeScript parser (handles both JS and TS)
     const parseResult = await this.parser.parse(scriptContent, 'typescript');
     if (!parseResult.success) {
+      const fileContext = filePath ? ` in ${filePath}` : '';
       console.warn(
-        `[VueRelationshipExtractor] Failed to parse script: ${parseResult.error.message}`
+        `[VueRelationshipExtractor] Failed to parse script${fileContext}: ${parseResult.error.message}. ` +
+          'Relationship extraction will be incomplete for this file.'
       );
       return [];
     }
@@ -117,7 +121,12 @@ export class VueRelationshipExtractor {
         return rel;
       });
     } catch (error) {
-      console.warn('[VueRelationshipExtractor] Extraction failed:', error);
+      const fileContext = filePath ? ` in ${filePath}` : '';
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `[VueRelationshipExtractor] TypeScript extraction failed${fileContext}: ${errorMessage}. ` +
+          'Relationship extraction will be incomplete for this file.'
+      );
       return [];
     }
   }
@@ -175,14 +184,19 @@ export class VueRelationshipExtractor {
     for (const tag of allTags) {
       // Find tag_name as a direct child
       const tagNameNode = tag.children.find((child) => child.type === 'tag_name');
-      const tagName = tagNameNode?.text ?? null;
+      if (!tagNameNode) continue;
 
-      if (!tagName) continue;
+      const tagName = tagNameNode.text;
 
       // Check if it's a custom component (PascalCase or kebab-case with dash)
       if (this.isCustomComponent(tagName)) {
         // Look up the import path for this component
-        const targetFilePath = componentImportMap.get(tagName);
+        // Try exact match first, then try PascalCase for kebab-case tags
+        let targetFilePath = componentImportMap.get(tagName);
+        if (!targetFilePath && tagName.includes('-')) {
+          const pascalName = this.kebabToPascalCase(tagName);
+          targetFilePath = componentImportMap.get(pascalName);
+        }
 
         relationships.push({
           type: 'calls',
@@ -222,5 +236,16 @@ export class VueRelationshipExtractor {
     }
 
     return false;
+  }
+
+  /**
+   * Convert kebab-case to PascalCase.
+   * E.g., "child-component" -> "ChildComponent"
+   */
+  private kebabToPascalCase(str: string): string {
+    return str
+      .split('-')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join('');
   }
 }

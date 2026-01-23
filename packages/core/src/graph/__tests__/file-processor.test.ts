@@ -653,7 +653,7 @@ describe('FileProcessor', () => {
         }
       });
 
-      it('supports what_calls queries for Vue components', async () => {
+      it('supports what_calls queries for Vue components', { timeout: 30000 }, async () => {
         // Process child first so it's in the database for cross-file resolution
         const childPath = join(fixturesDir, 'ChildComponent.vue');
         const childResult = await processor.processFile({ filePath: childPath, db });

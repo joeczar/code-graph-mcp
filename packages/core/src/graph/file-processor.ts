@@ -324,7 +324,7 @@ export class FileProcessor {
     }
     // Vue extraction
     else if (language === 'vue') {
-      const vueEntities = await this.extractVueEntities(node, filePath, language);
+      const vueEntities = await this.extractVueEntities(node, filePath);
       entities.push(...vueEntities);
     }
 
@@ -374,14 +374,9 @@ export class FileProcessor {
   /**
    * Extract Vue entities from AST using dedicated VueExtractor.
    */
-  private async extractVueEntities(
-    node: SyntaxNode,
-    filePath: string,
-    language: string
-  ): Promise<NewEntity[]> {
+  private async extractVueEntities(node: SyntaxNode, filePath: string): Promise<NewEntity[]> {
     const extractor = new VueExtractor({ filePath });
-    const extracted = await extractor.extract(node);
-    return extracted;
+    return extractor.extract(node);
   }
 
   /**

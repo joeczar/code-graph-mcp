@@ -141,6 +141,35 @@ import MyButton from './MyButton.vue'
       expect(buttonUsage?.targetFilePath).toBe('./MyButton.vue');
     });
 
+    it('resolves kebab-case component usage to PascalCase imports', async () => {
+      const code = `
+<template>
+  <div>
+    <my-button @click="handleClick" />
+  </div>
+</template>
+
+<script setup>
+import MyButton from './MyButton.vue'
+</script>
+      `;
+
+      const result = await parser.parse(code, 'vue');
+      if (!result.success) {
+        throw new Error('Parse failed');
+      }
+
+      const extractor = new VueRelationshipExtractor();
+      const relationships = await extractor.extract(result.result);
+
+      // Should detect my-button component usage with targetFilePath resolved from MyButton import
+      const buttonUsage = relationships.find(
+        (r) => r.targetName === 'my-button' && r.metadata?.['usage'] === 'template-component'
+      );
+      expect(buttonUsage).toBeDefined();
+      expect(buttonUsage?.targetFilePath).toBe('./MyButton.vue');
+    });
+
     it('ignores built-in HTML tags', async () => {
       const code = `
 <template>
