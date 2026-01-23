@@ -81,12 +81,24 @@ export const findDeadCodeTool: ToolDefinition<typeof findDeadCodeInputSchema> =
       const result = findDeadCode(entityStore, relationshipStore, options);
 
       if (result.unusedEntities.length === 0) {
+        // Check if we have any analyzable entities in the graph
+        const hasAnalyzableEntities =
+          entityStore.findByType('function').length > 0 ||
+          entityStore.findByType('class').length > 0 ||
+          entityStore.findByType('method').length > 0;
+
+        if (!hasAnalyzableEntities) {
+          return createSuccessResponse(
+            'No entities found in the code graph.\n\n' +
+              'The codebase has not been parsed yet. ' +
+              'Run parse_directory first to analyze your code.'
+          );
+        }
+
         return createSuccessResponse(
           'No potentially unused code found.\n\n' +
-            'This could mean:\n' +
-            '- All code is being used\n' +
-            '- The codebase has not been parsed yet (use parse_directory first)\n' +
-            '- All unused code is in excluded locations (entry points, test files)'
+            'All analyzed code has incoming calls, extends, or implements relationships, ' +
+            'or is in excluded locations (entry points, test files, lifecycle methods).'
         );
       }
 
